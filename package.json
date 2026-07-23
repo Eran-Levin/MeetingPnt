@@ -1,0 +1,36 @@
+{
+  "name": "meetingpnt",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "backend",
+    "portal",
+    "mobile",
+    "shared"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d postgres redis",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run prisma:migrate -w backend",
+    "db:seed": "npm run seed -w backend",
+    "build:shared": "npm run build -w shared",
+    "dev": "concurrently -n backend,portal,mobile -c blue,green,magenta \"npm run dev -w backend\" \"npm run dev -w portal\" \"npm run dev -w mobile\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:portal": "npm run dev -w portal",
+    "dev:mobile": "npm run dev -w mobile",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w backend && npm run typecheck -w portal"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.16.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

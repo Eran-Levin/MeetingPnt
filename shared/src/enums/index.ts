@@ -1,0 +1,50 @@
+export const Role = {
+  Admin: 'admin',
+  Leader: 'leader',
+  User: 'user',
+} as const;
+export type Role = (typeof Role)[keyof typeof Role];
+
+export const GroupMemberStatus = {
+  Active: 'active',
+  Removed: 'removed',
+} as const;
+export type GroupMemberStatus = (typeof GroupMemberStatus)[keyof typeof GroupMemberStatus];
+
+export const InvitationStatus = {
+  Pending: 'pending',
+  Accepted: 'accepted',
+  Expired: 'expired',
+  Revoked: 'revoked',
+} as const;
+export type InvitationStatus = (typeof InvitationStatus)[keyof typeof InvitationStatus];
+
+export const ActivityStatus = {
+  Draft: 'draft',
+  Published: 'published',
+  InProgress: 'in_progress',
+  Completed: 'completed',
+  Cancelled: 'cancelled',
+} as const;
+export type ActivityStatus = (typeof ActivityStatus)[keyof typeof ActivityStatus];
+
+export const TransportMode = {
+  Driving: 'driving',
+  Walking: 'walking',
+  Bicycling: 'bicycling',
+  Transit: 'transit',
+} as const;
+export type TransportMode = (typeof TransportMode)[keyof typeof TransportMode];
+
+export const RsvpStatus = {
+  Pending: 'pending',
+  Approved: 'approved',
+  Declined: 'declined',
+} as const;
+export type RsvpStatus = (typeof RsvpStatus)[keyof typeof RsvpStatus];
+
+export const LocationSource = {
+  Omw: 'omw',
+  PingResponse: 'ping_response',
+} as const;
+export type LocationSource = (typeof LocationSource)[keyof typeof LocationSource];
