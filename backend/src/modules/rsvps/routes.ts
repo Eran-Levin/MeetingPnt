@@ -17,6 +17,15 @@ rsvpsRouter.post('/:id/rsvp', validate(rsvpUpdateSchema), async (req, res, next)
   }
 });
 
+rsvpsRouter.get('/:id/rsvp/me', async (req, res, next) => {
+  try {
+    const rsvp = await rsvpsService.getMyRsvp(req.params.id as string, req.user!.id);
+    res.json({ rsvp });
+  } catch (err) {
+    next(err);
+  }
+});
+
 rsvpsRouter.get('/:id/rsvps', async (req, res, next) => {
   try {
     const rsvps = await rsvpsService.listRsvps(req.params.id as string, req.user!.id);

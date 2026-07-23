@@ -113,3 +113,7 @@ export interface LocationSnapshot {
   source: LocationSource;
   createdAt: string;
 }
+
+export interface LocationSnapshotWithUser extends LocationSnapshot {
+  user: Pick<User, 'id' | 'name' | 'email'> | null;
+}

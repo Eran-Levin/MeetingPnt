@@ -14,6 +14,7 @@ import type {
   rsvpUpdateSchema,
   updateActivitySchema,
   updateGroupSchema,
+  updateMeetingPointSchema,
 } from '../schemas/index.js';
 import type { User } from '../types/index.js';
 
@@ -27,6 +28,7 @@ export type CreateActivityDto = z.infer<typeof createActivitySchema>;
 export type UpdateActivityDto = z.infer<typeof updateActivitySchema>;
 export type RsvpUpdateDto = z.infer<typeof rsvpUpdateSchema>;
 export type CreateMeetingPointDto = z.infer<typeof createMeetingPointSchema>;
+export type UpdateMeetingPointDto = z.infer<typeof updateMeetingPointSchema>;
 export type OmwLocationDto = z.infer<typeof omwLocationSchema>;
 export type PingRequestDto = z.infer<typeof pingRequestSchema>;
 export type PingResponseDto = z.infer<typeof pingResponseSchema>;

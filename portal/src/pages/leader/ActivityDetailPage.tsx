@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
+import { LiveLocationDashboard } from '../../components/LiveLocationDashboard.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function ActivityDetailPage() {
@@ -97,6 +98,10 @@ export function ActivityDetailPage() {
             </table>
           )}
         </>
+      )}
+
+      {isLeader && activity?.status !== 'draft' && rsvpsQuery.data && (
+        <LiveLocationDashboard activityId={activityId} rsvps={rsvpsQuery.data.rsvps} />
       )}
     </div>
   );

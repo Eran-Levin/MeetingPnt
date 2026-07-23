@@ -8,6 +8,7 @@ interface PushMessage {
   body: string;
   data?: Record<string, unknown>;
   priority?: 'default' | 'high';
+  categoryId?: string;
 }
 
 export async function sendPushNotifications(messages: PushMessage[]) {
@@ -22,6 +23,7 @@ export async function sendPushNotifications(messages: PushMessage[]) {
       body: m.body,
       data: m.data,
       priority: m.priority ?? 'default',
+      categoryId: m.categoryId,
     })),
   );
 

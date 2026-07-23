@@ -48,6 +48,11 @@ enum RsvpStatus {
   declined
 }
 
+enum LocationSource {
+  omw
+  ping_response
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique @db.Citext
@@ -57,15 +62,17 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  refreshTokens     RefreshToken[]
-  pushTokens        PushToken[]
-  auditLogsAsActor  AuditLog[]     @relation("AuditActor")
-  auditLogsAsTarget AuditLog[]     @relation("AuditTarget")
-  groupsLed         Group[]        @relation("GroupLeader")
-  groupMemberships  GroupMember[]
-  invitationsSent   Invitation[]
-  activitiesCreated Activity[]
-  rsvps             Rsvp[]
+  refreshTokens        RefreshToken[]
+  pushTokens           PushToken[]
+  auditLogsAsActor     AuditLog[]         @relation("AuditActor")
+  auditLogsAsTarget    AuditLog[]         @relation("AuditTarget")
+  groupsLed            Group[]            @relation("GroupLeader")
+  groupMemberships     GroupMember[]
+  invitationsSent      Invitation[]
+  activitiesCreated    Activity[]
+  rsvps                Rsvp[]
+  meetingPointsCreated MeetingPoint[]
+  locationSnapshots    LocationSnapshot[]
 
   @@map("users")
 }
@@ -120,10 +127,11 @@ model Group {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  leader      User          @relation("GroupLeader", fields: [leaderId], references: [id])
-  members     GroupMember[]
-  invitations Invitation[]
-  activities  Activity[]
+  leader        User           @relation("GroupLeader", fields: [leaderId], references: [id])
+  members       GroupMember[]
+  invitations   Invitation[]
+  activities    Activity[]
+  meetingPoints MeetingPoint[]
 
   @@index([leaderId])
   @@map("groups")
@@ -175,9 +183,11 @@ model Activity {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  creator User   @relation(fields: [createdBy], references: [id])
-  rsvps   Rsvp[]
+  group             Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator           User               @relation(fields: [createdBy], references: [id])
+  rsvps             Rsvp[]
+  meetingPoints     MeetingPoint[]
+  locationSnapshots LocationSnapshot[]
 
   @@index([groupId, startAt])
   @@map("activities")
@@ -198,4 +208,46 @@ model Rsvp {
   @@unique([activityId, userId])
   @@index([activityId, status])
   @@map("rsvps")
+}
+
+// location is managed exclusively via raw SQL ($queryRaw/$executeRaw) since Prisma
+// Client can't read/write Unsupported columns — see modules/*/repo.ts.
+model MeetingPoint {
+  id            String                               @id @default(uuid())
+  groupId       String                               @map("group_id")
+  activityId    String?                              @map("activity_id")
+  label         String?
+  location      Unsupported("geography(Point,4326)")
+  isPrimary     Boolean                              @default(false) @map("is_primary")
+  reconveneTime DateTime?                            @map("reconvene_time")
+  createdBy     String                               @map("created_by")
+  createdAt     DateTime                             @default(now()) @map("created_at")
+
+  group             Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activity          Activity?          @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  creator           User               @relation(fields: [createdBy], references: [id])
+  locationSnapshots LocationSnapshot[]
+
+  @@index([activityId])
+  @@map("meeting_points")
+}
+
+model LocationSnapshot {
+  id             String                               @id @default(uuid())
+  activityId     String                               @map("activity_id")
+  userId         String                               @map("user_id")
+  meetingPointId String?                              @map("meeting_point_id")
+  location       Unsupported("geography(Point,4326)")
+  capturedAt     DateTime                             @map("captured_at")
+  etaSeconds     Int?                                 @map("eta_seconds")
+  etaComputedAt  DateTime?                            @map("eta_computed_at")
+  source         LocationSource
+  createdAt      DateTime                             @default(now()) @map("created_at")
+
+  activity     Activity      @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meetingPoint MeetingPoint? @relation(fields: [meetingPointId], references: [id])
+
+  @@index([activityId, userId, createdAt(sort: Desc)])
+  @@map("location_snapshots")
 }

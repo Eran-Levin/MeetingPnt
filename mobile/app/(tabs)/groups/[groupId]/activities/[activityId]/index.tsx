@@ -2,11 +2,23 @@ import type { RsvpStatus } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Calendar from 'expo-calendar';
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi.js';
+import { locationsApi } from '../../../../../../src/api/locationsApi.js';
+import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi.js';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi.js';
 import { groupsApi } from '../../../../../../src/api/groupsApi.js';
+import { getCurrentLocationSnapshot } from '../../../../../../src/services/location.js';
 import { useAuthStore } from '../../../../../../src/store/authStore.js';
 
 async function addToDeviceCalendar(title: string, startAt: string, description?: string | null) {
@@ -50,6 +62,8 @@ export default function ActivityDetailScreen() {
   const [myStatus, setMyStatus] = useState<RsvpStatus | null>(null);
   const [rsvpMessage, setRsvpMessage] = useState<string | null>(null);
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
+  const [omwMessage, setOmwMessage] = useState<string | null>(null);
+  const [omwSubmitting, setOmwSubmitting] = useState(false);
 
   const activityQuery = useQuery({
     queryKey: ['activities', activityId],
@@ -61,11 +75,26 @@ export default function ActivityDetailScreen() {
   });
   const isLeader = groupQuery.data?.group.leaderId === user?.id;
 
+  const myRsvpQuery = useQuery({
+    queryKey: ['activities', activityId, 'rsvp', 'me'],
+    queryFn: () => rsvpsApi.getMine(activityId),
+    enabled: !isLeader,
+  });
+  useEffect(() => {
+    if (myRsvpQuery.data?.rsvp) setMyStatus(myRsvpQuery.data.rsvp.status);
+  }, [myRsvpQuery.data]);
+
   const rsvpsQuery = useQuery({
     queryKey: ['activities', activityId, 'rsvps'],
     queryFn: () => rsvpsApi.list(activityId),
     enabled: isLeader,
   });
+
+  const meetingPointsQuery = useQuery({
+    queryKey: ['activities', activityId, 'meeting-points'],
+    queryFn: () => meetingPointsApi.list(activityId),
+  });
+  const primaryMeetingPoint = meetingPointsQuery.data?.meetingPoints.find((m) => m.isPrimary);
 
   const activity = activityQuery.data?.activity;
 
@@ -90,6 +119,38 @@ export default function ActivityDetailScreen() {
     setCalendarMessage(ok ? 'Added to your calendar.' : 'Calendar permission denied.');
   }
 
+  function handleGetDirections() {
+    if (!primaryMeetingPoint) return;
+    const { lat, lng } = primaryMeetingPoint.location;
+    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+  }
+
+  async function handleOnMyWay() {
+    setOmwMessage(null);
+    setOmwSubmitting(true);
+    try {
+      const location = await getCurrentLocationSnapshot();
+      if (!location) {
+        setOmwMessage('Location permission is required to share your ETA.');
+        return;
+      }
+      const { snapshot } = await locationsApi.submitOmw(activityId, location);
+      setOmwMessage(
+        snapshot.etaSeconds != null
+          ? `Shared! ETA: ${Math.round(snapshot.etaSeconds / 60)} min.`
+          : "Shared your location, but couldn't calculate an ETA.",
+      );
+    } catch {
+      setOmwMessage('Failed to share your location.');
+    } finally {
+      setOmwSubmitting(false);
+    }
+  }
+
+  async function handleRequestLocation(userId: string) {
+    await locationsApi.requestPing(activityId, userId);
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.title}>{activity?.title ?? '…'}</Text>
@@ -99,6 +160,14 @@ export default function ActivityDetailScreen() {
             {new Date(activity.startAt).toLocaleString()} · {activity.transportMode} · {activity.status}
           </Text>
           {activity.description && <Text style={styles.desc}>{activity.description}</Text>}
+
+          {primaryMeetingPoint && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleGetDirections}>
+              <Text style={styles.secondaryButtonText}>
+                Get Directions{primaryMeetingPoint.label ? ` to ${primaryMeetingPoint.label}` : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleAddToCalendar}>
             <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
@@ -111,7 +180,7 @@ export default function ActivityDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {activity.status !== 'draft' && (
+          {activity.status !== 'draft' && !isLeader && (
             <View style={styles.rsvpBox}>
               <Text style={styles.sectionTitle}>Your RSVP</Text>
               <TextInput
@@ -135,6 +204,15 @@ export default function ActivityDetailScreen() {
                 </TouchableOpacity>
               </View>
               {rsvpMessage && <Text style={styles.muted}>{rsvpMessage}</Text>}
+
+              {myStatus === 'approved' && (
+                <View style={{ marginTop: 12 }}>
+                  <TouchableOpacity style={styles.button} onPress={handleOnMyWay} disabled={omwSubmitting}>
+                    <Text style={styles.buttonText}>{omwSubmitting ? 'Sharing…' : "I'm On My Way"}</Text>
+                  </TouchableOpacity>
+                  {omwMessage && <Text style={styles.muted}>{omwMessage}</Text>}
+                </View>
+              )}
             </View>
           )}
         </>
@@ -145,11 +223,18 @@ export default function ActivityDetailScreen() {
           <Text style={styles.sectionTitle}>RSVP dashboard</Text>
           {rsvpsQuery.data.rsvps.map((rsvp) => (
             <View key={rsvp.id} style={styles.dashboardRow}>
-              <Text>{rsvp.user.name}</Text>
-              <Text style={styles.muted}>
-                {rsvp.status}
-                {rsvp.note ? ` — ${rsvp.note}` : ''}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text>{rsvp.user.name}</Text>
+                <Text style={styles.muted}>
+                  {rsvp.status}
+                  {rsvp.note ? ` — ${rsvp.note}` : ''}
+                </Text>
+              </View>
+              {rsvp.status === 'approved' && (
+                <TouchableOpacity onPress={() => handleRequestLocation(rsvp.userId)}>
+                  <Text style={styles.link}>Request location</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ))}
           {rsvpsQuery.data.rsvps.length === 0 && <Text style={styles.muted}>No RSVPs yet.</Text>}
@@ -170,11 +255,12 @@ const styles = StyleSheet.create({
   buttonText: { color: 'white', fontWeight: '600' },
   secondaryButton: { borderWidth: 1, borderColor: '#2563eb', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   secondaryButtonText: { color: '#2563eb', fontWeight: '600' },
+  link: { color: '#2563eb', fontWeight: '600' },
   rsvpBox: { marginTop: 20 },
   rsvpRow: { flexDirection: 'row', gap: 8 },
   rsvpButton: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, alignItems: 'center' },
   rsvpApproved: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
   rsvpDeclined: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rsvpButtonText: { fontWeight: '600' },
-  dashboardRow: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  dashboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
 });

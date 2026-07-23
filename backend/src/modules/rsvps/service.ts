@@ -36,6 +36,11 @@ export async function upsertRsvp(activityId: string, userId: string, dto: RsvpUp
   return toSharedRsvp(rsvp);
 }
 
+export async function getMyRsvp(activityId: string, userId: string) {
+  const rsvp = await prisma.rsvp.findUnique({ where: { activityId_userId: { activityId, userId } } });
+  return rsvp ? toSharedRsvp(rsvp) : null;
+}
+
 export async function listRsvps(activityId: string, requesterId: string): Promise<RsvpWithUser[]> {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {

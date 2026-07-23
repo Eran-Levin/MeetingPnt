@@ -9,6 +9,11 @@ import { authRouter } from './modules/auth/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
 import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
 import { groupInvitationsRouter, invitationsRouter } from './modules/invitations/routes.js';
+import { locationsRouter } from './modules/locations/routes.js';
+import {
+  activityMeetingPointsRouter,
+  meetingPointsRouter,
+} from './modules/meetingPoints/routes.js';
 import { rsvpsRouter } from './modules/rsvps/routes.js';
 import { usersRouter } from './modules/users/routes.js';
 
@@ -32,6 +37,9 @@ export function createApp() {
   app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
   app.use('/api/activities', activitiesRouter);
   app.use('/api/activities', rsvpsRouter);
+  app.use('/api/activities/:activityId/meeting-points', activityMeetingPointsRouter);
+  app.use('/api/meeting-points', meetingPointsRouter);
+  app.use('/api/activities', locationsRouter);
   app.use('/api/users', usersRouter);
 
   app.use(errorHandler);

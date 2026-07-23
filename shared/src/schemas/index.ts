@@ -71,6 +71,8 @@ export const createMeetingPointSchema = z.object({
   reconveneTime: z.string().datetime().optional(),
 });
 
+export const updateMeetingPointSchema = createMeetingPointSchema.partial();
+
 // ---- locations ----
 export const omwLocationSchema = z.object({
   location: geoPointSchema,
