@@ -1,15 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import type { Activity as SharedActivity, CreateActivityDto, UpdateActivityDto } from '@meetingpnt/shared';
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { buildIcsEvent } from '../../lib/ics.js';
+import { generateOccurrenceDates } from '../../lib/recurrence.js';
 import { assertMembership } from '../groups/service.js';
 
 function toSharedActivity(activity: Activity): SharedActivity {
   return {
     id: activity.id,
     groupId: activity.groupId,
+    seriesId: activity.seriesId,
     title: activity.title,
     description: activity.description,
     startAt: activity.startAt.toISOString(),
@@ -40,20 +43,100 @@ async function getActivityOrThrow(activityId: string) {
   return activity;
 }
 
+/** Leader, active group member, or an activity guest ("visitor") invited to this specific activity. */
+export async function assertActivityParticipant(activityId: string, userId: string) {
+  const activity = await getActivityOrThrow(activityId);
+
+  const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
+  if (group?.leaderId === userId) {
+    return activity;
+  }
+
+  const isMember = await prisma.groupMember.findFirst({
+    where: { groupId: activity.groupId, userId, status: 'active' },
+  });
+  if (isMember) {
+    return activity;
+  }
+
+  const isGuest = await prisma.activityGuest.findFirst({ where: { activityId, userId } });
+  if (isGuest) {
+    return activity;
+  }
+
+  throw new HttpError(403, 'Not a participant of this activity');
+}
+
 export async function createActivity(groupId: string, requesterId: string, dto: CreateActivityDto) {
   await assertGroupLeader(groupId, requesterId);
-  const activity = await prisma.activity.create({
-    data: {
-      groupId,
-      title: dto.title,
-      description: dto.description,
-      startAt: new Date(dto.startAt),
-      transportMode: dto.transportMode,
-      createdBy: requesterId,
-      status: 'draft',
-    },
+
+  const firstStartAt = new Date(dto.startAt);
+  const occurrenceDates = dto.recurrence
+    ? generateOccurrenceDates(firstStartAt, dto.recurrence)
+    : [firstStartAt];
+  const seriesId = dto.recurrence ? randomUUID() : null;
+
+  const activities = await prisma.$transaction(
+    occurrenceDates.map((startAt) =>
+      prisma.activity.create({
+        data: {
+          groupId,
+          seriesId,
+          title: dto.title,
+          description: dto.description,
+          startAt,
+          transportMode: dto.transportMode,
+          createdBy: requesterId,
+          status: 'draft',
+        },
+      }),
+    ),
+  );
+
+  return activities.map(toSharedActivity);
+}
+
+/** Publishes every still-draft occurrence in a recurring series at once, sending a single
+ * summary push per member rather than one per occurrence. */
+export async function publishSeries(seriesId: string, requesterId: string) {
+  const occurrences = await prisma.activity.findMany({ where: { seriesId } });
+  if (occurrences.length === 0) {
+    throw new HttpError(404, 'Series not found');
+  }
+  const group = await assertGroupLeader(occurrences[0]!.groupId, requesterId);
+
+  const draftIds = occurrences.filter((a) => a.status === 'draft').map((a) => a.id);
+  if (draftIds.length === 0) {
+    throw new HttpError(409, 'All occurrences in this series are already published');
+  }
+
+  const members = await prisma.groupMember.findMany({
+    where: { groupId: occurrences[0]!.groupId, status: 'active' },
+    include: { user: { include: { pushTokens: true } } },
   });
-  return toSharedActivity(activity);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.activity.updateMany({ where: { id: { in: draftIds } }, data: { status: 'published' } });
+    await tx.rsvp.createMany({
+      data: draftIds.flatMap((activityId) =>
+        members.map((member) => ({ activityId, userId: member.userId, status: 'pending' as const })),
+      ),
+      skipDuplicates: true,
+    });
+    return tx.activity.findMany({ where: { seriesId }, orderBy: { startAt: 'asc' } });
+  });
+
+  const recipients = members.filter((m) => m.userId !== requesterId).flatMap((m) => m.user.pushTokens);
+  await sendPushNotifications(
+    recipients.map((token) => ({
+      to: token.expoPushToken,
+      title: `New recurring activity in ${group.name}`,
+      body: `${occurrences[0]!.title} — ${draftIds.length} session${draftIds.length > 1 ? 's' : ''} scheduled. RSVP now`,
+      data: { type: 'activity_series_published', seriesId },
+    })),
+  );
+
+  return updated.map(toSharedActivity);
 }
 
 export async function updateActivity(activityId: string, requesterId: string, dto: UpdateActivityDto) {
@@ -122,8 +205,7 @@ export async function listActivities(groupId: string, requesterId: string) {
 }
 
 export async function getActivity(activityId: string, requesterId: string) {
-  const activity = await getActivityOrThrow(activityId);
-  await assertMembership(activity.groupId, requesterId);
+  const activity = await assertActivityParticipant(activityId, requesterId);
   return toSharedActivity(activity);
 }
 
@@ -134,8 +216,7 @@ export async function deleteActivity(activityId: string, requesterId: string) {
 }
 
 export async function generateIcs(activityId: string, requesterId: string): Promise<string> {
-  const activity = await getActivityOrThrow(activityId);
-  await assertMembership(activity.groupId, requesterId);
+  const activity = await assertActivityParticipant(activityId, requesterId);
   return buildIcsEvent({
     uid: activity.id,
     title: activity.title,

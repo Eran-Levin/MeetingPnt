@@ -2,11 +2,12 @@ import type { TransportMode } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { activitiesApi } from '../../../../../src/api/activitiesApi.js';
 import { ApiError } from '../../../../../src/api/client.js';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function NewActivityScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
@@ -16,21 +17,39 @@ export default function NewActivityScreen() {
   const [startAt, setStartAt] = useState(new Date(Date.now() + 60 * 60 * 1000));
   const [showPicker, setShowPicker] = useState(false);
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
+  const [repeats, setRepeats] = useState(false);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [count, setCount] = useState('8');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function toggleDay(day: number) {
+    setDaysOfWeek((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
+  }
+
   async function handleSubmit() {
     if (!title.trim()) return;
+    if (repeats && daysOfWeek.length === 0) {
+      setError('Pick at least one day of the week to repeat on.');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
-      const { activity } = await activitiesApi.create(groupId, {
+      const result = await activitiesApi.create(groupId, {
         title,
         description: description || undefined,
         startAt: startAt.toISOString(),
         transportMode,
+        recurrence: repeats
+          ? { frequency: 'weekly', daysOfWeek, endType: 'count', count: Number(count) }
+          : undefined,
       });
-      router.replace(`/(tabs)/groups/${groupId}/activities/${activity.id}`);
+      if ('activities' in result) {
+        router.replace(`/(tabs)/groups/${groupId}`);
+      } else {
+        router.replace(`/(tabs)/groups/${groupId}/activities/${result.activity.id}`);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to create activity');
     } finally {
@@ -78,9 +97,44 @@ export default function NewActivityScreen() {
         ))}
       </View>
 
+      <View style={styles.repeatRow}>
+        <Text style={styles.label}>Repeat weekly</Text>
+        <Switch value={repeats} onValueChange={setRepeats} />
+      </View>
+
+      {repeats && (
+        <View style={{ gap: 8 }}>
+          <View style={styles.modeRow}>
+            {WEEKDAY_LABELS.map((label, day) => (
+              <TouchableOpacity
+                key={day}
+                style={[styles.modeChip, daysOfWeek.includes(day) && styles.modeChipSelected]}
+                onPress={() => toggleDay(day)}
+              >
+                <Text style={daysOfWeek.includes(day) ? styles.modeTextSelected : styles.modeText}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.repeatRow}>
+            <Text>For</Text>
+            <TextInput
+              style={[styles.input, { width: 60 }]}
+              keyboardType="number-pad"
+              value={count}
+              onChangeText={setCount}
+            />
+            <Text>occurrences</Text>
+          </View>
+        </View>
+      )}
+
       {error && <Text style={styles.error}>{error}</Text>}
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={submitting}>
-        <Text style={styles.buttonText}>{submitting ? 'Creating…' : 'Create draft'}</Text>
+        <Text style={styles.buttonText}>
+          {submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -96,6 +150,7 @@ const styles = StyleSheet.create({
   modeChipSelected: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   modeText: { color: '#333' },
   modeTextSelected: { color: 'white', fontWeight: '600' },
+  repeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 8 },
   buttonText: { color: 'white', fontWeight: '600' },
   error: { color: 'crimson' },

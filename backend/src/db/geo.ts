@@ -4,10 +4,9 @@ import type { GeoPoint, LocationSource } from '@meetingpnt/shared';
 import { prisma } from './prisma.js';
 
 const MEETING_POINT_COLUMNS = Prisma.sql`
-  id, group_id AS "groupId", activity_id AS "activityId", label,
+  id, group_id AS "groupId", activity_id AS "activityId", label, google_maps_url AS "googleMapsUrl",
   ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng,
-  is_primary AS "isPrimary", reconvene_time AS "reconveneTime",
-  created_by AS "createdBy", created_at AS "createdAt"
+  time, created_by AS "createdBy", created_at AS "createdAt"
 `;
 
 export interface MeetingPointRow {
@@ -15,10 +14,10 @@ export interface MeetingPointRow {
   groupId: string;
   activityId: string | null;
   label: string | null;
+  googleMapsUrl: string;
   lat: number;
   lng: number;
-  isPrimary: boolean;
-  reconveneTime: Date | null;
+  time: Date;
   createdBy: string;
   createdAt: Date;
 }
@@ -27,18 +26,18 @@ export async function insertMeetingPoint(input: {
   groupId: string;
   activityId: string | null;
   label?: string;
+  googleMapsUrl: string;
   location: GeoPoint;
-  isPrimary: boolean;
-  reconveneTime?: Date;
+  time: Date;
   createdBy: string;
 }): Promise<MeetingPointRow> {
   const id = randomUUID();
   const rows = await prisma.$queryRaw<MeetingPointRow[]>`
-    INSERT INTO meeting_points (id, group_id, activity_id, label, location, is_primary, reconvene_time, created_by, created_at)
+    INSERT INTO meeting_points (id, group_id, activity_id, label, google_maps_url, location, time, created_by, created_at)
     VALUES (
-      ${id}, ${input.groupId}, ${input.activityId}, ${input.label ?? null},
+      ${id}, ${input.groupId}, ${input.activityId}, ${input.label ?? null}, ${input.googleMapsUrl},
       ST_SetSRID(ST_MakePoint(${input.location.lng}, ${input.location.lat}), 4326)::geography,
-      ${input.isPrimary}, ${input.reconveneTime ?? null}, ${input.createdBy}, now()
+      ${input.time}, ${input.createdBy}, now()
     )
     RETURNING ${MEETING_POINT_COLUMNS}
   `;
@@ -48,16 +47,26 @@ export async function insertMeetingPoint(input: {
 export async function listMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
   return prisma.$queryRaw<MeetingPointRow[]>`
     SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
-    WHERE activity_id = ${activityId} ORDER BY created_at ASC
+    WHERE activity_id = ${activityId} ORDER BY time ASC
   `;
 }
 
-export async function getPrimaryMeetingPoint(activityId: string): Promise<MeetingPointRow | null> {
+/** The meeting point OMW/ping ETA should target: whichever time is soonest and hasn't passed yet. */
+export async function getNextUpcomingMeetingPoint(activityId: string): Promise<MeetingPointRow | null> {
   const rows = await prisma.$queryRaw<MeetingPointRow[]>`
     SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
-    WHERE activity_id = ${activityId} AND is_primary = true LIMIT 1
+    WHERE activity_id = ${activityId} AND time >= now()
+    ORDER BY time ASC LIMIT 1
   `;
-  return rows[0] ?? null;
+  if (rows[0]) return rows[0];
+
+  // All meeting points have passed — fall back to the most recent one rather than none at all.
+  const fallback = await prisma.$queryRaw<MeetingPointRow[]>`
+    SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
+    WHERE activity_id = ${activityId}
+    ORDER BY time DESC LIMIT 1
+  `;
+  return fallback[0] ?? null;
 }
 
 export async function getMeetingPointById(id: string): Promise<MeetingPointRow | null> {
@@ -69,17 +78,20 @@ export async function getMeetingPointById(id: string): Promise<MeetingPointRow |
 
 export async function updateMeetingPoint(
   id: string,
-  input: { label?: string; location?: GeoPoint; reconveneTime?: Date | null },
+  input: { label?: string; googleMapsUrl?: string; location?: GeoPoint; time?: Date },
 ): Promise<MeetingPointRow | null> {
   const sets: Prisma.Sql[] = [];
   if (input.label !== undefined) sets.push(Prisma.sql`label = ${input.label}`);
+  if (input.googleMapsUrl !== undefined) {
+    sets.push(Prisma.sql`google_maps_url = ${input.googleMapsUrl}`);
+  }
   if (input.location !== undefined) {
     sets.push(
       Prisma.sql`location = ST_SetSRID(ST_MakePoint(${input.location.lng}, ${input.location.lat}), 4326)::geography`,
     );
   }
-  if (input.reconveneTime !== undefined) {
-    sets.push(Prisma.sql`reconvene_time = ${input.reconveneTime}`);
+  if (input.time !== undefined) {
+    sets.push(Prisma.sql`time = ${input.time}`);
   }
 
   if (sets.length === 0) {

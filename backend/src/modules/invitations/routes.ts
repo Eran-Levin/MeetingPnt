@@ -40,6 +40,49 @@ groupInvitationsRouter.get<{ groupId: string }>('/', async (req, res, next) => {
   }
 });
 
+// Nested under /api/activities/:activityId/invitations (visitor invites) and /guests
+export const activityInvitationsRouter = Router({ mergeParams: true });
+
+activityInvitationsRouter.use(authenticate);
+
+activityInvitationsRouter.post<{ activityId: string }>(
+  '/invitations',
+  validate(inviteMemberSchema),
+  async (req, res, next) => {
+    try {
+      const result = await invitationsService.inviteActivityGuest(
+        req.params.activityId,
+        req.user!.id,
+        req.body,
+      );
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+activityInvitationsRouter.get<{ activityId: string }>('/invitations', async (req, res, next) => {
+  try {
+    const invitations = await invitationsService.listPendingActivityInvitations(
+      req.params.activityId,
+      req.user!.id,
+    );
+    res.json({ invitations });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activityInvitationsRouter.get<{ activityId: string }>('/guests', async (req, res, next) => {
+  try {
+    const guests = await invitationsService.listActivityGuests(req.params.activityId, req.user!.id);
+    res.json({ guests });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Standalone /api/invitations/:token (public preview) and /api/invitations/:id (revoke)
 invitationsRouter.get('/:token', async (req, res, next) => {
   try {

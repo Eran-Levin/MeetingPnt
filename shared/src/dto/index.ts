@@ -9,6 +9,7 @@ import type {
   pingRequestSchema,
   pingResponseSchema,
   pushTokenSchema,
+  recurrenceRuleSchema,
   registerSchema,
   roleElevationSchema,
   rsvpUpdateSchema,
@@ -24,6 +25,7 @@ export type RoleElevationDto = z.infer<typeof roleElevationSchema>;
 export type CreateGroupDto = z.infer<typeof createGroupSchema>;
 export type UpdateGroupDto = z.infer<typeof updateGroupSchema>;
 export type InviteMemberDto = z.infer<typeof inviteMemberSchema>;
+export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
 export type CreateActivityDto = z.infer<typeof createActivitySchema>;
 export type UpdateActivityDto = z.infer<typeof updateActivitySchema>;
 export type RsvpUpdateDto = z.infer<typeof rsvpUpdateSchema>;

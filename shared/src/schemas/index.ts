@@ -38,6 +38,18 @@ export const inviteMemberSchema = z.object({
 });
 
 // ---- activities ----
+export const recurrenceRuleSchema = z
+  .object({
+    frequency: z.literal('weekly'),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
+    endType: z.enum(['count', 'until']),
+    count: z.number().int().min(1).max(52).optional(),
+    until: z.string().datetime().optional(),
+  })
+  .refine((rule) => (rule.endType === 'count' ? rule.count != null : rule.until != null), {
+    message: 'count is required when endType is "count", until is required when endType is "until"',
+  });
+
 export const createActivitySchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -48,9 +60,10 @@ export const createActivitySchema = z.object({
     TransportMode.Bicycling,
     TransportMode.Transit,
   ]),
+  recurrence: recurrenceRuleSchema.optional(),
 });
 
-export const updateActivitySchema = createActivitySchema.partial();
+export const updateActivitySchema = createActivitySchema.omit({ recurrence: true }).partial();
 
 // ---- rsvps ----
 export const rsvpUpdateSchema = z.object({
@@ -67,8 +80,10 @@ export const pushTokenSchema = z.object({
 // ---- meeting points ----
 export const createMeetingPointSchema = z.object({
   label: z.string().optional(),
-  location: geoPointSchema,
-  reconveneTime: z.string().datetime().optional(),
+  googleMapsUrl: z.string().url(),
+  time: z.string().datetime(),
+  // Manual fallback pin, used only if the URL can't be parsed server-side.
+  location: geoPointSchema.optional(),
 });
 
 export const updateMeetingPointSchema = createMeetingPointSchema.partial();

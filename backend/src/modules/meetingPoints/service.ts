@@ -1,4 +1,8 @@
-import type { CreateMeetingPointDto, MeetingPoint as SharedMeetingPoint } from '@meetingpnt/shared';
+import type {
+  CreateMeetingPointDto,
+  MeetingPoint as SharedMeetingPoint,
+  UpdateMeetingPointDto,
+} from '@meetingpnt/shared';
 import { SocketEvents } from '@meetingpnt/shared';
 import {
   getMeetingPointById,
@@ -9,8 +13,9 @@ import {
 } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { getIO } from '../../realtime/index.js';
-import { assertMembership } from '../groups/service.js';
+import { assertActivityParticipant } from '../activities/service.js';
 
 function toSharedMeetingPoint(row: MeetingPointRow): SharedMeetingPoint {
   return {
@@ -18,9 +23,9 @@ function toSharedMeetingPoint(row: MeetingPointRow): SharedMeetingPoint {
     groupId: row.groupId,
     activityId: row.activityId,
     label: row.label,
+    googleMapsUrl: row.googleMapsUrl,
     location: { lat: row.lat, lng: row.lng },
-    isPrimary: row.isPrimary,
-    reconveneTime: row.reconveneTime?.toISOString() ?? null,
+    time: row.time.toISOString(),
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
   };
@@ -38,23 +43,31 @@ async function assertActivityLeader(activityId: string, requesterId: string) {
   return { activity, group };
 }
 
+async function resolveLocation(googleMapsUrl: string, fallback?: { lat: number; lng: number }) {
+  const parsed = await parseGoogleMapsUrl(googleMapsUrl);
+  if (parsed) return parsed;
+  if (fallback) return fallback;
+  throw new HttpError(
+    400,
+    "Couldn't read coordinates from that Google Maps link — please drop a pin instead.",
+  );
+}
+
 export async function createMeetingPoint(
   activityId: string,
   requesterId: string,
   dto: CreateMeetingPointDto,
 ) {
   const { activity, group } = await assertActivityLeader(activityId, requesterId);
-
-  const existing = await listMeetingPointRows(activityId);
-  const isPrimary = existing.length === 0;
+  const location = await resolveLocation(dto.googleMapsUrl, dto.location);
 
   const row = await insertMeetingPoint({
     groupId: group.id,
     activityId: activity.id,
     label: dto.label,
-    location: dto.location,
-    isPrimary,
-    reconveneTime: dto.reconveneTime ? new Date(dto.reconveneTime) : undefined,
+    googleMapsUrl: dto.googleMapsUrl,
+    location,
+    time: new Date(dto.time),
     createdBy: requesterId,
   });
 
@@ -68,11 +81,7 @@ export async function createMeetingPoint(
 }
 
 export async function listMeetingPointsForActivity(activityId: string, requesterId: string) {
-  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
-  if (!activity) {
-    throw new HttpError(404, 'Activity not found');
-  }
-  await assertMembership(activity.groupId, requesterId);
+  await assertActivityParticipant(activityId, requesterId);
 
   const rows = await listMeetingPointRows(activityId);
   return rows.map(toSharedMeetingPoint);
@@ -81,7 +90,7 @@ export async function listMeetingPointsForActivity(activityId: string, requester
 export async function updateMeetingPoint(
   meetingPointId: string,
   requesterId: string,
-  dto: { label?: string; location?: { lat: number; lng: number }; reconveneTime?: string },
+  dto: UpdateMeetingPointDto,
 ) {
   const existing = await getMeetingPointById(meetingPointId);
   if (!existing) {
@@ -92,10 +101,16 @@ export async function updateMeetingPoint(
     throw new HttpError(403, 'Only the group leader can manage meeting points');
   }
 
+  const location =
+    dto.googleMapsUrl !== undefined
+      ? await resolveLocation(dto.googleMapsUrl, dto.location)
+      : dto.location;
+
   const row = await updateMeetingPointRow(meetingPointId, {
     label: dto.label,
-    location: dto.location,
-    reconveneTime: dto.reconveneTime ? new Date(dto.reconveneTime) : undefined,
+    googleMapsUrl: dto.googleMapsUrl,
+    location,
+    time: dto.time ? new Date(dto.time) : undefined,
   });
   if (!row) {
     throw new HttpError(404, 'Meeting point not found');

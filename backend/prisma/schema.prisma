@@ -62,17 +62,19 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  refreshTokens        RefreshToken[]
-  pushTokens           PushToken[]
-  auditLogsAsActor     AuditLog[]         @relation("AuditActor")
-  auditLogsAsTarget    AuditLog[]         @relation("AuditTarget")
-  groupsLed            Group[]            @relation("GroupLeader")
-  groupMemberships     GroupMember[]
-  invitationsSent      Invitation[]
-  activitiesCreated    Activity[]
-  rsvps                Rsvp[]
-  meetingPointsCreated MeetingPoint[]
-  locationSnapshots    LocationSnapshot[]
+  refreshTokens         RefreshToken[]
+  pushTokens            PushToken[]
+  auditLogsAsActor      AuditLog[]         @relation("AuditActor")
+  auditLogsAsTarget     AuditLog[]         @relation("AuditTarget")
+  groupsLed             Group[]            @relation("GroupLeader")
+  groupMemberships      GroupMember[]
+  invitationsSent       Invitation[]
+  activitiesCreated     Activity[]
+  rsvps                 Rsvp[]
+  meetingPointsCreated  MeetingPoint[]
+  locationSnapshots     LocationSnapshot[]
+  activityGuestOf       ActivityGuest[]    @relation("ActivityGuestUser")
+  activityGuestsInvited ActivityGuest[]    @relation("ActivityGuestInviter")
 
   @@map("users")
 }
@@ -154,17 +156,19 @@ model GroupMember {
 }
 
 model Invitation {
-  id        String           @id @default(uuid())
-  groupId   String           @map("group_id")
-  email     String           @db.Citext
-  tokenHash String           @map("token_hash")
-  status    InvitationStatus @default(pending)
-  invitedBy String           @map("invited_by")
-  expiresAt DateTime         @map("expires_at")
-  createdAt DateTime         @default(now()) @map("created_at")
+  id         String           @id @default(uuid())
+  groupId    String           @map("group_id")
+  activityId String?          @map("activity_id")
+  email      String           @db.Citext
+  tokenHash  String           @map("token_hash")
+  status     InvitationStatus @default(pending)
+  invitedBy  String           @map("invited_by")
+  expiresAt  DateTime         @map("expires_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
 
-  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  inviter User  @relation(fields: [invitedBy], references: [id])
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  inviter  User      @relation(fields: [invitedBy], references: [id])
 
   @@unique([tokenHash])
   @@index([groupId, email])
@@ -174,6 +178,7 @@ model Invitation {
 model Activity {
   id            String         @id @default(uuid())
   groupId       String         @map("group_id")
+  seriesId      String?        @map("series_id")
   title         String
   description   String?
   startAt       DateTime       @map("start_at")
@@ -188,9 +193,28 @@ model Activity {
   rsvps             Rsvp[]
   meetingPoints     MeetingPoint[]
   locationSnapshots LocationSnapshot[]
+  invitations       Invitation[]
+  guests            ActivityGuest[]
 
   @@index([groupId, startAt])
+  @@index([seriesId])
   @@map("activities")
+}
+
+model ActivityGuest {
+  id         String   @id @default(uuid())
+  activityId String   @map("activity_id")
+  userId     String   @map("user_id")
+  invitedBy  String   @map("invited_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation("ActivityGuestUser", fields: [userId], references: [id], onDelete: Cascade)
+  inviter  User     @relation("ActivityGuestInviter", fields: [invitedBy], references: [id])
+
+  @@unique([activityId, userId])
+  @@index([userId])
+  @@map("activity_guests")
 }
 
 model Rsvp {
@@ -217,9 +241,9 @@ model MeetingPoint {
   groupId       String                               @map("group_id")
   activityId    String?                              @map("activity_id")
   label         String?
+  googleMapsUrl String                               @map("google_maps_url")
   location      Unsupported("geography(Point,4326)")
-  isPrimary     Boolean                              @default(false) @map("is_primary")
-  reconveneTime DateTime?                            @map("reconvene_time")
+  time          DateTime
   createdBy     String                               @map("created_by")
   createdAt     DateTime                             @default(now()) @map("created_at")
 
@@ -228,7 +252,7 @@ model MeetingPoint {
   creator           User               @relation(fields: [createdBy], references: [id])
   locationSnapshots LocationSnapshot[]
 
-  @@index([activityId])
+  @@index([activityId, time])
   @@map("meeting_points")
 }
 

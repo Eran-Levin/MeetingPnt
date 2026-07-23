@@ -1,4 +1,5 @@
-import type { RsvpStatus } from '@meetingpnt/shared';
+import type { MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Calendar from 'expo-calendar';
 import { useLocalSearchParams } from 'expo-router';
@@ -14,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi.js';
+import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi.js';
 import { locationsApi } from '../../../../../../src/api/locationsApi.js';
 import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi.js';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi.js';
@@ -54,6 +56,16 @@ async function addToDeviceCalendar(title: string, startAt: string, description?:
   return true;
 }
 
+/** Mirrors the backend's OMW/ping ETA target: soonest time that hasn't passed yet. */
+function getNextUpcoming(meetingPoints: MeetingPoint[]): MeetingPoint | undefined {
+  const now = Date.now();
+  const upcoming = meetingPoints
+    .filter((m) => new Date(m.time).getTime() >= now)
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  if (upcoming[0]) return upcoming[0];
+  return [...meetingPoints].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
+}
+
 export default function ActivityDetailScreen() {
   const { groupId, activityId } = useLocalSearchParams<{ groupId: string; activityId: string }>();
   const user = useAuthStore((s) => s.user);
@@ -64,6 +76,15 @@ export default function ActivityDetailScreen() {
   const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
   const [omwMessage, setOmwMessage] = useState<string | null>(null);
   const [omwSubmitting, setOmwSubmitting] = useState(false);
+  const [mpLabel, setMpLabel] = useState('');
+  const [mpUrl, setMpUrl] = useState('');
+  const [mpTime, setMpTime] = useState(new Date());
+  const [showMpPicker, setShowMpPicker] = useState(false);
+  const [mpError, setMpError] = useState<string | null>(null);
+  const [mpSubmitting, setMpSubmitting] = useState(false);
+  const [visitorEmail, setVisitorEmail] = useState('');
+  const [visitorMessage, setVisitorMessage] = useState<string | null>(null);
+  const [visitorSubmitting, setVisitorSubmitting] = useState(false);
 
   const activityQuery = useQuery({
     queryKey: ['activities', activityId],
@@ -90,11 +111,18 @@ export default function ActivityDetailScreen() {
     enabled: isLeader,
   });
 
+  const guestsQuery = useQuery({
+    queryKey: ['activities', activityId, 'guests'],
+    queryFn: () => activityInvitationsApi.listGuests(activityId),
+    enabled: isLeader,
+  });
+
   const meetingPointsQuery = useQuery({
     queryKey: ['activities', activityId, 'meeting-points'],
     queryFn: () => meetingPointsApi.list(activityId),
   });
-  const primaryMeetingPoint = meetingPointsQuery.data?.meetingPoints.find((m) => m.isPrimary);
+  const meetingPoints = meetingPointsQuery.data?.meetingPoints ?? [];
+  const nextMeetingPoint = getNextUpcoming(meetingPoints);
 
   const activity = activityQuery.data?.activity;
 
@@ -119,10 +147,25 @@ export default function ActivityDetailScreen() {
     setCalendarMessage(ok ? 'Added to your calendar.' : 'Calendar permission denied.');
   }
 
-  function handleGetDirections() {
-    if (!primaryMeetingPoint) return;
-    const { lat, lng } = primaryMeetingPoint.location;
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+  async function handleAddMeetingPoint() {
+    if (!mpUrl.trim()) return;
+    setMpError(null);
+    setMpSubmitting(true);
+    try {
+      await meetingPointsApi.create(activityId, {
+        label: mpLabel || undefined,
+        googleMapsUrl: mpUrl,
+        time: mpTime.toISOString(),
+      });
+      setMpLabel('');
+      setMpUrl('');
+      setMpTime(new Date());
+      queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
+    } catch {
+      setMpError("Couldn't read that Maps link — try a full (non-shortened) URL.");
+    } finally {
+      setMpSubmitting(false);
+    }
   }
 
   async function handleOnMyWay() {
@@ -151,6 +194,24 @@ export default function ActivityDetailScreen() {
     await locationsApi.requestPing(activityId, userId);
   }
 
+  async function handleInviteVisitor() {
+    if (!visitorEmail.trim()) return;
+    setVisitorMessage(null);
+    setVisitorSubmitting(true);
+    try {
+      const result = await activityInvitationsApi.invite(activityId, { email: visitorEmail });
+      setVisitorMessage(
+        result.type === 'added' ? `${visitorEmail} added as a visitor.` : `Invitation sent to ${visitorEmail}.`,
+      );
+      setVisitorEmail('');
+      queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'guests'] });
+    } catch {
+      setVisitorMessage('Failed to invite visitor.');
+    } finally {
+      setVisitorSubmitting(false);
+    }
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.title}>{activity?.title ?? '…'}</Text>
@@ -161,12 +222,57 @@ export default function ActivityDetailScreen() {
           </Text>
           {activity.description && <Text style={styles.desc}>{activity.description}</Text>}
 
-          {primaryMeetingPoint && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleGetDirections}>
-              <Text style={styles.secondaryButtonText}>
-                Get Directions{primaryMeetingPoint.label ? ` to ${primaryMeetingPoint.label}` : ''}
-              </Text>
+          <Text style={styles.sectionTitle}>Meeting points</Text>
+          {meetingPoints.map((mp) => (
+            <TouchableOpacity
+              key={mp.id}
+              style={styles.meetingPointRow}
+              onPress={() => Linking.openURL(mp.googleMapsUrl)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={mp.id === nextMeetingPoint?.id ? styles.meetingPointNext : undefined}>
+                  {mp.label || 'Meeting point'} — {new Date(mp.time).toLocaleString()}
+                  {mp.id === nextMeetingPoint?.id ? ' (next)' : ''}
+                </Text>
+              </View>
+              <Text style={styles.link}>Directions</Text>
             </TouchableOpacity>
+          ))}
+          {meetingPoints.length === 0 && <Text style={styles.muted}>No meeting points set yet.</Text>}
+
+          {isLeader && (
+            <View style={{ marginTop: 8 }}>
+              <TextInput
+                style={styles.input}
+                placeholder="Label (optional)"
+                value={mpLabel}
+                onChangeText={setMpLabel}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Google Maps URL"
+                autoCapitalize="none"
+                value={mpUrl}
+                onChangeText={setMpUrl}
+              />
+              <TouchableOpacity style={styles.input} onPress={() => setShowMpPicker(true)}>
+                <Text>{mpTime.toLocaleString()}</Text>
+              </TouchableOpacity>
+              {showMpPicker && (
+                <DateTimePicker
+                  value={mpTime}
+                  mode="datetime"
+                  onChange={(_event, selectedDate) => {
+                    setShowMpPicker(Platform.OS === 'ios');
+                    if (selectedDate) setMpTime(selectedDate);
+                  }}
+                />
+              )}
+              <TouchableOpacity style={styles.secondaryButton} onPress={handleAddMeetingPoint} disabled={mpSubmitting}>
+                <Text style={styles.secondaryButtonText}>{mpSubmitting ? 'Adding…' : 'Add meeting point'}</Text>
+              </TouchableOpacity>
+              {mpError && <Text style={styles.error}>{mpError}</Text>}
+            </View>
           )}
 
           <TouchableOpacity style={styles.secondaryButton} onPress={handleAddToCalendar}>
@@ -240,6 +346,32 @@ export default function ActivityDetailScreen() {
           {rsvpsQuery.data.rsvps.length === 0 && <Text style={styles.muted}>No RSVPs yet.</Text>}
         </View>
       )}
+
+      {isLeader && (
+        <View style={styles.rsvpBox}>
+          <Text style={styles.sectionTitle}>Visitors</Text>
+          <Text style={styles.muted}>People invited to just this activity, without joining the group.</Text>
+          <View style={{ marginTop: 8 }}>
+            <TextInput
+              style={styles.input}
+              placeholder="visitor@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={visitorEmail}
+              onChangeText={setVisitorEmail}
+            />
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleInviteVisitor} disabled={visitorSubmitting}>
+              <Text style={styles.secondaryButtonText}>{visitorSubmitting ? 'Sending…' : 'Invite visitor'}</Text>
+            </TouchableOpacity>
+            {visitorMessage && <Text style={styles.muted}>{visitorMessage}</Text>}
+          </View>
+          {guestsQuery.data?.guests.map((guest) => (
+            <View key={guest.id} style={styles.dashboardRow}>
+              <Text>{guest.user.name} ({guest.user.email})</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -249,7 +381,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '600' },
   desc: { marginTop: 8 },
   muted: { color: '#888', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  error: { color: 'crimson', marginTop: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 8 },
   button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 16 },
   buttonText: { color: 'white', fontWeight: '600' },
@@ -263,4 +396,6 @@ const styles = StyleSheet.create({
   rsvpDeclined: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rsvpButtonText: { fontWeight: '600' },
   dashboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  meetingPointRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  meetingPointNext: { fontWeight: '600', color: '#2563eb' },
 });

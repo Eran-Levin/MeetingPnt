@@ -31,6 +31,18 @@ export default function GroupDetailScreen() {
 
   const isLeader = groupQuery.data?.group.leaderId === user?.id;
 
+  const standaloneActivities = activitiesQuery.data?.activities.filter((a) => !a.seriesId) ?? [];
+  const seriesGroups = new Map<string, typeof standaloneActivities>();
+  for (const activity of activitiesQuery.data?.activities ?? []) {
+    if (!activity.seriesId) continue;
+    seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
+  }
+
+  async function handlePublishSeries(seriesId: string) {
+    await activitiesApi.publishSeries(seriesId);
+    queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
+  }
+
   async function handleInvite() {
     if (!email.trim()) return;
     setMessage(null);
@@ -91,7 +103,7 @@ export default function GroupDetailScreen() {
           </Link>
         )}
       </View>
-      {activitiesQuery.data?.activities.map((activity) => (
+      {standaloneActivities.map((activity) => (
         <Link key={activity.id} href={`/(tabs)/groups/${groupId}/activities/${activity.id}`} asChild>
           <TouchableOpacity style={styles.activityRow}>
             <Text>{activity.title}</Text>
@@ -101,6 +113,34 @@ export default function GroupDetailScreen() {
           </TouchableOpacity>
         </Link>
       ))}
+
+      {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
+        const draftCount = occurrences.filter((o) => o.status === 'draft').length;
+        return (
+          <View key={seriesId} style={styles.seriesBox}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={{ fontWeight: '600' }}>
+                {occurrences[0]!.title} (recurring, {occurrences.length})
+              </Text>
+              {isLeader && draftCount > 0 && (
+                <TouchableOpacity onPress={() => handlePublishSeries(seriesId)}>
+                  <Text style={styles.link}>Publish all ({draftCount})</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {occurrences.map((activity) => (
+              <Link key={activity.id} href={`/(tabs)/groups/${groupId}/activities/${activity.id}`} asChild>
+                <TouchableOpacity style={styles.activityRow}>
+                  <Text style={styles.muted}>
+                    {new Date(activity.startAt).toLocaleString()} · {activity.status}
+                  </Text>
+                </TouchableOpacity>
+              </Link>
+            ))}
+          </View>
+        );
+      })}
+
       {activitiesQuery.data?.activities.length === 0 && (
         <Text style={styles.muted}>No activities scheduled yet.</Text>
       )}
@@ -123,5 +163,6 @@ const styles = StyleSheet.create({
   message: { marginTop: 8, color: 'green' },
   memberRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
   activityRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  seriesBox: { marginTop: 8, padding: 8, borderWidth: 1, borderColor: '#eee', borderRadius: 8 },
   muted: { color: '#888' },
 });

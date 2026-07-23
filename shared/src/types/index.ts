@@ -50,11 +50,24 @@ export interface GroupWithRole extends Group {
 export interface Invitation {
   id: string;
   groupId: string;
+  activityId: string | null;
   email: string;
   status: InvitationStatus;
   invitedBy: string;
   expiresAt: string;
   createdAt: string;
+}
+
+export interface ActivityGuest {
+  id: string;
+  activityId: string;
+  userId: string;
+  invitedBy: string;
+  createdAt: string;
+}
+
+export interface ActivityGuestWithUser extends ActivityGuest {
+  user: Pick<User, 'id' | 'name' | 'email'>;
 }
 
 export interface InvitationPreview {
@@ -65,6 +78,7 @@ export interface InvitationPreview {
 export interface Activity {
   id: string;
   groupId: string;
+  seriesId: string | null;
   title: string;
   description: string | null;
   startAt: string;
@@ -94,9 +108,9 @@ export interface MeetingPoint {
   groupId: string;
   activityId: string | null;
   label: string | null;
+  googleMapsUrl: string;
   location: GeoPoint;
-  isPrimary: boolean;
-  reconveneTime: string | null;
+  time: string;
   createdBy: string;
   createdAt: string;
 }

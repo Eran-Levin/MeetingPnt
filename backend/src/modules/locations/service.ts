@@ -7,7 +7,7 @@ import type {
 import { LocationSource, SocketEvents } from '@meetingpnt/shared';
 import {
   getLatestSnapshotsForActivity,
-  getPrimaryMeetingPoint,
+  getNextUpcomingMeetingPoint,
   insertLocationSnapshot,
   type LocationSnapshotRow,
 } from '../../db/geo.js';
@@ -51,7 +51,7 @@ async function recordSnapshot(
   }
   await assertApprovedRsvp(activityId, userId);
 
-  const meetingPoint = await getPrimaryMeetingPoint(activityId);
+  const meetingPoint = await getNextUpcomingMeetingPoint(activityId);
   if (!meetingPoint) {
     throw new HttpError(409, 'No meeting point has been set for this activity yet');
   }

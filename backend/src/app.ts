@@ -8,7 +8,11 @@ import { adminRouter } from './modules/admin/routes.js';
 import { authRouter } from './modules/auth/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
 import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
-import { groupInvitationsRouter, invitationsRouter } from './modules/invitations/routes.js';
+import {
+  activityInvitationsRouter,
+  groupInvitationsRouter,
+  invitationsRouter,
+} from './modules/invitations/routes.js';
 import { locationsRouter } from './modules/locations/routes.js';
 import {
   activityMeetingPointsRouter,
@@ -40,6 +44,7 @@ export function createApp() {
   app.use('/api/activities/:activityId/meeting-points', activityMeetingPointsRouter);
   app.use('/api/meeting-points', meetingPointsRouter);
   app.use('/api/activities', locationsRouter);
+  app.use('/api/activities/:activityId', activityInvitationsRouter);
   app.use('/api/users', usersRouter);
 
   app.use(errorHandler);

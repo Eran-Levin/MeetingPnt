@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
+import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
 import { LiveLocationDashboard } from '../../components/LiveLocationDashboard.js';
 import { useAuthStore } from '../../store/authStore.js';
 
@@ -103,6 +104,8 @@ export function ActivityDetailPage() {
       {isLeader && activity?.status !== 'draft' && rsvpsQuery.data && (
         <LiveLocationDashboard activityId={activityId} rsvps={rsvpsQuery.data.rsvps} />
       )}
+
+      {isLeader && <ActivityVisitorsPanel activityId={activityId} />}
     </div>
   );
 }

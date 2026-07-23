@@ -2,7 +2,7 @@ import type { Rsvp as SharedRsvp, RsvpUpdateDto, RsvpWithUser } from '@meetingpn
 import type { Rsvp, User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
-import { assertMembership } from '../groups/service.js';
+import { assertActivityParticipant } from '../activities/service.js';
 
 function toSharedRsvp(rsvp: Rsvp): SharedRsvp {
   return {
@@ -17,11 +17,7 @@ function toSharedRsvp(rsvp: Rsvp): SharedRsvp {
 }
 
 export async function upsertRsvp(activityId: string, userId: string, dto: RsvpUpdateDto) {
-  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
-  if (!activity) {
-    throw new HttpError(404, 'Activity not found');
-  }
-  await assertMembership(activity.groupId, userId);
+  const activity = await assertActivityParticipant(activityId, userId);
 
   if (activity.startAt < new Date()) {
     throw new HttpError(409, 'This activity has already started; RSVP is locked');

@@ -14,8 +14,12 @@ groupActivitiesRouter.post<{ groupId: string }>(
   validate(createActivitySchema),
   async (req, res, next) => {
     try {
-      const activity = await activitiesService.createActivity(req.params.groupId, req.user!.id, req.body);
-      res.status(201).json({ activity });
+      const activities = await activitiesService.createActivity(req.params.groupId, req.user!.id, req.body);
+      if (req.body.recurrence) {
+        res.status(201).json({ activities });
+      } else {
+        res.status(201).json({ activity: activities[0] });
+      }
     } catch (err) {
       next(err);
     }
@@ -62,6 +66,18 @@ activitiesRouter.post('/:id/publish', async (req, res, next) => {
   try {
     const activity = await activitiesService.publishActivity(req.params.id as string, req.user!.id);
     res.json({ activity });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activitiesRouter.post('/series/:seriesId/publish', async (req, res, next) => {
+  try {
+    const activities = await activitiesService.publishSeries(
+      req.params.seriesId as string,
+      req.user!.id,
+    );
+    res.json({ activities });
   } catch (err) {
     next(err);
   }

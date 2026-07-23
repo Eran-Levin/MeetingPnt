@@ -69,6 +69,18 @@ export function GroupDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'invitations'] });
   }
 
+  async function handlePublishSeries(seriesId: string) {
+    await activitiesApi.publishSeries(seriesId);
+    queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
+  }
+
+  const standaloneActivities = activitiesQuery.data?.activities.filter((a) => !a.seriesId) ?? [];
+  const seriesGroups = new Map<string, typeof standaloneActivities>();
+  for (const activity of activitiesQuery.data?.activities ?? []) {
+    if (!activity.seriesId) continue;
+    seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}>
       <Link to="/groups">&larr; Groups</Link>
@@ -145,7 +157,7 @@ export function GroupDetailPage() {
         {isLeader && <Link to={`/groups/${groupId}/activities/new`}>+ New activity</Link>}
       </div>
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {activitiesQuery.data?.activities.map((activity) => (
+        {standaloneActivities.map((activity) => (
           <li
             key={activity.id}
             style={{
@@ -161,10 +173,38 @@ export function GroupDetailPage() {
             </span>
           </li>
         ))}
-        {activitiesQuery.data?.activities.length === 0 && (
-          <p style={{ color: '#888' }}>No activities scheduled yet.</p>
-        )}
       </ul>
+
+      {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
+        const draftCount = occurrences.filter((o) => o.status === 'draft').length;
+        return (
+          <div key={seriesId} style={{ marginTop: 12, padding: 12, border: '1px solid #eee', borderRadius: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>{occurrences[0]!.title} (recurring, {occurrences.length} occurrences)</strong>
+              {isLeader && draftCount > 0 && (
+                <button onClick={() => handlePublishSeries(seriesId)}>
+                  Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
+                </button>
+              )}
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, marginTop: 8 }}>
+              {occurrences.map((activity) => (
+                <li
+                  key={activity.id}
+                  style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}
+                >
+                  <Link to={`/activities/${activity.id}`}>{new Date(activity.startAt).toLocaleString()}</Link>
+                  <span style={{ color: '#888' }}>{activity.status}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+
+      {activitiesQuery.data?.activities.length === 0 && (
+        <p style={{ color: '#888' }}>No activities scheduled yet.</p>
+      )}
     </div>
   );
 }
