@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { activitiesApi } from '../../../../src/api/activitiesApi.js';
 import { groupsApi } from '../../../../src/api/groupsApi.js';
 import { invitationsApi } from '../../../../src/api/invitationsApi.js';
 import { ApiError } from '../../../../src/api/client.js';
@@ -23,6 +24,10 @@ export default function GroupDetailScreen() {
     queryKey: ['groups', groupId, 'members'],
     queryFn: () => groupsApi.listMembers(groupId),
   });
+  const activitiesQuery = useQuery({
+    queryKey: ['groups', groupId, 'activities'],
+    queryFn: () => activitiesApi.list(groupId),
+  });
 
   const isLeader = groupQuery.data?.group.leaderId === user?.id;
 
@@ -43,7 +48,7 @@ export default function GroupDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.title}>{groupQuery.data?.group.name ?? '…'}</Text>
       {groupQuery.data?.group.description && (
         <Text style={styles.desc}>{groupQuery.data.group.description}</Text>
@@ -70,29 +75,46 @@ export default function GroupDetailScreen() {
       )}
 
       <Text style={styles.sectionTitle}>Roster</Text>
-      <FlatList
-        data={membersQuery.data?.members ?? []}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.memberRow}>
-            <Text>{item.user.name}</Text>
-            <Text style={styles.muted}>{item.user.email}</Text>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.muted}>No members yet.</Text>}
-      />
+      {membersQuery.data?.members.map((item) => (
+        <View key={item.id} style={styles.memberRow}>
+          <Text>{item.user.name}</Text>
+          <Text style={styles.muted}>{item.user.email}</Text>
+        </View>
+      ))}
+      {membersQuery.data?.members.length === 0 && <Text style={styles.muted}>No members yet.</Text>}
 
-      <Text style={styles.sectionTitle}>Activities</Text>
-      <Text style={styles.muted}>Coming in Phase 3.</Text>
-    </View>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Activities</Text>
+        {isLeader && (
+          <Link href={`/(tabs)/groups/${groupId}/activities/new`} style={styles.link}>
+            + New
+          </Link>
+        )}
+      </View>
+      {activitiesQuery.data?.activities.map((activity) => (
+        <Link key={activity.id} href={`/(tabs)/groups/${groupId}/activities/${activity.id}`} asChild>
+          <TouchableOpacity style={styles.activityRow}>
+            <Text>{activity.title}</Text>
+            <Text style={styles.muted}>
+              {new Date(activity.startAt).toLocaleString()} · {activity.status}
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      ))}
+      {activitiesQuery.data?.activities.length === 0 && (
+        <Text style={styles.muted}>No activities scheduled yet.</Text>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
+  container: { flex: 1 },
   title: { fontSize: 22, fontWeight: '600' },
   desc: { color: '#555', marginTop: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 20, marginBottom: 8 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 },
+  link: { color: '#2563eb', fontWeight: '600' },
   inviteBox: { marginTop: 8 },
   inviteRow: { flexDirection: 'row', gap: 8 },
   input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10 },
@@ -100,5 +122,6 @@ const styles = StyleSheet.create({
   buttonText: { color: 'white', fontWeight: '600' },
   message: { marginTop: 8, color: 'green' },
   memberRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  activityRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
   muted: { color: '#888' },
 });

@@ -58,6 +58,12 @@ export const rsvpUpdateSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+// ---- users ----
+export const pushTokenSchema = z.object({
+  expoPushToken: z.string().min(1),
+  platform: z.enum(['ios', 'android']),
+});
+
 // ---- meeting points ----
 export const createMeetingPointSchema = z.object({
   label: z.string().optional(),

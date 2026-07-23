@@ -31,7 +31,7 @@ function toSharedMember(member: GroupMember & { user: User }): GroupMemberWithUs
   };
 }
 
-async function assertMembership(groupId: string, userId: string) {
+export async function assertMembership(groupId: string, userId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
     throw new HttpError(404, 'Group not found');

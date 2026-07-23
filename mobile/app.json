@@ -14,7 +14,21 @@
     "android": {
       "package": "com.meetingpnt.app"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "MeetingPnt needs calendar access to add activities you RSVP to."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#2563eb"
+        }
+      ]
+    ],
     "extra": {
       "router": {
         "origin": false

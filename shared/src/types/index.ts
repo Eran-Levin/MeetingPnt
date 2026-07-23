@@ -85,6 +85,10 @@ export interface Rsvp {
   updatedAt: string;
 }
 
+export interface RsvpWithUser extends Rsvp {
+  user: Pick<User, 'id' | 'name' | 'email'>;
+}
+
 export interface MeetingPoint {
   id: string;
   groupId: string;

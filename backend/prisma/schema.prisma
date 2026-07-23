@@ -27,6 +27,27 @@ enum InvitationStatus {
   revoked
 }
 
+enum ActivityStatus {
+  draft
+  published
+  in_progress
+  completed
+  cancelled
+}
+
+enum TransportMode {
+  driving
+  walking
+  bicycling
+  transit
+}
+
+enum RsvpStatus {
+  pending
+  approved
+  declined
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique @db.Citext
@@ -43,6 +64,8 @@ model User {
   groupsLed         Group[]        @relation("GroupLeader")
   groupMemberships  GroupMember[]
   invitationsSent   Invitation[]
+  activitiesCreated Activity[]
+  rsvps             Rsvp[]
 
   @@map("users")
 }
@@ -100,6 +123,7 @@ model Group {
   leader      User          @relation("GroupLeader", fields: [leaderId], references: [id])
   members     GroupMember[]
   invitations Invitation[]
+  activities  Activity[]
 
   @@index([leaderId])
   @@map("groups")
@@ -137,4 +161,41 @@ model Invitation {
   @@unique([tokenHash])
   @@index([groupId, email])
   @@map("invitations")
+}
+
+model Activity {
+  id            String         @id @default(uuid())
+  groupId       String         @map("group_id")
+  title         String
+  description   String?
+  startAt       DateTime       @map("start_at")
+  transportMode TransportMode  @default(driving) @map("transport_mode")
+  status        ActivityStatus @default(draft)
+  createdBy     String         @map("created_by")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator User   @relation(fields: [createdBy], references: [id])
+  rsvps   Rsvp[]
+
+  @@index([groupId, startAt])
+  @@map("activities")
+}
+
+model Rsvp {
+  id          String     @id @default(uuid())
+  activityId  String     @map("activity_id")
+  userId      String     @map("user_id")
+  status      RsvpStatus @default(pending)
+  note        String?
+  respondedAt DateTime?  @map("responded_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([activityId, status])
+  @@map("rsvps")
 }

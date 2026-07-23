@@ -8,6 +8,7 @@ import type {
   omwLocationSchema,
   pingRequestSchema,
   pingResponseSchema,
+  pushTokenSchema,
   registerSchema,
   roleElevationSchema,
   rsvpUpdateSchema,
@@ -29,6 +30,7 @@ export type CreateMeetingPointDto = z.infer<typeof createMeetingPointSchema>;
 export type OmwLocationDto = z.infer<typeof omwLocationSchema>;
 export type PingRequestDto = z.infer<typeof pingRequestSchema>;
 export type PingResponseDto = z.infer<typeof pingResponseSchema>;
+export type PushTokenDto = z.infer<typeof pushTokenSchema>;
 
 export interface AuthResponse {
   user: User;

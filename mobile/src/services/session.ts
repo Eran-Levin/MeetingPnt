@@ -1,4 +1,5 @@
 import type { AuthResponse } from '@meetingpnt/shared';
+import { registerForPushNotifications } from './pushNotifications.js';
 import { useAuthStore } from '../store/authStore.js';
 import { secureStore } from './secureStore.js';
 
@@ -7,6 +8,9 @@ export async function establishSession(data: AuthResponse) {
   if (data.refreshToken) {
     await secureStore.setRefreshToken(data.refreshToken);
   }
+  registerForPushNotifications().catch((err) =>
+    console.warn('[push] registration failed', err),
+  );
 }
 
 export async function endSession() {

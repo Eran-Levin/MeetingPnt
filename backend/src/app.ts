@@ -7,7 +7,10 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { adminRouter } from './modules/admin/routes.js';
 import { authRouter } from './modules/auth/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
+import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
 import { groupInvitationsRouter, invitationsRouter } from './modules/invitations/routes.js';
+import { rsvpsRouter } from './modules/rsvps/routes.js';
+import { usersRouter } from './modules/users/routes.js';
 
 export function createApp() {
   const app = express();
@@ -26,6 +29,10 @@ export function createApp() {
   app.use('/api/groups', groupsRouter);
   app.use('/api/groups/:groupId/invitations', groupInvitationsRouter);
   app.use('/api/invitations', invitationsRouter);
+  app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
+  app.use('/api/activities', activitiesRouter);
+  app.use('/api/activities', rsvpsRouter);
+  app.use('/api/users', usersRouter);
 
   app.use(errorHandler);
 

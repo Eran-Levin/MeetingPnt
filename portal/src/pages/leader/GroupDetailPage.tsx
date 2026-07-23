@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { activitiesApi } from '../../api/activitiesApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
 import { ApiError } from '../../api/client.js';
@@ -28,6 +29,10 @@ export function GroupDetailPage() {
   const invitationsQuery = useQuery({
     queryKey: ['groups', groupId, 'invitations'],
     queryFn: () => invitationsApi.listPending(groupId),
+  });
+  const activitiesQuery = useQuery({
+    queryKey: ['groups', groupId, 'activities'],
+    queryFn: () => activitiesApi.list(groupId),
   });
 
   const isLeader = groupQuery.data?.group.leaderId === currentUser?.id;
@@ -135,8 +140,31 @@ export function GroupDetailPage() {
         </>
       )}
 
-      <h2>Activities</h2>
-      <p style={{ color: '#888' }}>Activity scheduling coming in Phase 3.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2>Activities</h2>
+        {isLeader && <Link to={`/groups/${groupId}/activities/new`}>+ New activity</Link>}
+      </div>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {activitiesQuery.data?.activities.map((activity) => (
+          <li
+            key={activity.id}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '6px 0',
+              borderBottom: '1px solid #eee',
+            }}
+          >
+            <Link to={`/activities/${activity.id}`}>{activity.title}</Link>
+            <span style={{ color: '#888' }}>
+              {new Date(activity.startAt).toLocaleString()} · {activity.status}
+            </span>
+          </li>
+        ))}
+        {activitiesQuery.data?.activities.length === 0 && (
+          <p style={{ color: '#888' }}>No activities scheduled yet.</p>
+        )}
+      </ul>
     </div>
   );
 }
