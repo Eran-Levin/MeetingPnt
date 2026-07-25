@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { locationsApi } from '../api/locationsApi.js';
 import { meetingPointsApi } from '../api/meetingPointsApi.js';
 import { getSocket } from '../lib/socket.js';
+import { Button } from './ui/Button.js';
+import { Card } from './ui/Card.js';
 
 interface Props {
   activityId: string;
@@ -102,128 +104,131 @@ export function LiveLocationDashboard({ activityId, rsvps }: Props) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   return (
-    <div style={{ marginTop: 24 }}>
-      <h2>Meeting points</h2>
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold text-slate-900">Meeting points</h2>
 
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+      <Card className="mt-3 divide-y divide-slate-100 p-0">
         {meetingPoints.map((mp) => (
-          <li
-            key={mp.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '6px 0',
-              borderBottom: '1px solid #eee',
-              fontWeight: mp.id === nextMeetingPoint?.id ? 600 : 400,
-            }}
-          >
-            <span>
+          <div key={mp.id} className="flex items-center justify-between px-4 py-3">
+            <span className={`text-sm ${mp.id === nextMeetingPoint?.id ? 'font-semibold text-slate-900' : 'text-slate-700'}`}>
               {mp.label || 'Meeting point'} — {new Date(mp.time).toLocaleString()}
               {mp.id === nextMeetingPoint?.id && (
-                <span style={{ color: '#2563eb', marginLeft: 8 }}>(current ETA target)</span>
+                <span className="ml-2 text-blue-600">(current ETA target)</span>
               )}
             </span>
-            <a href={mp.googleMapsUrl} target="_blank" rel="noreferrer">
+            <a
+              href={mp.googleMapsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
               Open in Maps
             </a>
-          </li>
+          </div>
         ))}
-        {meetingPoints.length === 0 && <p style={{ color: '#888' }}>No meeting points set yet.</p>}
-      </ul>
+        {meetingPoints.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-slate-400">No meeting points set yet.</p>
+        )}
+      </Card>
 
-      <form
-        onSubmit={handleAddMeetingPoint}
-        style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}
-      >
-        <input
-          placeholder="Label (optional)"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          style={{ padding: 8 }}
-        />
-        <input
-          placeholder="Google Maps URL"
-          value={googleMapsUrl}
-          onChange={(e) => setGoogleMapsUrl(e.target.value)}
-          required
-          style={{ padding: 8, flex: 1, minWidth: 220 }}
-        />
-        <input
-          type="datetime-local"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          required
-          style={{ padding: 8 }}
-        />
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Adding…' : 'Add meeting point'}
-        </button>
-      </form>
-      {formError && <p style={{ color: 'crimson' }}>{formError}</p>}
+      <Card className="mt-3">
+        <form onSubmit={handleAddMeetingPoint} className="flex flex-wrap items-center gap-2">
+          <input
+            placeholder="Label (optional)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <input
+            placeholder="Google Maps URL"
+            value={googleMapsUrl}
+            onChange={(e) => setGoogleMapsUrl(e.target.value)}
+            required
+            className="min-w-[220px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <input
+            type="datetime-local"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            required
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <Button type="submit" disabled={submitting} size="sm">
+            {submitting ? 'Adding…' : 'Add meeting point'}
+          </Button>
+        </form>
+        {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
+      </Card>
 
-      <h2 style={{ marginTop: 24 }}>Live locations</h2>
+      <h2 className="mt-8 text-lg font-semibold text-slate-900">Live locations</h2>
 
       {apiKey && nextMeetingPoint && (
-        <div style={{ height: 320, marginBottom: 16 }}>
-          <APIProvider apiKey={apiKey}>
-            <Map defaultCenter={nextMeetingPoint.location} defaultZoom={13} gestureHandling="greedy">
-              {meetingPoints.map((mp) => (
-                <Marker
-                  key={mp.id}
-                  position={mp.location}
-                  label="M"
-                  title={mp.label ?? new Date(mp.time).toLocaleString()}
-                />
-              ))}
-              {Object.values(locations).map((loc) => (
-                <Marker
-                  key={loc.userId}
-                  position={loc.location}
-                  label={loc.user?.name?.[0] ?? '?'}
-                  title={loc.user?.name}
-                />
-              ))}
-            </Map>
-          </APIProvider>
-        </div>
+        <Card className="mt-3 overflow-hidden p-0">
+          <div style={{ height: 320 }}>
+            <APIProvider apiKey={apiKey}>
+              <Map defaultCenter={nextMeetingPoint.location} defaultZoom={13} gestureHandling="greedy">
+                {meetingPoints.map((mp) => (
+                  <Marker
+                    key={mp.id}
+                    position={mp.location}
+                    label="M"
+                    title={mp.label ?? new Date(mp.time).toLocaleString()}
+                  />
+                ))}
+                {Object.values(locations).map((loc) => (
+                  <Marker
+                    key={loc.userId}
+                    position={loc.location}
+                    label={loc.user?.name?.[0] ?? '?'}
+                    title={loc.user?.name}
+                  />
+                ))}
+              </Map>
+            </APIProvider>
+          </div>
+        </Card>
       )}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-            <th style={{ padding: 8 }}>Member</th>
-            <th style={{ padding: 8 }}>ETA</th>
-            <th style={{ padding: 8 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {approvedRsvps.map((rsvp) => {
-            const loc = locations[rsvp.userId];
-            return (
-              <tr key={rsvp.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 8 }}>{rsvp.user.name}</td>
-                <td style={{ padding: 8 }}>
-                  {loc?.etaSeconds != null
-                    ? `${Math.round(loc.etaSeconds / 60)} min`
-                    : loc
-                      ? 'ETA unavailable'
-                      : 'No update yet'}
-                </td>
-                <td style={{ padding: 8 }}>
-                  <button onClick={() => handleRequestLocation(rsvp.userId)}>Request location</button>
+      <Card className="mt-3 overflow-hidden p-0">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+              <th className="px-4 py-3">Member</th>
+              <th className="px-4 py-3">ETA</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {approvedRsvps.map((rsvp) => {
+              const loc = locations[rsvp.userId];
+              return (
+                <tr key={rsvp.id} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-3 text-slate-900">{rsvp.user.name}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {loc?.etaSeconds != null
+                      ? `${Math.round(loc.etaSeconds / 60)} min`
+                      : loc
+                        ? 'ETA unavailable'
+                        : 'No update yet'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Button variant="ghost" size="sm" onClick={() => handleRequestLocation(rsvp.userId)}>
+                      Request location
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+            {approvedRsvps.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                  No approved attendees yet.
                 </td>
               </tr>
-            );
-          })}
-          {approvedRsvps.length === 0 && (
-            <tr>
-              <td colSpan={3} style={{ padding: 8, color: '#888' }}>
-                No approved attendees yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+            )}
+          </tbody>
+        </table>
+      </Card>
+    </section>
   );
 }

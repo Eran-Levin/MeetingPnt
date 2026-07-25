@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activityInvitationsApi } from '../api/activityInvitationsApi.js';
 import { ApiError } from '../api/client.js';
+import { Button } from './ui/Button.js';
+import { Card } from './ui/Card.js';
 
 interface Props {
   activityId: string;
@@ -44,48 +46,50 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
   }
 
   return (
-    <div style={{ marginTop: 24 }}>
-      <h2>Visitors</h2>
-      <p style={{ color: '#888', marginTop: -8 }}>
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold text-slate-900">Visitors</h2>
+      <p className="mt-1 text-sm text-slate-500">
         People invited to just this activity, without joining the group.
       </p>
 
-      <form onSubmit={handleInvite} style={{ display: 'flex', gap: 8 }}>
-        <input
-          type="email"
-          placeholder="visitor@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{ padding: 8, flex: 1 }}
-        />
-        <button type="submit" disabled={inviting}>
-          {inviting ? 'Sending…' : 'Invite visitor'}
-        </button>
-      </form>
-      {message && <p style={{ color: 'green' }}>{message}</p>}
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      <Card className="mt-3">
+        <form onSubmit={handleInvite} className="flex gap-2">
+          <input
+            type="email"
+            placeholder="visitor@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <Button type="submit" disabled={inviting}>
+            {inviting ? 'Sending…' : 'Invite visitor'}
+          </Button>
+        </form>
+        {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      </Card>
 
-      <ul style={{ listStyle: 'none', padding: 0, marginTop: 12 }}>
-        {guestsQuery.data?.guests.map((guest) => (
-          <li key={guest.id} style={{ padding: '6px 0', borderBottom: '1px solid #eee' }}>
-            {guest.user.name} ({guest.user.email})
-          </li>
-        ))}
-      </ul>
+      {(guestsQuery.data?.guests.length ?? 0) > 0 && (
+        <Card className="mt-3 divide-y divide-slate-100 p-0">
+          {guestsQuery.data?.guests.map((guest) => (
+            <div key={guest.id} className="px-4 py-3 text-sm text-slate-700">
+              {guest.user.name} <span className="text-slate-400">({guest.user.email})</span>
+            </div>
+          ))}
+        </Card>
+      )}
 
       {invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
-        <>
-          <p style={{ fontWeight: 600, marginTop: 12 }}>Pending</p>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {invitationsQuery.data.invitations.map((invitation) => (
-              <li key={invitation.id} style={{ padding: '6px 0', color: '#888' }}>
-                {invitation.email}
-              </li>
-            ))}
-          </ul>
-        </>
+        <Card className="mt-3 divide-y divide-slate-100 p-0">
+          <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">Pending</p>
+          {invitationsQuery.data.invitations.map((invitation) => (
+            <div key={invitation.id} className="px-4 py-3 text-sm text-slate-500">
+              {invitation.email}
+            </div>
+          ))}
+        </Card>
       )}
-    </div>
+    </section>
   );
 }

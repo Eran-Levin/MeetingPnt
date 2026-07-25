@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { Card } from '../components/ui/Card.js';
 import { useAuthStore } from '../store/authStore.js';
 
 export function HomeRedirect() {
@@ -18,12 +19,14 @@ export function HomeRedirect() {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>MeetingPnt</h1>
-      <p>
-        This account doesn&rsquo;t have Leader or Admin access. Group members use the MeetingPnt
-        mobile app instead.
-      </p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <Card className="w-full max-w-sm text-center">
+        <h1 className="text-xl font-semibold text-slate-900">MeetingPnt</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          This account doesn&rsquo;t have Leader or Admin access. Group members use the MeetingPnt
+          mobile app instead.
+        </p>
+      </Card>
     </div>
   );
 }

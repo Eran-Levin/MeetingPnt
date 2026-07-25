@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { Bootstrap } from './app/Bootstrap.js';
 import { router } from './app/routes.js';
+import './index.css';
 
 const queryClient = new QueryClient();
 

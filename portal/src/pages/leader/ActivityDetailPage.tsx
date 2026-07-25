@@ -5,6 +5,10 @@ import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
 import { LiveLocationDashboard } from '../../components/LiveLocationDashboard.js';
+import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { PageContainer } from '../../components/ui/PageContainer.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function ActivityDetailPage() {
@@ -42,63 +46,79 @@ export function ActivityDetailPage() {
   const activity = activityQuery.data?.activity;
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}>
-      {groupId && <Link to={`/groups/${groupId}`}>&larr; Back to group</Link>}
-      <h1>{activity?.title ?? '…'}</h1>
+    <PageContainer className="max-w-4xl">
+      {groupId && (
+        <Link to={`/groups/${groupId}`} className="text-sm text-blue-600 hover:underline">
+          &larr; Back to group
+        </Link>
+      )}
+      <h1 className="mt-2 text-2xl font-semibold text-slate-900">{activity?.title ?? '…'}</h1>
+
       {activity && (
-        <>
-          <p style={{ color: '#888' }}>
-            {new Date(activity.startAt).toLocaleString()} · {activity.transportMode} ·{' '}
-            <strong>{activity.status}</strong>
-          </p>
-          {activity.description && <p>{activity.description}</p>}
-          <a href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}>
+        <Card className="mt-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <span>{new Date(activity.startAt).toLocaleString()}</span>
+            <span>&middot;</span>
+            <span className="capitalize">{activity.transportMode}</span>
+            <Badge status={activity.status} />
+          </div>
+          {activity.description && <p className="mt-3 text-sm text-slate-700">{activity.description}</p>}
+          <a
+            href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}
+            className="mt-3 inline-block text-sm text-blue-600 hover:underline"
+          >
             Download .ics
           </a>
 
           {isLeader && activity.status === 'draft' && (
-            <div style={{ marginTop: 16 }}>
-              <button onClick={handlePublish}>Publish &amp; notify members</button>
+            <div className="mt-4">
+              <Button onClick={handlePublish}>Publish &amp; notify members</Button>
             </div>
           )}
-        </>
+        </Card>
       )}
 
       {isLeader && (
-        <>
-          <h2>RSVP dashboard</h2>
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-slate-900">RSVP dashboard</h2>
           {activity?.status === 'draft' ? (
-            <p style={{ color: '#888' }}>Publish this activity to start collecting RSVPs.</p>
+            <p className="mt-2 text-sm text-slate-400">
+              Publish this activity to start collecting RSVPs.
+            </p>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-                  <th style={{ padding: 8 }}>Member</th>
-                  <th style={{ padding: 8 }}>Status</th>
-                  <th style={{ padding: 8 }}>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rsvpsQuery.data?.rsvps.map((rsvp) => (
-                  <tr key={rsvp.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: 8 }}>
-                      {rsvp.user.name} ({rsvp.user.email})
-                    </td>
-                    <td style={{ padding: 8 }}>{rsvp.status}</td>
-                    <td style={{ padding: 8 }}>{rsvp.note ?? '—'}</td>
+            <Card className="mt-3 overflow-hidden p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <th className="px-4 py-3">Member</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Note</th>
                   </tr>
-                ))}
-                {rsvpsQuery.data?.rsvps.length === 0 && (
-                  <tr>
-                    <td colSpan={3} style={{ padding: 8, color: '#888' }}>
-                      No RSVPs yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rsvpsQuery.data?.rsvps.map((rsvp) => (
+                    <tr key={rsvp.id} className="border-b border-slate-100 last:border-0">
+                      <td className="px-4 py-3 text-slate-900">
+                        {rsvp.user.name} <span className="text-slate-400">({rsvp.user.email})</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge status={rsvp.status} />
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{rsvp.note ?? '—'}</td>
+                    </tr>
+                  ))}
+                  {rsvpsQuery.data?.rsvps.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                        No RSVPs yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </Card>
           )}
-        </>
+        </section>
       )}
 
       {isLeader && activity?.status !== 'draft' && rsvpsQuery.data && (
@@ -106,6 +126,6 @@ export function ActivityDetailPage() {
       )}
 
       {isLeader && <ActivityVisitorsPanel activityId={activityId} />}
-    </div>
+    </PageContainer>
   );
 }

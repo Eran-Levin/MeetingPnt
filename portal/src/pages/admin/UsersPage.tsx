@@ -2,15 +2,15 @@ import type { Role } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { adminApi } from '../../api/adminApi.js';
-import { authApi } from '../../api/authApi.js';
-import { useAuthStore } from '../../store/authStore.js';
+import { Badge } from '../../components/ui/Badge.js';
+import { Card } from '../../components/ui/Card.js';
+import { PageContainer } from '../../components/ui/PageContainer.js';
 
 const ROLES: Role[] = ['user', 'leader', 'admin'];
 
 export function UsersPage() {
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
-  const clearSession = useAuthStore((s) => s.clearSession);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'users', search],
@@ -22,66 +22,65 @@ export function UsersPage() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
   }
 
-  async function handleLogout() {
-    await authApi.logout();
-    clearSession();
-  }
-
   return (
-    <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Users</h1>
-        <button onClick={handleLogout}>Log out</button>
-      </div>
+    <PageContainer className="max-w-4xl">
+      <h1 className="text-2xl font-semibold text-slate-900">Users</h1>
+      <p className="mt-1 text-sm text-slate-500">View all registered users and manage their role.</p>
 
       <input
         placeholder="Search by name or email"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ padding: 8, width: '100%', marginBottom: 16 }}
+        className="mt-6 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
 
-      {isLoading && <p>Loading…</p>}
-      {error && <p style={{ color: 'crimson' }}>Failed to load users.</p>}
+      {isLoading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
+      {error && <p className="mt-4 text-sm text-red-600">Failed to load users.</p>}
 
       {data && (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-              <th style={{ padding: 8 }}>Name</th>
-              <th style={{ padding: 8 }}>Email</th>
-              <th style={{ padding: 8 }}>Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.users.map((user) => (
-              <tr key={user.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 8 }}>{user.name}</td>
-                <td style={{ padding: 8 }}>{user.email}</td>
-                <td style={{ padding: 8 }}>
-                  <select
-                    value={user.role}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
-                  >
-                    {ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+        <Card className="mt-4 overflow-hidden p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Role</th>
               </tr>
-            ))}
-            {data.users.length === 0 && (
-              <tr>
-                <td colSpan={3} style={{ padding: 8, color: '#888' }}>
-                  No users found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.users.map((user) => (
+                <tr key={user.id} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-3 text-slate-900">{user.name}</td>
+                  <td className="px-4 py-3 text-slate-500">{user.email}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Badge status={user.role} />
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {data.users.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-slate-400">
+                    No users found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }

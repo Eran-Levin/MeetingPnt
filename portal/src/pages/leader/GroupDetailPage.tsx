@@ -5,6 +5,10 @@ import { activitiesApi } from '../../api/activitiesApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
 import { ApiError } from '../../api/client.js';
+import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { PageContainer } from '../../components/ui/PageContainer.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function GroupDetailPage() {
@@ -82,129 +86,136 @@ export function GroupDetailPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}>
-      <Link to="/groups">&larr; Groups</Link>
-      <h1>{groupQuery.data?.group.name ?? '…'}</h1>
-      {groupQuery.data?.group.description && <p>{groupQuery.data.group.description}</p>}
-
-      {isLeader && (
-        <>
-          <h2>Invite a member</h2>
-          <form onSubmit={handleInvite} style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="email"
-              placeholder="member@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{ padding: 8, flex: 1 }}
-            />
-            <button type="submit" disabled={inviting}>
-              {inviting ? 'Sending…' : 'Invite'}
-            </button>
-          </form>
-          {inviteMessage && <p style={{ color: 'green' }}>{inviteMessage}</p>}
-          {inviteError && <p style={{ color: 'crimson' }}>{inviteError}</p>}
-        </>
+    <PageContainer>
+      <Link to="/groups" className="text-sm text-blue-600 hover:underline">
+        &larr; Groups
+      </Link>
+      <h1 className="mt-2 text-2xl font-semibold text-slate-900">
+        {groupQuery.data?.group.name ?? '…'}
+      </h1>
+      {groupQuery.data?.group.description && (
+        <p className="mt-1 text-sm text-slate-500">{groupQuery.data.group.description}</p>
       )}
 
-      <h2>Roster</h2>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {membersQuery.data?.members.map((member) => (
-          <li
-            key={member.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '6px 0',
-              borderBottom: '1px solid #eee',
-            }}
-          >
-            <span>
-              {member.user.name} ({member.user.email})
-            </span>
-            {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
-              <button onClick={() => handleRemoveMember(member.userId)}>Remove</button>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {isLeader && invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
-        <>
-          <h2>Pending invitations</h2>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {invitationsQuery.data.invitations.map((invitation) => (
-              <li
-                key={invitation.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '6px 0',
-                  borderBottom: '1px solid #eee',
-                }}
-              >
-                <span>{invitation.email}</span>
-                <button onClick={() => handleRevoke(invitation.id)}>Revoke</button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Activities</h2>
-        {isLeader && <Link to={`/groups/${groupId}/activities/new`}>+ New activity</Link>}
-      </div>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {standaloneActivities.map((activity) => (
-          <li
-            key={activity.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '6px 0',
-              borderBottom: '1px solid #eee',
-            }}
-          >
-            <Link to={`/activities/${activity.id}`}>{activity.title}</Link>
-            <span style={{ color: '#888' }}>
-              {new Date(activity.startAt).toLocaleString()} · {activity.status}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
-        const draftCount = occurrences.filter((o) => o.status === 'draft').length;
-        return (
-          <div key={seriesId} style={{ marginTop: 12, padding: 12, border: '1px solid #eee', borderRadius: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{occurrences[0]!.title} (recurring, {occurrences.length} occurrences)</strong>
-              {isLeader && draftCount > 0 && (
-                <button onClick={() => handlePublishSeries(seriesId)}>
-                  Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
-                </button>
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold text-slate-900">Roster</h2>
+        <Card className="mt-3 divide-y divide-slate-100 p-0">
+          {membersQuery.data?.members.map((member) => (
+            <div key={member.id} className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-slate-700">
+                {member.user.name}{' '}
+                <span className="text-slate-400">({member.user.email})</span>
+              </span>
+              {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
+                <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.userId)}>
+                  Remove
+                </Button>
               )}
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, marginTop: 8 }}>
-              {occurrences.map((activity) => (
-                <li
-                  key={activity.id}
-                  style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}
-                >
-                  <Link to={`/activities/${activity.id}`}>{new Date(activity.startAt).toLocaleString()}</Link>
-                  <span style={{ color: '#888' }}>{activity.status}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      })}
+          ))}
+          {membersQuery.data?.members.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-slate-400">No members yet.</p>
+          )}
+        </Card>
 
-      {activitiesQuery.data?.activities.length === 0 && (
-        <p style={{ color: '#888' }}>No activities scheduled yet.</p>
-      )}
-    </div>
+        {isLeader && (
+          <Card className="mt-3">
+            <form onSubmit={handleInvite} className="flex gap-2">
+              <input
+                type="email"
+                placeholder="member@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <Button type="submit" disabled={inviting}>
+                {inviting ? 'Sending…' : 'Invite member'}
+              </Button>
+            </form>
+            {inviteMessage && <p className="mt-2 text-sm text-green-600">{inviteMessage}</p>}
+            {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
+          </Card>
+        )}
+
+        {isLeader && invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
+          <Card className="mt-3 divide-y divide-slate-100 p-0">
+            <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
+              Pending invitations
+            </p>
+            {invitationsQuery.data.invitations.map((invitation) => (
+              <div key={invitation.id} className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-slate-600">{invitation.email}</span>
+                <Button variant="ghost" size="sm" onClick={() => handleRevoke(invitation.id)}>
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </Card>
+        )}
+      </section>
+
+      <section className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Activities</h2>
+          {isLeader && (
+            <Link to={`/groups/${groupId}/activities/new`} className="text-sm font-medium text-blue-600 hover:underline">
+              + New activity
+            </Link>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-col gap-3">
+          {standaloneActivities.map((activity) => (
+            <Link key={activity.id} to={`/activities/${activity.id}`}>
+              <Card className="flex items-center justify-between transition-shadow hover:shadow-md">
+                <span className="font-medium text-slate-900">{activity.title}</span>
+                <span className="flex items-center gap-2 text-sm text-slate-500">
+                  {new Date(activity.startAt).toLocaleString()}
+                  <Badge status={activity.status} />
+                </span>
+              </Card>
+            </Link>
+          ))}
+
+          {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
+            const draftCount = occurrences.filter((o) => o.status === 'draft').length;
+            return (
+              <Card key={seriesId}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-slate-900">
+                    {occurrences[0]!.title}{' '}
+                    <span className="font-normal text-slate-400">
+                      (recurring, {occurrences.length} occurrences)
+                    </span>
+                  </p>
+                  {isLeader && draftCount > 0 && (
+                    <Button size="sm" onClick={() => handlePublishSeries(seriesId)}>
+                      Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-col divide-y divide-slate-100">
+                  {occurrences.map((activity) => (
+                    <Link
+                      key={activity.id}
+                      to={`/activities/${activity.id}`}
+                      className="flex items-center justify-between py-2 text-sm hover:text-blue-600"
+                    >
+                      <span>{new Date(activity.startAt).toLocaleString()}</span>
+                      <Badge status={activity.status} />
+                    </Link>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+
+          {activitiesQuery.data?.activities.length === 0 && (
+            <p className="text-sm text-slate-400">No activities scheduled yet.</p>
+          )}
+        </div>
+      </section>
+    </PageContainer>
   );
 }

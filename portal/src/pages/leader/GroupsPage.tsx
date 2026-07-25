@@ -2,11 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { groupsApi } from '../../api/groupsApi.js';
-import { authApi } from '../../api/authApi.js';
-import { useAuthStore } from '../../store/authStore.js';
+import { Button } from '../../components/ui/Button.js';
+import { Card } from '../../components/ui/Card.js';
+import { PageContainer } from '../../components/ui/PageContainer.js';
+import { TextField } from '../../components/ui/TextField.js';
 
 export function GroupsPage() {
-  const clearSession = useAuthStore((s) => s.clearSession);
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -16,11 +17,6 @@ export function GroupsPage() {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
-
-  async function handleLogout() {
-    await authApi.logout();
-    clearSession();
-  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -37,47 +33,48 @@ export function GroupsPage() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Groups</h1>
-        <button onClick={handleLogout}>Log out</button>
-      </div>
+    <PageContainer>
+      <h1 className="text-2xl font-semibold text-slate-900">Groups</h1>
+      <p className="mt-1 text-sm text-slate-500">Groups you lead or belong to.</p>
 
-      <form
-        onSubmit={handleCreate}
-        style={{ display: 'flex', gap: 8, margin: '16px 0', flexWrap: 'wrap' }}
-      >
-        <input
-          placeholder="Group name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ padding: 8, flex: 1, minWidth: 160 }}
-        />
-        <input
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          style={{ padding: 8, flex: 2, minWidth: 200 }}
-        />
-        <button type="submit" disabled={creating}>
-          {creating ? 'Creating…' : 'Create group'}
-        </button>
-      </form>
+      <Card className="mt-6">
+        <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
+          <TextField
+            label="Group name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="min-w-[160px] flex-1"
+          />
+          <TextField
+            label="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="min-w-[200px] flex-[2]"
+          />
+          <Button type="submit" disabled={creating}>
+            {creating ? 'Creating…' : 'Create group'}
+          </Button>
+        </form>
+      </Card>
 
-      {isLoading && <p>Loading…</p>}
+      {isLoading && <p className="mt-6 text-sm text-slate-500">Loading…</p>}
 
-      <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <ul className="mt-6 flex flex-col gap-3">
         {data?.groups.map((group) => (
-          <li key={group.id} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
-            <Link to={`/groups/${group.id}`} style={{ fontWeight: 600 }}>
-              {group.name}
-            </Link>
-            {!group.isLeader && <span style={{ color: '#888', marginLeft: 8 }}>(member)</span>}
-            {group.description && <p style={{ margin: '4px 0 0', color: '#555' }}>{group.description}</p>}
+          <li key={group.id}>
+            <Card className="transition-shadow hover:shadow-md">
+              <Link to={`/groups/${group.id}`} className="font-semibold text-slate-900 hover:text-blue-600">
+                {group.name}
+              </Link>
+              {!group.isLeader && <span className="ml-2 text-sm text-slate-400">(member)</span>}
+              {group.description && <p className="mt-1 text-sm text-slate-500">{group.description}</p>}
+            </Card>
           </li>
         ))}
-        {data?.groups.length === 0 && <p style={{ color: '#888' }}>No groups yet.</p>}
+        {data?.groups.length === 0 && (
+          <p className="text-sm text-slate-400">No groups yet.</p>
+        )}
       </ul>
-    </div>
+    </PageContainer>
   );
 }
