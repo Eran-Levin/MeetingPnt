@@ -1,6 +1,7 @@
 import type {
   ActivityStatus,
   GroupMemberStatus,
+  GroupStatus,
   InvitationStatus,
   LocationSource,
   Role,
@@ -26,6 +27,7 @@ export interface Group {
   id: string;
   name: string;
   description: string | null;
+  status: GroupStatus;
   leaderId: string;
   createdAt: string;
   updatedAt: string;

@@ -9,11 +9,18 @@ import type { Group, GroupMember, User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
+const STATUS_ORDER: Record<Group['status'], number> = {
+  planned: 0,
+  in_progress: 1,
+  completed: 2,
+};
+
 function toSharedGroup(group: Group): SharedGroup {
   return {
     id: group.id,
     name: group.name,
     description: group.description,
+    status: group.status,
     leaderId: group.leaderId,
     createdAt: group.createdAt.toISOString(),
     updatedAt: group.updatedAt.toISOString(),
@@ -68,7 +75,8 @@ export async function listMyGroups(userId: string): Promise<GroupWithRole[]> {
     },
     orderBy: { createdAt: 'desc' },
   });
-  return groups.map((group) => ({ ...toSharedGroup(group), isLeader: group.leaderId === userId }));
+  const sorted = [...groups].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+  return sorted.map((group) => ({ ...toSharedGroup(group), isLeader: group.leaderId === userId }));
 }
 
 export async function getGroup(groupId: string, requesterId: string) {

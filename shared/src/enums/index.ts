@@ -5,6 +5,13 @@ export const Role = {
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 
+export const GroupStatus = {
+  Planned: 'planned',
+  InProgress: 'in_progress',
+  Completed: 'completed',
+} as const;
+export type GroupStatus = (typeof GroupStatus)[keyof typeof GroupStatus];
+
 export const GroupMemberStatus = {
   Active: 'active',
   Removed: 'removed',

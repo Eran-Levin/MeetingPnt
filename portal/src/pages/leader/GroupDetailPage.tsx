@@ -1,6 +1,7 @@
+import type { GroupStatus } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
@@ -9,13 +10,18 @@ import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
+import { Select } from '../../components/ui/Select.js';
 import { useAuthStore } from '../../store/authStore.js';
+
+const GROUP_STATUSES: GroupStatus[] = ['planned', 'in_progress', 'completed'];
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const groupId = id!;
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
+  const [deleting, setDeleting] = useState(false);
 
   const [email, setEmail] = useState('');
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
@@ -78,6 +84,27 @@ export function GroupDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
   }
 
+  async function handleStatusChange(status: GroupStatus) {
+    await groupsApi.update(groupId, { status });
+    queryClient.invalidateQueries({ queryKey: ['groups', groupId] });
+    queryClient.invalidateQueries({ queryKey: ['groups'] });
+  }
+
+  async function handleDeleteGroup() {
+    const confirmed = window.confirm(
+      `Delete "${groupQuery.data?.group.name}"? This removes the group, its roster, activities, and meeting points. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await groupsApi.remove(groupId);
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      navigate('/groups');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const standaloneActivities = activitiesQuery.data?.activities.filter((a) => !a.seriesId) ?? [];
   const seriesGroups = new Map<string, typeof standaloneActivities>();
   for (const activity of activitiesQuery.data?.activities ?? []) {
@@ -90,12 +117,40 @@ export function GroupDetailPage() {
       <Link to="/groups" className="text-sm text-blue-600 hover:underline">
         &larr; Groups
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-slate-900">
-        {groupQuery.data?.group.name ?? '…'}
-      </h1>
-      {groupQuery.data?.group.description && (
-        <p className="mt-1 text-sm text-slate-500">{groupQuery.data.group.description}</p>
-      )}
+      <div className="mt-2 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {groupQuery.data?.group.name ?? '…'}
+          </h1>
+          {groupQuery.data?.group.description && (
+            <p className="mt-1 text-sm text-slate-500">{groupQuery.data.group.description}</p>
+          )}
+        </div>
+        {groupQuery.data && (
+          <div className="flex shrink-0 items-center gap-2">
+            {isLeader ? (
+              <Select
+                value={groupQuery.data.group.status}
+                onChange={(e) => handleStatusChange(e.target.value as GroupStatus)}
+                className="py-1.5"
+              >
+                {GROUP_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Badge status={groupQuery.data.group.status} />
+            )}
+            {isLeader && (
+              <Button variant="danger" size="sm" disabled={deleting} onClick={handleDeleteGroup}>
+                {deleting ? 'Deleting…' : 'Delete group'}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold text-slate-900">Roster</h2>

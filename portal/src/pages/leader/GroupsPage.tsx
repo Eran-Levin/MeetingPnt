@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { groupsApi } from '../../api/groupsApi.js';
+import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -63,10 +64,13 @@ export function GroupsPage() {
         {data?.groups.map((group) => (
           <li key={group.id}>
             <Card className="transition-shadow hover:shadow-md">
-              <Link to={`/groups/${group.id}`} className="font-semibold text-slate-900 hover:text-blue-600">
-                {group.name}
-              </Link>
-              {!group.isLeader && <span className="ml-2 text-sm text-slate-400">(member)</span>}
+              <div className="flex items-center gap-2">
+                <Link to={`/groups/${group.id}`} className="font-semibold text-slate-900 hover:text-blue-600">
+                  {group.name}
+                </Link>
+                <Badge status={group.status} />
+                {!group.isLeader && <span className="text-sm text-slate-400">(member)</span>}
+              </div>
               {group.description && <p className="mt-1 text-sm text-slate-500">{group.description}</p>}
             </Card>
           </li>

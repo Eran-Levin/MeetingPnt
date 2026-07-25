@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RsvpStatus, TransportMode } from '../enums/index.js';
+import { GroupStatus, RsvpStatus, TransportMode } from '../enums/index.js';
 
 export const geoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -30,7 +30,11 @@ export const createGroupSchema = z.object({
   description: z.string().optional(),
 });
 
-export const updateGroupSchema = createGroupSchema.partial();
+export const updateGroupSchema = createGroupSchema
+  .extend({
+    status: z.enum([GroupStatus.Planned, GroupStatus.InProgress, GroupStatus.Completed]),
+  })
+  .partial();
 
 // ---- invitations ----
 export const inviteMemberSchema = z.object({

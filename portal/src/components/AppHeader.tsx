@@ -17,7 +17,7 @@ export function AppHeader() {
       <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
         <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
           <AppLogo size={28} />
-          Meeting<span className="text-blue-600">Pnt</span>
+          MeetingPnt
         </Link>
         <nav className="flex items-center gap-5">
           {user?.role === 'admin' && (
