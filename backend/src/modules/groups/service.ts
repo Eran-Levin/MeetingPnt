@@ -21,6 +21,7 @@ function toSharedGroup(group: Group): SharedGroup {
     name: group.name,
     description: group.description,
     status: group.status,
+    chatMode: group.chatMode,
     leaderId: group.leaderId,
     createdAt: group.createdAt.toISOString(),
     updatedAt: group.updatedAt.toISOString(),

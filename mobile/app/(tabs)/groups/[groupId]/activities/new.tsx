@@ -16,8 +16,12 @@ export default function NewActivityScreen() {
   const [description, setDescription] = useState('');
   const [startAt, setStartAt] = useState(new Date(Date.now() + 60 * 60 * 1000));
   const [showPicker, setShowPicker] = useState(false);
+  const [endAt, setEndAt] = useState<Date | null>(null);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
+  const [requiresRsvp, setRequiresRsvp] = useState(true);
   const [repeats, setRepeats] = useState(false);
+  const [intervalWeeks, setIntervalWeeks] = useState('1');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
   const [count, setCount] = useState('8');
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +44,17 @@ export default function NewActivityScreen() {
         title,
         description: description || undefined,
         startAt: startAt.toISOString(),
+        endAt: endAt ? endAt.toISOString() : undefined,
         transportMode,
+        requiresRsvp,
         recurrence: repeats
-          ? { frequency: 'weekly', daysOfWeek, endType: 'count', count: Number(count) }
+          ? {
+              frequency: 'weekly',
+              intervalWeeks: Number(intervalWeeks) || 1,
+              daysOfWeek,
+              endType: 'count',
+              count: Number(count),
+            }
           : undefined,
       });
       if ('activities' in result) {
@@ -82,6 +94,25 @@ export default function NewActivityScreen() {
         />
       )}
 
+      <TouchableOpacity style={styles.input} onPress={() => setShowEndPicker(true)}>
+        <Text>{endAt ? endAt.toLocaleString() : 'End date & time (optional)'}</Text>
+      </TouchableOpacity>
+      {showEndPicker && (
+        <DateTimePicker
+          value={endAt ?? startAt}
+          mode="datetime"
+          onChange={(_event, selectedDate) => {
+            setShowEndPicker(Platform.OS === 'ios');
+            if (selectedDate) setEndAt(selectedDate);
+          }}
+        />
+      )}
+
+      <View style={styles.repeatRow}>
+        <Text style={styles.label}>Require RSVP confirmation</Text>
+        <Switch value={requiresRsvp} onValueChange={setRequiresRsvp} />
+      </View>
+
       <Text style={styles.label}>Mode of transport</Text>
       <View style={styles.modeRow}>
         {TRANSPORT_MODES.map((mode) => (
@@ -104,6 +135,16 @@ export default function NewActivityScreen() {
 
       {repeats && (
         <View style={{ gap: 8 }}>
+          <View style={styles.repeatRow}>
+            <Text>Every</Text>
+            <TextInput
+              style={[styles.input, { width: 50 }]}
+              keyboardType="number-pad"
+              value={intervalWeeks}
+              onChangeText={setIntervalWeeks}
+            />
+            <Text>week(s)</Text>
+          </View>
           <View style={styles.modeRow}>
             {WEEKDAY_LABELS.map((label, day) => (
               <TouchableOpacity

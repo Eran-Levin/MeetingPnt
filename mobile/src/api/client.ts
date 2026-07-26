@@ -15,6 +15,9 @@ export class ApiError extends Error {
 interface RequestOptions {
   method?: string;
   body?: unknown;
+  /** For multipart uploads — when set, `body` is ignored and Content-Type is left for the
+   * runtime to set (with the correct multipart boundary). */
+  formData?: FormData;
   skipAuth?: boolean;
 }
 
@@ -24,10 +27,10 @@ async function rawFetch(path: string, options: RequestOptions = {}) {
   return fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? 'GET',
     headers: {
-      'Content-Type': 'application/json',
+      ...(options.formData ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken && !options.skipAuth ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.formData ?? (options.body ? JSON.stringify(options.body) : undefined),
   });
 }
 

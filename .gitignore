@@ -9,5 +9,6 @@ build/
 coverage/
 .turbo/
 *.tsbuildinfo
+backend/uploads/
 .vscode/*
 !.vscode/extensions.json

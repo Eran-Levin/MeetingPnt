@@ -1,10 +1,12 @@
 import type { z } from 'zod';
 import type {
+  attendanceEntrySchema,
   createActivitySchema,
   createGroupSchema,
   createMeetingPointSchema,
   inviteMemberSchema,
   loginSchema,
+  meetingPointTemplateSchema,
   omwLocationSchema,
   pingRequestSchema,
   pingResponseSchema,
@@ -13,7 +15,9 @@ import type {
   registerSchema,
   roleElevationSchema,
   rsvpUpdateSchema,
+  sendMessageSchema,
   updateActivitySchema,
+  updateAttendanceSchema,
   updateGroupSchema,
   updateMeetingPointSchema,
 } from '../schemas/index.js';
@@ -26,6 +30,7 @@ export type CreateGroupDto = z.infer<typeof createGroupSchema>;
 export type UpdateGroupDto = z.infer<typeof updateGroupSchema>;
 export type InviteMemberDto = z.infer<typeof inviteMemberSchema>;
 export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
+export type MeetingPointTemplateDto = z.infer<typeof meetingPointTemplateSchema>;
 export type CreateActivityDto = z.infer<typeof createActivitySchema>;
 export type UpdateActivityDto = z.infer<typeof updateActivitySchema>;
 export type RsvpUpdateDto = z.infer<typeof rsvpUpdateSchema>;
@@ -35,6 +40,9 @@ export type OmwLocationDto = z.infer<typeof omwLocationSchema>;
 export type PingRequestDto = z.infer<typeof pingRequestSchema>;
 export type PingResponseDto = z.infer<typeof pingResponseSchema>;
 export type PushTokenDto = z.infer<typeof pushTokenSchema>;
+export type AttendanceEntryDto = z.infer<typeof attendanceEntrySchema>;
+export type UpdateAttendanceDto = z.infer<typeof updateAttendanceSchema>;
+export type SendMessageDto = z.infer<typeof sendMessageSchema>;
 
 export interface AuthResponse {
   user: User;

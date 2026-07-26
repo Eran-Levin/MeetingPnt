@@ -1,4 +1,4 @@
-import type { Activity, LocationSnapshot, MeetingPoint, Rsvp } from '../types/index.js';
+import type { Activity, LocationSnapshot, MeetingPoint, MessageWithAuthor, Rsvp } from '../types/index.js';
 
 export const SocketEvents = {
   GroupJoin: 'group:join',
@@ -12,11 +12,7 @@ export const SocketEvents = {
 export type SocketEvent = (typeof SocketEvents)[keyof typeof SocketEvents];
 
 export interface ChatMessagePayload {
-  id: string;
-  groupId: string;
-  userId: string;
-  body: string;
-  createdAt: string;
+  message: MessageWithAuthor;
 }
 
 export interface RsvpUpdatedPayload {

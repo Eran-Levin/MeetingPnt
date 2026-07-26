@@ -8,6 +8,8 @@ const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700',
   approved: 'bg-green-100 text-green-700',
   declined: 'bg-red-100 text-red-600',
+  present: 'bg-green-100 text-green-700',
+  absent: 'bg-red-100 text-red-600',
   admin: 'bg-purple-100 text-purple-700',
   leader: 'bg-blue-100 text-blue-700',
   user: 'bg-slate-100 text-slate-600',

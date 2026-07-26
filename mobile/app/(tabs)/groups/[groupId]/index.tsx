@@ -61,7 +61,12 @@ export default function GroupDetailScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.title}>{groupQuery.data?.group.name ?? '…'}</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.title}>{groupQuery.data?.group.name ?? '…'}</Text>
+        <Link href={`/(tabs)/groups/${groupId}/chat`} style={styles.link}>
+          Chat
+        </Link>
+      </View>
       {groupQuery.data?.group.description && (
         <Text style={styles.desc}>{groupQuery.data.group.description}</Text>
       )}

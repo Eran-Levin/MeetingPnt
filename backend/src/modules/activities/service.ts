@@ -3,7 +3,9 @@ import type { Activity as SharedActivity, CreateActivityDto, UpdateActivityDto }
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { insertMeetingPoint } from '../../db/geo.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
+import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { buildIcsEvent } from '../../lib/ics.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
 import { assertMembership } from '../groups/service.js';
@@ -16,7 +18,9 @@ function toSharedActivity(activity: Activity): SharedActivity {
     title: activity.title,
     description: activity.description,
     startAt: activity.startAt.toISOString(),
+    endAt: activity.endAt ? activity.endAt.toISOString() : null,
     transportMode: activity.transportMode,
+    requiresRsvp: activity.requiresRsvp,
     status: activity.status,
     createdBy: activity.createdBy,
     createdAt: activity.createdAt.toISOString(),
@@ -85,13 +89,45 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
           title: dto.title,
           description: dto.description,
           startAt,
+          endAt: dto.endAt ? new Date(dto.endAt) : null,
           transportMode: dto.transportMode,
+          requiresRsvp: dto.requiresRsvp,
           createdBy: requesterId,
           status: 'draft',
         },
       }),
     ),
   );
+
+  if (dto.meetingPoints && dto.meetingPoints.length > 0) {
+    // Resolve each template's URL once — the coordinates are the same for every occurrence.
+    const resolvedTemplates = await Promise.all(
+      dto.meetingPoints.map(async (template) => {
+        const location = await parseGoogleMapsUrl(template.googleMapsUrl);
+        if (!location) {
+          throw new HttpError(
+            400,
+            `Couldn't read coordinates from the meeting point link "${template.googleMapsUrl}" — please use a link that includes coordinates.`,
+          );
+        }
+        return { ...template, location };
+      }),
+    );
+
+    for (const activity of activities) {
+      for (const template of resolvedTemplates) {
+        await insertMeetingPoint({
+          groupId,
+          activityId: activity.id,
+          label: template.label,
+          googleMapsUrl: template.googleMapsUrl,
+          location: template.location,
+          time: new Date(activity.startAt.getTime() + template.offsetMinutes * 60_000),
+          createdBy: requesterId,
+        });
+      }
+    }
+  }
 
   return activities.map(toSharedActivity);
 }
@@ -115,11 +151,17 @@ export async function publishSeries(seriesId: string, requesterId: string) {
     include: { user: { include: { pushTokens: true } } },
   });
 
+  const requiresRsvpByActivity = new Map(occurrences.map((o) => [o.id, o.requiresRsvp]));
+
   const updated = await prisma.$transaction(async (tx) => {
     await tx.activity.updateMany({ where: { id: { in: draftIds } }, data: { status: 'published' } });
     await tx.rsvp.createMany({
       data: draftIds.flatMap((activityId) =>
-        members.map((member) => ({ activityId, userId: member.userId, status: 'pending' as const })),
+        members.map((member) => ({
+          activityId,
+          userId: member.userId,
+          status: requiresRsvpByActivity.get(activityId) ? ('pending' as const) : ('approved' as const),
+        })),
       ),
       skipDuplicates: true,
     });
@@ -149,7 +191,9 @@ export async function updateActivity(activityId: string, requesterId: string, dt
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined ? { description: dto.description } : {}),
       ...(dto.startAt !== undefined ? { startAt: new Date(dto.startAt) } : {}),
+      ...(dto.endAt !== undefined ? { endAt: new Date(dto.endAt) } : {}),
       ...(dto.transportMode !== undefined ? { transportMode: dto.transportMode } : {}),
+      ...(dto.requiresRsvp !== undefined ? { requiresRsvp: dto.requiresRsvp } : {}),
     },
   });
   return toSharedActivity(updated);
@@ -175,7 +219,11 @@ export async function publishActivity(activityId: string, requesterId: string) {
     });
 
     await tx.rsvp.createMany({
-      data: members.map((member) => ({ activityId, userId: member.userId, status: 'pending' as const })),
+      data: members.map((member) => ({
+        activityId,
+        userId: member.userId,
+        status: activity.requiresRsvp ? ('pending' as const) : ('approved' as const),
+      })),
       skipDuplicates: true,
     });
 
@@ -222,5 +270,6 @@ export async function generateIcs(activityId: string, requesterId: string): Prom
     title: activity.title,
     description: activity.description,
     startAt: activity.startAt,
+    endAt: activity.endAt,
   });
 }

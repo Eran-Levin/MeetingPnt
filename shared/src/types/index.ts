@@ -1,5 +1,7 @@
 import type {
   ActivityStatus,
+  AttendanceStatus,
+  GroupChatMode,
   GroupMemberStatus,
   GroupStatus,
   InvitationStatus,
@@ -28,6 +30,7 @@ export interface Group {
   name: string;
   description: string | null;
   status: GroupStatus;
+  chatMode: GroupChatMode;
   leaderId: string;
   createdAt: string;
   updatedAt: string;
@@ -84,11 +87,39 @@ export interface Activity {
   title: string;
   description: string | null;
   startAt: string;
+  endAt: string | null;
   transportMode: TransportMode;
+  requiresRsvp: boolean;
   status: ActivityStatus;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Attendance {
+  id: string;
+  activityId: string;
+  userId: string;
+  status: AttendanceStatus;
+  markedBy: string;
+  markedAt: string;
+}
+
+export interface AttendanceWithUser extends Attendance {
+  user: Pick<User, 'id' | 'name' | 'email'>;
+}
+
+export interface Message {
+  id: string;
+  groupId: string;
+  authorId: string;
+  body: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
+export interface MessageWithAuthor extends Message {
+  author: Pick<User, 'id' | 'name' | 'email'>;
 }
 
 export interface Rsvp {

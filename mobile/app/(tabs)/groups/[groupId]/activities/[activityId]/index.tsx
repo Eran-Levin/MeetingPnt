@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi.js';
 import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi.js';
+import { attendanceApi } from '../../../../../../src/api/attendanceApi.js';
 import { locationsApi } from '../../../../../../src/api/locationsApi.js';
 import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi.js';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi.js';
@@ -116,6 +117,20 @@ export default function ActivityDetailScreen() {
     queryFn: () => activityInvitationsApi.listGuests(activityId),
     enabled: isLeader,
   });
+
+  const attendanceQuery = useQuery({
+    queryKey: ['activities', activityId, 'attendance'],
+    queryFn: () => attendanceApi.list(activityId),
+    enabled: isLeader,
+  });
+  const attendanceByUser = new Map(
+    attendanceQuery.data?.attendance.map((record) => [record.userId, record]) ?? [],
+  );
+
+  async function handleMarkAttendance(userId: string, status: 'present' | 'absent') {
+    await attendanceApi.mark(activityId, userId, status);
+    queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'attendance'] });
+  }
 
   const meetingPointsQuery = useQuery({
     queryKey: ['activities', activityId, 'meeting-points'],
@@ -218,7 +233,10 @@ export default function ActivityDetailScreen() {
       {activity && (
         <>
           <Text style={styles.muted}>
-            {new Date(activity.startAt).toLocaleString()} · {activity.transportMode} · {activity.status}
+            {new Date(activity.startAt).toLocaleString()}
+            {activity.endAt ? ` → ${new Date(activity.endAt).toLocaleString()}` : ''} ·{' '}
+            {activity.transportMode} · {activity.status}
+            {!activity.requiresRsvp ? ' · no RSVP required' : ''}
           </Text>
           {activity.description && <Text style={styles.desc}>{activity.description}</Text>}
 
@@ -344,6 +362,32 @@ export default function ActivityDetailScreen() {
             </View>
           ))}
           {rsvpsQuery.data.rsvps.length === 0 && <Text style={styles.muted}>No RSVPs yet.</Text>}
+        </View>
+      )}
+
+      {isLeader && rsvpsQuery.data && (
+        <View style={styles.rsvpBox}>
+          <Text style={styles.sectionTitle}>Attendance</Text>
+          <Text style={styles.muted}>Roll call for who actually showed up.</Text>
+          {rsvpsQuery.data.rsvps
+            .filter((rsvp) => rsvp.status === 'approved')
+            .map((rsvp) => {
+              const record = attendanceByUser.get(rsvp.userId);
+              return (
+                <View key={rsvp.id} style={styles.dashboardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text>{rsvp.user.name}</Text>
+                    {record && <Text style={styles.muted}>{record.status}</Text>}
+                  </View>
+                  <TouchableOpacity onPress={() => handleMarkAttendance(rsvp.userId, 'present')}>
+                    <Text style={[styles.link, { marginRight: 12 }]}>Present</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleMarkAttendance(rsvp.userId, 'absent')}>
+                    <Text style={styles.link}>Absent</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
         </View>
       )}
 

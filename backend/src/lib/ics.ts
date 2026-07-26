@@ -3,6 +3,7 @@ interface IcsEventInput {
   title: string;
   description?: string | null;
   startAt: Date;
+  endAt?: Date | null;
   durationMinutes?: number;
 }
 
@@ -17,7 +18,7 @@ function escapeIcsText(text: string): string {
 export function buildIcsEvent(input: IcsEventInput): string {
   const start = formatIcsDate(input.startAt);
   const end = formatIcsDate(
-    new Date(input.startAt.getTime() + (input.durationMinutes ?? 60) * 60_000),
+    input.endAt ?? new Date(input.startAt.getTime() + (input.durationMinutes ?? 60) * 60_000),
   );
   const stamp = formatIcsDate(new Date());
 

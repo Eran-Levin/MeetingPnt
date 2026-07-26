@@ -4,6 +4,7 @@ import { activitiesApi } from '../../api/activitiesApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
+import { AttendancePanel } from '../../components/AttendancePanel.js';
 import { LiveLocationDashboard } from '../../components/LiveLocationDashboard.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -57,10 +58,18 @@ export function ActivityDetailPage() {
       {activity && (
         <Card className="mt-4">
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span>{new Date(activity.startAt).toLocaleString()}</span>
+            <span>
+              {new Date(activity.startAt).toLocaleString()}
+              {activity.endAt && <> &rarr; {new Date(activity.endAt).toLocaleString()}</>}
+            </span>
             <span>&middot;</span>
             <span className="capitalize">{activity.transportMode}</span>
             <Badge status={activity.status} />
+            {!activity.requiresRsvp && (
+              <span className="inline-block whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                no RSVP required
+              </span>
+            )}
           </div>
           {activity.description && <p className="mt-3 text-sm text-slate-700">{activity.description}</p>}
           <a
@@ -123,6 +132,13 @@ export function ActivityDetailPage() {
 
       {isLeader && activity?.status !== 'draft' && rsvpsQuery.data && (
         <LiveLocationDashboard activityId={activityId} rsvps={rsvpsQuery.data.rsvps} />
+      )}
+
+      {isLeader && activity?.status !== 'draft' && rsvpsQuery.data && (
+        <AttendancePanel
+          activityId={activityId}
+          approvedRsvps={rsvpsQuery.data.rsvps.filter((rsvp) => rsvp.status === 'approved')}
+        />
       )}
 
       {isLeader && <ActivityVisitorsPanel activityId={activityId} />}

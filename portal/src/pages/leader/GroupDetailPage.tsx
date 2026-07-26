@@ -1,4 +1,4 @@
-import type { GroupStatus } from '@meetingpnt/shared';
+import type { GroupChatMode, GroupStatus } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -9,11 +9,13 @@ import { ApiError } from '../../api/client.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
+import { GroupChatPanel } from '../../components/GroupChatPanel.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Select } from '../../components/ui/Select.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 const GROUP_STATUSES: GroupStatus[] = ['planned', 'in_progress', 'completed'];
+const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -90,6 +92,11 @@ export function GroupDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['groups'] });
   }
 
+  async function handleChatModeChange(chatMode: GroupChatMode) {
+    await groupsApi.update(groupId, { chatMode });
+    queryClient.invalidateQueries({ queryKey: ['groups', groupId] });
+  }
+
   async function handleDeleteGroup() {
     const confirmed = window.confirm(
       `Delete "${groupQuery.data?.group.name}"? This removes the group, its roster, activities, and meeting points. This cannot be undone.`,
@@ -142,6 +149,19 @@ export function GroupDetailPage() {
               </Select>
             ) : (
               <Badge status={groupQuery.data.group.status} />
+            )}
+            {isLeader && (
+              <Select
+                value={groupQuery.data.group.chatMode}
+                onChange={(e) => handleChatModeChange(e.target.value as GroupChatMode)}
+                className="py-1.5"
+              >
+                {CHAT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode === 'two_way' ? 'two-way chat' : 'announcements only'}
+                  </option>
+                ))}
+              </Select>
             )}
             {isLeader && (
               <Button variant="danger" size="sm" disabled={deleting} onClick={handleDeleteGroup}>
@@ -271,6 +291,10 @@ export function GroupDetailPage() {
           )}
         </div>
       </section>
+
+      {groupQuery.data && (
+        <GroupChatPanel groupId={groupId} chatMode={groupQuery.data.group.chatMode} isLeader={isLeader} />
+      )}
     </PageContainer>
   );
 }

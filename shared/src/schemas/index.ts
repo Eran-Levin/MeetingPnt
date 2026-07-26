@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GroupStatus, RsvpStatus, TransportMode } from '../enums/index.js';
+import { AttendanceStatus, GroupChatMode, GroupStatus, RsvpStatus, TransportMode } from '../enums/index.js';
 
 export const geoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -33,6 +33,7 @@ export const createGroupSchema = z.object({
 export const updateGroupSchema = createGroupSchema
   .extend({
     status: z.enum([GroupStatus.Planned, GroupStatus.InProgress, GroupStatus.Completed]),
+    chatMode: z.enum([GroupChatMode.Announcements, GroupChatMode.TwoWay]),
   })
   .partial();
 
@@ -45,6 +46,8 @@ export const inviteMemberSchema = z.object({
 export const recurrenceRuleSchema = z
   .object({
     frequency: z.literal('weekly'),
+    // Number of weeks between occurrences, e.g. 1 = every week, 4 = every four weeks.
+    intervalWeeks: z.number().int().min(1).max(12).default(1),
     daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
     endType: z.enum(['count', 'until']),
     count: z.number().int().min(1).max(52).optional(),
@@ -54,20 +57,38 @@ export const recurrenceRuleSchema = z
     message: 'count is required when endType is "count", until is required when endType is "until"',
   });
 
-export const createActivitySchema = z.object({
+// A meeting point to clone onto every generated occurrence of a recurring activity.
+export const meetingPointTemplateSchema = z.object({
+  label: z.string().optional(),
+  googleMapsUrl: z.string().url(),
+  // Minutes relative to each occurrence's startAt (e.g. 0 = at start time, -15 = 15 min before).
+  offsetMinutes: z.number().int().min(-1440).max(1440),
+});
+
+const createActivityBaseSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   startAt: z.string().datetime(),
+  endAt: z.string().datetime().optional(),
   transportMode: z.enum([
     TransportMode.Driving,
     TransportMode.Walking,
     TransportMode.Bicycling,
     TransportMode.Transit,
   ]),
+  requiresRsvp: z.boolean().default(true),
   recurrence: recurrenceRuleSchema.optional(),
+  meetingPoints: z.array(meetingPointTemplateSchema).max(5).optional(),
 });
 
-export const updateActivitySchema = createActivitySchema.omit({ recurrence: true }).partial();
+export const createActivitySchema = createActivityBaseSchema.refine(
+  (data) => !data.endAt || new Date(data.endAt) > new Date(data.startAt),
+  { message: 'endAt must be after startAt', path: ['endAt'] },
+);
+
+export const updateActivitySchema = createActivityBaseSchema
+  .omit({ recurrence: true, meetingPoints: true })
+  .partial();
 
 // ---- rsvps ----
 export const rsvpUpdateSchema = z.object({
@@ -103,4 +124,21 @@ export const pingRequestSchema = z.object({
 
 export const pingResponseSchema = z.object({
   location: geoPointSchema,
+});
+
+// ---- attendance ----
+export const attendanceEntrySchema = z.object({
+  userId: z.string().uuid(),
+  status: z.enum([AttendanceStatus.Present, AttendanceStatus.Absent]),
+});
+
+export const updateAttendanceSchema = z.object({
+  entries: z.array(attendanceEntrySchema).min(1),
+});
+
+// ---- chat ----
+// Multipart request: `body` lands here via multer's text-field parsing; the image (if any)
+// arrives as req.file and is validated separately in the route, not through this schema.
+export const sendMessageSchema = z.object({
+  body: z.string().max(2000).optional(),
 });

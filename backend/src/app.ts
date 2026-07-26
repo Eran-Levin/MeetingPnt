@@ -3,9 +3,12 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { corsOrigins } from './config/env.js';
+import { UPLOADS_DIR } from './lib/storage.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { adminRouter } from './modules/admin/routes.js';
+import { attendanceRouter } from './modules/attendance/routes.js';
 import { authRouter } from './modules/auth/routes.js';
+import { chatRouter } from './modules/chat/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
 import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
 import {
@@ -33,14 +36,24 @@ export function createApp() {
     res.json({ status: 'ok' });
   });
 
+  // Portal/mobile run on different origins than the API, so uploaded images need CORP relaxed.
+  app.use(
+    '/uploads',
+    express.static(UPLOADS_DIR, {
+      setHeaders: (res) => res.set('Cross-Origin-Resource-Policy', 'cross-origin'),
+    }),
+  );
+
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/groups', groupsRouter);
+  app.use('/api/groups', chatRouter);
   app.use('/api/groups/:groupId/invitations', groupInvitationsRouter);
   app.use('/api/invitations', invitationsRouter);
   app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
   app.use('/api/activities', activitiesRouter);
   app.use('/api/activities', rsvpsRouter);
+  app.use('/api/activities', attendanceRouter);
   app.use('/api/activities/:activityId/meeting-points', activityMeetingPointsRouter);
   app.use('/api/meeting-points', meetingPointsRouter);
   app.use('/api/activities', locationsRouter);

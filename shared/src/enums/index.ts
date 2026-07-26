@@ -12,6 +12,12 @@ export const GroupStatus = {
 } as const;
 export type GroupStatus = (typeof GroupStatus)[keyof typeof GroupStatus];
 
+export const GroupChatMode = {
+  Announcements: 'announcements',
+  TwoWay: 'two_way',
+} as const;
+export type GroupChatMode = (typeof GroupChatMode)[keyof typeof GroupChatMode];
+
 export const GroupMemberStatus = {
   Active: 'active',
   Removed: 'removed',
@@ -55,3 +61,9 @@ export const LocationSource = {
   PingResponse: 'ping_response',
 } as const;
 export type LocationSource = (typeof LocationSource)[keyof typeof LocationSource];
+
+export const AttendanceStatus = {
+  Present: 'present',
+  Absent: 'absent',
+} as const;
+export type AttendanceStatus = (typeof AttendanceStatus)[keyof typeof AttendanceStatus];
