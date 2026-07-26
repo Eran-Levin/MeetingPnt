@@ -7,7 +7,16 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "isolatedModules": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    // Mobile (Expo SDK 54) pins React 19, which npm hoists to the repo root. The portal is still
+    // on React 18, so force every `react` type import — including ones from root-hoisted packages
+    // like react-router-dom — onto the portal's own nested React 18 types.
+    "typeRoots": ["./node_modules/@types", "../node_modules/@types"],
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"]
+    }
   },
   "include": ["src"]
 }
