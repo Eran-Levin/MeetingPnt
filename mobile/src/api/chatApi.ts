@@ -1,5 +1,5 @@
 import type { MessageWithAuthor } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const chatApi = {
   list: (groupId: string) =>

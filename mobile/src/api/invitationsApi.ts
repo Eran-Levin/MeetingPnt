@@ -1,5 +1,5 @@
 import type { Invitation, InvitationPreview, InviteMemberDto } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const invitationsApi = {
   preview: (token: string) =>

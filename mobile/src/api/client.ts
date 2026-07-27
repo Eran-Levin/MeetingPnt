@@ -1,5 +1,5 @@
-import { useAuthStore } from '../store/authStore.js';
-import { secureStore } from '../services/secureStore.js';
+import { useAuthStore } from '../store/authStore';
+import { secureStore } from '../services/secureStore';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL as string;
 

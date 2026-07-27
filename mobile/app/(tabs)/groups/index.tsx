@@ -10,11 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { groupsApi } from '../../../src/api/groupsApi.js';
-import { authApi } from '../../../src/api/authApi.js';
-import { secureStore } from '../../../src/services/secureStore.js';
-import { endSession } from '../../../src/services/session.js';
-import { useAuthStore } from '../../../src/store/authStore.js';
+import { groupsApi } from '../../../src/api/groupsApi';
+import { authApi } from '../../../src/api/authApi';
+import { secureStore } from '../../../src/services/secureStore';
+import { endSession } from '../../../src/services/session';
+import { useAuthStore } from '../../../src/store/authStore';
 
 export default function GroupsScreen() {
   const router = useRouter();

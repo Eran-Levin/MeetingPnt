@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { locationsApi } from '../api/locationsApi.js';
-import { getCurrentLocationSnapshot } from './location.js';
+import { locationsApi } from '../api/locationsApi';
+import { getCurrentLocationSnapshot } from './location';
 
 const LOCATION_PING_CATEGORY = 'location_ping';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';

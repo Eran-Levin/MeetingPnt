@@ -1,5 +1,5 @@
 import type { AttendanceStatus, AttendanceWithUser } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const attendanceApi = {
   list: (activityId: string) =>

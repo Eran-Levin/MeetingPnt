@@ -1,10 +1,10 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { authApi } from '../src/api/authApi.js';
-import { secureStore } from '../src/services/secureStore.js';
-import { establishSession, endSession } from '../src/services/session.js';
-import { useAuthStore } from '../src/store/authStore.js';
+import { authApi } from '../src/api/authApi';
+import { secureStore } from '../src/services/secureStore';
+import { establishSession, endSession } from '../src/services/session';
+import { useAuthStore } from '../src/store/authStore';
 
 export default function Index() {
   const [ready, setReady] = useState(false);

@@ -1,5 +1,5 @@
 import type { GeoPoint, LocationSnapshot } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const locationsApi = {
   submitOmw: (activityId: string, location: GeoPoint) =>

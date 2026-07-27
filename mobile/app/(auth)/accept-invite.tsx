@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { invitationsApi } from '../../src/api/invitationsApi.js';
-import { ApiError } from '../../src/api/client.js';
+import { invitationsApi } from '../../src/api/invitationsApi';
+import { ApiError } from '../../src/api/client';
 
 export default function AcceptInviteScreen() {
   const { token } = useLocalSearchParams<{ token?: string }>();

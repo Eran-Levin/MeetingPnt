@@ -1,7 +1,7 @@
 import type { AuthResponse } from '@meetingpnt/shared';
-import { registerForPushNotifications } from './pushNotifications.js';
-import { useAuthStore } from '../store/authStore.js';
-import { secureStore } from './secureStore.js';
+import { registerForPushNotifications } from './pushNotifications';
+import { useAuthStore } from '../store/authStore';
+import { secureStore } from './secureStore';
 
 export async function establishSession(data: AuthResponse) {
   useAuthStore.getState().setSession(data.user, data.accessToken);

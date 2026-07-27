@@ -2,11 +2,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { activitiesApi } from '../../../../src/api/activitiesApi.js';
-import { groupsApi } from '../../../../src/api/groupsApi.js';
-import { invitationsApi } from '../../../../src/api/invitationsApi.js';
-import { ApiError } from '../../../../src/api/client.js';
-import { useAuthStore } from '../../../../src/store/authStore.js';
+import { activitiesApi } from '../../../../src/api/activitiesApi';
+import { groupsApi } from '../../../../src/api/groupsApi';
+import { invitationsApi } from '../../../../src/api/invitationsApi';
+import { ApiError } from '../../../../src/api/client';
+import { useAuthStore } from '../../../../src/store/authStore';
 
 export default function GroupDetailScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();

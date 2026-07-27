@@ -14,15 +14,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { activitiesApi } from '../../../../../../src/api/activitiesApi.js';
-import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi.js';
-import { attendanceApi } from '../../../../../../src/api/attendanceApi.js';
-import { locationsApi } from '../../../../../../src/api/locationsApi.js';
-import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi.js';
-import { rsvpsApi } from '../../../../../../src/api/rsvpsApi.js';
-import { groupsApi } from '../../../../../../src/api/groupsApi.js';
-import { getCurrentLocationSnapshot } from '../../../../../../src/services/location.js';
-import { useAuthStore } from '../../../../../../src/store/authStore.js';
+import { activitiesApi } from '../../../../../../src/api/activitiesApi';
+import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi';
+import { attendanceApi } from '../../../../../../src/api/attendanceApi';
+import { locationsApi } from '../../../../../../src/api/locationsApi';
+import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi';
+import { rsvpsApi } from '../../../../../../src/api/rsvpsApi';
+import { groupsApi } from '../../../../../../src/api/groupsApi';
+import { getCurrentLocationSnapshot } from '../../../../../../src/services/location';
+import { useAuthStore } from '../../../../../../src/store/authStore';
 
 async function addToDeviceCalendar(title: string, startAt: string, description?: string | null) {
   const { status } = await Calendar.requestCalendarPermissionsAsync();

@@ -4,7 +4,7 @@ import type {
   GroupMemberWithUser,
   GroupWithRole,
 } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const groupsApi = {
   list: () => apiFetch<{ groups: GroupWithRole[] }>('/api/groups'),

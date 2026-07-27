@@ -1,6 +1,5 @@
-import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 import {
@@ -13,9 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { chatApi } from '../../../../src/api/chatApi.js';
-import { groupsApi } from '../../../../src/api/groupsApi.js';
-import { useAuthStore } from '../../../../src/store/authStore.js';
+import { chatApi } from '../../../../src/api/chatApi';
+import { groupsApi } from '../../../../src/api/groupsApi';
+import { useAuthStore } from '../../../../src/store/authStore';
 
 export default function GroupChatScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();

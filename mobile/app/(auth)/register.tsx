@@ -1,9 +1,9 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { authApi } from '../../src/api/authApi.js';
-import { ApiError } from '../../src/api/client.js';
-import { establishSession } from '../../src/services/session.js';
+import { authApi } from '../../src/api/authApi';
+import { ApiError } from '../../src/api/client';
+import { establishSession } from '../../src/services/session';
 
 export default function RegisterScreen() {
   const router = useRouter();

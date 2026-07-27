@@ -1,5 +1,5 @@
 import type { Rsvp, RsvpUpdateDto, RsvpWithUser } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const rsvpsApi = {
   upsert: (activityId: string, dto: RsvpUpdateDto) =>

@@ -6,7 +6,7 @@ import {
   registerBackgroundNotificationTask,
   registerNotificationResponseHandler,
   setupNotificationCategories,
-} from '../src/services/pingHandler.js';
+} from '../src/services/pingHandler';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({

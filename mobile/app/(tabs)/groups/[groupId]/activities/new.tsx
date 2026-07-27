@@ -3,8 +3,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { activitiesApi } from '../../../../../src/api/activitiesApi.js';
-import { ApiError } from '../../../../../src/api/client.js';
+import { activitiesApi } from '../../../../../src/api/activitiesApi';
+import { ApiError } from '../../../../../src/api/client';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

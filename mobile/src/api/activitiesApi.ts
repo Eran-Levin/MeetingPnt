@@ -1,5 +1,5 @@
 import type { Activity, CreateActivityDto } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const activitiesApi = {
   list: (groupId: string) => apiFetch<{ activities: Activity[] }>(`/api/groups/${groupId}/activities`),

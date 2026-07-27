@@ -1,5 +1,5 @@
 import type { ActivityGuestWithUser, Invitation, InviteMemberDto } from '@meetingpnt/shared';
-import { apiFetch } from './client.js';
+import { apiFetch } from './client';
 
 export const activityInvitationsApi = {
   invite: (activityId: string, dto: InviteMemberDto) =>
