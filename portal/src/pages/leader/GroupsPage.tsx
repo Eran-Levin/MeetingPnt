@@ -1,3 +1,4 @@
+import type { GroupWithRole } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -18,6 +19,10 @@ export function GroupsPage() {
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
+
+  // "Closed" is a finished group; planned and in-progress are both still live concerns.
+  const activeGroups = data?.groups.filter((g) => g.status !== 'completed') ?? [];
+  const closedGroups = data?.groups.filter((g) => g.status === 'completed') ?? [];
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -60,25 +65,58 @@ export function GroupsPage() {
 
       {isLoading && <p className="mt-6 text-sm text-slate-500">Loading…</p>}
 
-      <ul className="mt-6 flex flex-col gap-3">
-        {data?.groups.map((group) => (
+      <GroupSection title="Active" groups={activeGroups} emptyLabel="No active groups." />
+      {closedGroups.length > 0 && <GroupSection title="Closed" groups={closedGroups} />}
+
+      {data?.groups.length === 0 && <p className="mt-6 text-sm text-slate-400">No groups yet.</p>}
+    </PageContainer>
+  );
+}
+
+function GroupSection({
+  title,
+  groups,
+  emptyLabel,
+}: {
+  title: string;
+  groups: GroupWithRole[];
+  emptyLabel?: string;
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="text-sm font-medium uppercase tracking-wide text-slate-400">
+        {title} <span className="text-slate-300">({groups.length})</span>
+      </h2>
+
+      <ul className="mt-3 flex flex-col gap-3">
+        {groups.map((group) => (
           <li key={group.id}>
             <Card className="transition-shadow hover:shadow-md">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link to={`/groups/${group.id}`} className="font-semibold text-slate-900 hover:text-blue-600">
                   {group.name}
                 </Link>
                 <Badge status={group.status} />
                 {!group.isLeader && <span className="text-sm text-slate-400">(member)</span>}
+                <span className="ml-auto text-sm text-slate-500">
+                  {group.nextActivityAt
+                    ? `Next: ${new Date(group.nextActivityAt).toLocaleString(undefined, {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}`
+                    : 'Nothing scheduled'}
+                </span>
               </div>
               {group.description && <p className="mt-1 text-sm text-slate-500">{group.description}</p>}
             </Card>
           </li>
         ))}
-        {data?.groups.length === 0 && (
-          <p className="text-sm text-slate-400">No groups yet.</p>
+        {groups.length === 0 && emptyLabel && (
+          <p className="text-sm text-slate-400">{emptyLabel}</p>
         )}
       </ul>
-    </PageContainer>
+    </section>
   );
 }

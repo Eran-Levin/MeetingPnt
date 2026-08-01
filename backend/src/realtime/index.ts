@@ -59,6 +59,8 @@ export function createRealtimeServer(httpServer: HttpServer): SocketIOServer {
       try {
         const activity = await prisma.activity.findUnique({ where: { id: activityId } });
         if (!activity) return ack?.(false);
+        // Ended activities stream nothing, matching the location gate in locations/service.ts.
+        if (activity.status === 'completed' || activity.status === 'cancelled') return ack?.(false);
         const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
         const isLeader = group?.leaderId === userId;
         const isApproved =

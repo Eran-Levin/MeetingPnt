@@ -2,6 +2,7 @@ import type { MessageWithAuthor, SendMessageDto } from '@meetingpnt/shared';
 import { SocketEvents } from '@meetingpnt/shared';
 import type { Message, User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
+import { displayName } from '../../lib/userName.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -17,7 +18,7 @@ function toSharedMessage(message: Message & { author: User }): MessageWithAuthor
     body: message.body,
     imageUrl: message.imageUrl,
     createdAt: message.createdAt.toISOString(),
-    author: { id: message.author.id, name: message.author.name, email: message.author.email },
+    author: { id: message.author.id, name: displayName(message.author), email: message.author.email },
   };
 }
 

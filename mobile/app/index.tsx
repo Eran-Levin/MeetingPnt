@@ -37,5 +37,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={status === 'authenticated' ? '/(tabs)/groups' : '/(auth)/login'} />;
+  return <Redirect href={status === 'authenticated' ? '/(tabs)/activities' : '/(auth)/login'} />;
 }

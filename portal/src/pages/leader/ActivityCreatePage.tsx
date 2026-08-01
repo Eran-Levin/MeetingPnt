@@ -21,8 +21,12 @@ export function ActivityCreatePage() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [startAt, setStartAt] = useState('');
-  const [endAt, setEndAt] = useState('');
+  // Timed activities are entered as one date plus two clock times; all-day ones as two dates.
+  const [allDay, setAllDay] = useState(false);
+  const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
   const [repeats, setRepeats] = useState(false);
@@ -52,13 +56,27 @@ export function ActivityCreatePage() {
       return;
     }
 
+    // All-day activities cover whole days; timed ones share a date and differ only by clock time.
+    const start = allDay ? new Date(`${date}T00:00:00`) : new Date(`${date}T${startTime}`);
+    const end = allDay
+      ? new Date(`${endDate || date}T23:59:59`)
+      : new Date(`${date}T${endTime}`);
+
+    if (end <= start) {
+      setError(
+        allDay ? 'The end date must not be before the start date.' : 'The end time must be after the start time.',
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await activitiesApi.create(groupId!, {
         title,
         description: description || undefined,
-        startAt: new Date(startAt).toISOString(),
-        endAt: endAt ? new Date(endAt).toISOString() : undefined,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        allDay,
         transportMode,
         requiresRsvp,
         recurrence: repeats
@@ -102,21 +120,58 @@ export function ActivityCreatePage() {
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
           />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <TextField
-              label={repeats ? 'First occurrence date & time' : 'Date & time'}
-              type="datetime-local"
-              required
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={allDay}
+              onChange={(e) => setAllDay(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <TextField
-              label="End date & time (optional, for multi-day activities)"
-              type="datetime-local"
-              value={endAt}
-              onChange={(e) => setEndAt(e.target.value)}
-            />
-          </div>
+            Spans whole days (multi-day trip)
+          </label>
+
+          {allDay ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TextField
+                label={repeats ? 'First occurrence start date' : 'Start date'}
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <TextField
+                label="End date"
+                type="date"
+                required
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <TextField
+                label={repeats ? 'First occurrence date' : 'Date'}
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <TextField
+                label="Start time"
+                type="time"
+                required
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+              <TextField
+                label="End time"
+                type="time"
+                required
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
+            </div>
+          )}
           <Select
             label="Mode of transport"
             value={transportMode}

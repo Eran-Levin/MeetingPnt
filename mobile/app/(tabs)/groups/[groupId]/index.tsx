@@ -1,3 +1,4 @@
+import { formatActivityWhen } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -13,6 +14,9 @@ export default function GroupDetailScreen() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -44,13 +48,22 @@ export default function GroupDetailScreen() {
   }
 
   async function handleInvite() {
-    if (!email.trim()) return;
+    if (!email.trim() || !firstName.trim() || !lastName.trim()) return;
     setMessage(null);
     setInviting(true);
     try {
-      const result = await invitationsApi.invite(groupId, { email });
-      setMessage(result.type === 'added' ? `${email} added.` : `Invitation sent to ${email}.`);
+      const result = await invitationsApi.invite(groupId, {
+        email,
+        firstName,
+        lastName,
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+      });
+      const who = `${firstName} ${lastName}`.trim();
+      setMessage(result.type === 'added' ? `${who} added.` : `Invitation sent to ${who}.`);
       setEmail('');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
     } catch (err) {
       setMessage(err instanceof ApiError ? err.message : 'Failed to invite');
@@ -77,6 +90,29 @@ export default function GroupDetailScreen() {
           <View style={styles.inviteRow}>
             <TextInput
               style={styles.input}
+              placeholder="First name"
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Last name"
+              value={lastName}
+              onChangeText={setLastName}
+            />
+          </View>
+          <View style={[styles.inviteRow, { marginTop: 8 }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Phone (optional)"
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+            />
+          </View>
+          <View style={[styles.inviteRow, { marginTop: 8 }]}>
+            <TextInput
+              style={styles.input}
               placeholder="member@example.com"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -96,6 +132,7 @@ export default function GroupDetailScreen() {
         <View key={item.id} style={styles.memberRow}>
           <Text>{item.user.name}</Text>
           <Text style={styles.muted}>{item.user.email}</Text>
+          {item.user.phone && <Text style={styles.muted}>{item.user.phone}</Text>}
         </View>
       ))}
       {membersQuery.data?.members.length === 0 && <Text style={styles.muted}>No members yet.</Text>}
@@ -113,7 +150,8 @@ export default function GroupDetailScreen() {
           <TouchableOpacity style={styles.activityRow}>
             <Text>{activity.title}</Text>
             <Text style={styles.muted}>
-              {new Date(activity.startAt).toLocaleString()} · {activity.status}
+              {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)} ·{' '}
+              {activity.status}
             </Text>
           </TouchableOpacity>
         </Link>
@@ -137,7 +175,8 @@ export default function GroupDetailScreen() {
               <Link key={activity.id} href={`/(tabs)/groups/${groupId}/activities/${activity.id}`} asChild>
                 <TouchableOpacity style={styles.activityRow}>
                   <Text style={styles.muted}>
-                    {new Date(activity.startAt).toLocaleString()} · {activity.status}
+                    {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)} ·{' '}
+                    {activity.status}
                   </Text>
                 </TouchableOpacity>
               </Link>

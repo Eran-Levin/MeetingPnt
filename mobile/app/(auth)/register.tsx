@@ -7,11 +7,23 @@ import { establishSession } from '../../src/services/session';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { invitationToken, email: prefilledEmail } = useLocalSearchParams<{
+  const {
+    invitationToken,
+    email: prefilledEmail,
+    firstName: prefilledFirstName,
+    lastName: prefilledLastName,
+    phone: prefilledPhone,
+  } = useLocalSearchParams<{
     invitationToken?: string;
     email?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
   }>();
-  const [name, setName] = useState('');
+  // Pre-filled from the invitation when there is one — the invitee confirms rather than retypes.
+  const [firstName, setFirstName] = useState(prefilledFirstName ?? '');
+  const [lastName, setLastName] = useState(prefilledLastName ?? '');
+  const [phone, setPhone] = useState(prefilledPhone ?? '');
   const [email, setEmail] = useState(prefilledEmail ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,9 +33,16 @@ export default function RegisterScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      const data = await authApi.register({ name, email, password, invitationToken });
+      const data = await authApi.register({
+        firstName,
+        lastName,
+        email,
+        password,
+        invitationToken,
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+      });
       await establishSession(data);
-      router.replace('/(tabs)/groups');
+      router.replace('/(tabs)/activities');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {
@@ -34,7 +53,25 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Create account</Text>
-      <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
+      <TextInput
+        style={styles.input}
+        placeholder="First name"
+        value={firstName}
+        onChangeText={setFirstName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Last name"
+        value={lastName}
+        onChangeText={setLastName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Phone (optional)"
+        keyboardType="phone-pad"
+        value={phone}
+        onChangeText={setPhone}
+      />
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -47,6 +84,8 @@ export default function RegisterScreen() {
         style={styles.input}
         placeholder="Password (min 8 characters)"
         secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
         value={password}
         onChangeText={setPassword}
       />

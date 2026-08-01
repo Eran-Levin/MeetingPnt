@@ -40,6 +40,16 @@ export const activitiesRouter = Router();
 
 activitiesRouter.use(authenticate);
 
+// Must precede /:id, otherwise "mine" is parsed as an activity id.
+activitiesRouter.get('/mine', async (req, res, next) => {
+  try {
+    const activities = await activitiesService.listMyActivities(req.user!.id);
+    res.json({ activities });
+  } catch (err) {
+    next(err);
+  }
+});
+
 activitiesRouter.get('/:id', async (req, res, next) => {
   try {
     const activity = await activitiesService.getActivity(req.params.id as string, req.user!.id);
@@ -65,6 +75,24 @@ activitiesRouter.patch('/:id', validate(updateActivitySchema), async (req, res, 
 activitiesRouter.post('/:id/publish', async (req, res, next) => {
   try {
     const activity = await activitiesService.publishActivity(req.params.id as string, req.user!.id);
+    res.json({ activity });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activitiesRouter.post('/:id/start', async (req, res, next) => {
+  try {
+    const activity = await activitiesService.startActivity(req.params.id as string, req.user!.id);
+    res.json({ activity });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activitiesRouter.post('/:id/end', async (req, res, next) => {
+  try {
+    const activity = await activitiesService.endActivity(req.params.id as string, req.user!.id);
     res.json({ activity });
   } catch (err) {
     next(err);

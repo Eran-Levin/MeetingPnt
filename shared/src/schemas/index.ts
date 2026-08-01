@@ -7,10 +7,20 @@ export const geoPointSchema = z.object({
 });
 
 // ---- auth ----
+/** Loose on purpose — international formats vary far too much to validate meaningfully. */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .min(6)
+  .max(30)
+  .regex(/^[+0-9][0-9\s\-()]*$/, 'Enter a valid phone number');
+
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  name: z.string().min(1),
+  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
+  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  phone: phoneSchema.optional(),
   invitationToken: z.string().optional(),
 });
 
@@ -38,8 +48,15 @@ export const updateGroupSchema = createGroupSchema
   .partial();
 
 // ---- invitations ----
+/**
+ * The leader knows who they're inviting, so they supply the name and phone rather than waiting
+ * for the invitee to fill them in — the roster is useful the moment the invitation goes out.
+ */
 export const inviteMemberSchema = z.object({
   email: z.string().email(),
+  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
+  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  phone: phoneSchema.optional(),
 });
 
 // ---- activities ----
@@ -69,7 +86,9 @@ const createActivityBaseSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   startAt: z.string().datetime(),
-  endAt: z.string().datetime().optional(),
+  endAt: z.string().datetime(),
+  // Multi-day activities are date-only: the daily schedule lives in the meeting points.
+  allDay: z.boolean().default(false),
   transportMode: z.enum([
     TransportMode.Driving,
     TransportMode.Walking,
@@ -82,13 +101,18 @@ const createActivityBaseSchema = z.object({
 });
 
 export const createActivitySchema = createActivityBaseSchema.refine(
-  (data) => !data.endAt || new Date(data.endAt) > new Date(data.startAt),
-  { message: 'endAt must be after startAt', path: ['endAt'] },
+  (data) => new Date(data.endAt) > new Date(data.startAt),
+  { message: 'The end must be after the start', path: ['endAt'] },
 );
 
 export const updateActivitySchema = createActivityBaseSchema
   .omit({ recurrence: true, meetingPoints: true })
-  .partial();
+  .partial()
+  // Only enforceable when a patch carries both ends; a one-sided edit is checked in the service.
+  .refine(
+    (data) => !data.startAt || !data.endAt || new Date(data.endAt) > new Date(data.startAt),
+    { message: 'The end must be after the start', path: ['endAt'] },
+  );
 
 // ---- rsvps ----
 export const rsvpUpdateSchema = z.object({
@@ -106,7 +130,8 @@ export const pushTokenSchema = z.object({
 export const createMeetingPointSchema = z.object({
   label: z.string().optional(),
   googleMapsUrl: z.string().url(),
-  time: z.string().datetime(),
+  // Optional: a point dropped mid-event is happening now, so the server defaults it.
+  time: z.string().datetime().optional(),
   // Manual fallback pin, used only if the URL can't be parsed server-side.
   location: geoPointSchema.optional(),
 });

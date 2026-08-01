@@ -1,7 +1,8 @@
 import type { MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
+import { formatActivityWhen } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Calendar from 'expo-calendar';
+import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -24,66 +25,30 @@ import { groupsApi } from '../../../../../../src/api/groupsApi';
 import { getCurrentLocationSnapshot } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
 
-async function addToDeviceCalendar(title: string, startAt: string, description?: string | null) {
-  const { status } = await Calendar.requestCalendarPermissionsAsync();
-  if (status !== 'granted') return false;
-
-  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
-  let calendarId = calendars.find((c) => c.allowsModifications)?.id;
-
-  if (!calendarId) {
-    const source =
-      Platform.OS === 'ios'
-        ? (await Calendar.getDefaultCalendarAsync()).source
-        : { isLocalAccount: true, name: 'MeetingPnt', type: 'LOCAL' };
-    calendarId = await Calendar.createCalendarAsync({
-      title: 'MeetingPnt',
-      color: '#2563eb',
-      entityType: Calendar.EntityTypes.EVENT,
-      source,
-      name: 'meetingpnt',
-      ownerAccount: 'meetingpnt',
-      accessLevel: Calendar.CalendarAccessLevel.OWNER,
-    });
-  }
-
-  const start = new Date(startAt);
-  await Calendar.createEventAsync(calendarId, {
-    title,
-    startDate: start,
-    endDate: new Date(start.getTime() + 60 * 60 * 1000),
-    notes: description ?? undefined,
-  });
-  return true;
-}
-
-/** Mirrors the backend's OMW/ping ETA target: soonest time that hasn't passed yet. */
-function getNextUpcoming(meetingPoints: MeetingPoint[]): MeetingPoint | undefined {
-  const now = Date.now();
-  const upcoming = meetingPoints
-    .filter((m) => new Date(m.time).getTime() >= now)
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-  if (upcoming[0]) return upcoming[0];
-  return [...meetingPoints].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())[0];
-}
-
 export default function ActivityDetailScreen() {
   const { groupId, activityId } = useLocalSearchParams<{ groupId: string; activityId: string }>();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+
   const [note, setNote] = useState('');
   const [myStatus, setMyStatus] = useState<RsvpStatus | null>(null);
   const [rsvpMessage, setRsvpMessage] = useState<string | null>(null);
-  const [calendarMessage, setCalendarMessage] = useState<string | null>(null);
   const [omwMessage, setOmwMessage] = useState<string | null>(null);
   const [omwSubmitting, setOmwSubmitting] = useState(false);
+
+  // Meeting point editor — doubles as "change the current one" and "move the group on".
+  const [mpMode, setMpMode] = useState<null | 'edit' | 'add'>(null);
   const [mpLabel, setMpLabel] = useState('');
   const [mpUrl, setMpUrl] = useState('');
-  const [mpTime, setMpTime] = useState(new Date());
+  const [mpTime, setMpTime] = useState<Date | null>(null);
   const [showMpPicker, setShowMpPicker] = useState(false);
   const [mpError, setMpError] = useState<string | null>(null);
   const [mpSubmitting, setMpSubmitting] = useState(false);
+
   const [visitorEmail, setVisitorEmail] = useState('');
+  const [visitorFirstName, setVisitorFirstName] = useState('');
+  const [visitorLastName, setVisitorLastName] = useState('');
+  const [visitorPhone, setVisitorPhone] = useState('');
   const [visitorMessage, setVisitorMessage] = useState<string | null>(null);
   const [visitorSubmitting, setVisitorSubmitting] = useState(false);
 
@@ -96,50 +61,43 @@ export default function ActivityDetailScreen() {
     queryFn: () => groupsApi.get(groupId),
   });
   const isLeader = groupQuery.data?.group.leaderId === user?.id;
-
-  const myRsvpQuery = useQuery({
-    queryKey: ['activities', activityId, 'rsvp', 'me'],
-    queryFn: () => rsvpsApi.getMine(activityId),
-    enabled: !isLeader,
-  });
-  useEffect(() => {
-    if (myRsvpQuery.data?.rsvp) setMyStatus(myRsvpQuery.data.rsvp.status);
-  }, [myRsvpQuery.data]);
-
-  const rsvpsQuery = useQuery({
-    queryKey: ['activities', activityId, 'rsvps'],
-    queryFn: () => rsvpsApi.list(activityId),
-    enabled: isLeader,
-  });
-
-  const guestsQuery = useQuery({
-    queryKey: ['activities', activityId, 'guests'],
-    queryFn: () => activityInvitationsApi.listGuests(activityId),
-    enabled: isLeader,
-  });
-
-  const attendanceQuery = useQuery({
-    queryKey: ['activities', activityId, 'attendance'],
-    queryFn: () => attendanceApi.list(activityId),
-    enabled: isLeader,
-  });
-  const attendanceByUser = new Map(
-    attendanceQuery.data?.attendance.map((record) => [record.userId, record]) ?? [],
-  );
-
-  async function handleMarkAttendance(userId: string, status: 'present' | 'absent') {
-    await attendanceApi.mark(activityId, userId, status);
-    queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'attendance'] });
-  }
+  const activity = activityQuery.data?.activity;
 
   const meetingPointsQuery = useQuery({
     queryKey: ['activities', activityId, 'meeting-points'],
     queryFn: () => meetingPointsApi.list(activityId),
   });
   const meetingPoints = meetingPointsQuery.data?.meetingPoints ?? [];
-  const nextMeetingPoint = getNextUpcoming(meetingPoints);
+  // The group moves forward through its meeting points, so the newest one is where they are now.
+  const currentPoint: MeetingPoint | undefined = meetingPoints[meetingPoints.length - 1];
+  const earlierPoints = meetingPoints.slice(0, -1);
 
-  const activity = activityQuery.data?.activity;
+  const rollCallQuery = useQuery({
+    queryKey: ['meeting-points', currentPoint?.id, 'roll-call'],
+    queryFn: () => attendanceApi.rollCall(currentPoint!.id),
+    enabled: isLeader && !!currentPoint,
+  });
+  const rollCall = rollCallQuery.data?.entries ?? [];
+
+  const myRsvpQuery = useQuery({
+    queryKey: ['activities', activityId, 'rsvp', 'me'],
+    queryFn: () => rsvpsApi.getMine(activityId),
+    enabled: !isLeader,
+  });
+
+  // Members see who else is coming — names only, never the leader's roll call.
+  const attendeesQuery = useQuery({
+    queryKey: ['activities', activityId, 'attendees'],
+    queryFn: () => rsvpsApi.attendees(activityId),
+    enabled: !isLeader,
+  });
+  useEffect(() => {
+    if (myRsvpQuery.data?.rsvp) setMyStatus(myRsvpQuery.data.rsvp.status);
+  }, [myRsvpQuery.data]);
+
+  function refreshRollCall() {
+    queryClient.invalidateQueries({ queryKey: ['meeting-points', currentPoint?.id, 'roll-call'] });
+  }
 
   async function handleRsvp(status: RsvpStatus) {
     setRsvpMessage(null);
@@ -149,32 +107,92 @@ export default function ActivityDetailScreen() {
     });
     setMyStatus(rsvp.status);
     setRsvpMessage(`You're marked as ${rsvp.status}.`);
+    queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'attendees'] });
+    queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
   }
 
-  async function handlePublish() {
-    await activitiesApi.publish(activityId);
+  async function handleStart() {
+    await activitiesApi.start(activityId);
     queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
   }
 
-  async function handleAddToCalendar() {
-    if (!activity) return;
-    const ok = await addToDeviceCalendar(activity.title, activity.startAt, activity.description);
-    setCalendarMessage(ok ? 'Added to your calendar.' : 'Calendar permission denied.');
+  async function handleEnd() {
+    await activitiesApi.end(activityId);
+    queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
   }
 
-  async function handleAddMeetingPoint() {
+  async function handleMarkAttendance(userId: string, status: 'present' | 'absent') {
+    if (!currentPoint) return;
+    await attendanceApi.mark(currentPoint.id, userId, status);
+    refreshRollCall();
+  }
+
+  /** Answering on a member's behalf — they told the leader in person or by phone. */
+  async function handleRsvpForMember(userId: string, status: 'approved' | 'declined') {
+    await rsvpsApi.setForUser(activityId, userId, { status });
+    refreshRollCall();
+    queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
+  }
+
+  function openEditor(mode: 'edit' | 'add') {
+    if (mode === 'edit' && currentPoint) {
+      setMpLabel(currentPoint.label ?? '');
+      setMpUrl(currentPoint.googleMapsUrl);
+      setMpTime(new Date(currentPoint.time));
+    } else {
+      setMpLabel('');
+      setMpUrl('');
+      setMpTime(null); // no time means "now"
+    }
+    setMpError(null);
+    setMpMode(mode);
+  }
+
+  /** The leader is usually standing at the new meeting point, so their own GPS is the fastest way in. */
+  async function useCurrentLocation() {
+    setMpError(null);
+    const location = await getCurrentLocationSnapshot();
+    if (!location) {
+      setMpError('Location permission is required to use your current position.');
+      return;
+    }
+    setMpUrl(`https://www.google.com/maps/@${location.lat.toFixed(6)},${location.lng.toFixed(6)},17z`);
+  }
+
+  /** Opens Maps so they can search for somewhere they aren't standing, then paste the link back. */
+  async function openGoogleMaps() {
+    const query = mpLabel.trim();
+    await Linking.openURL(
+      query
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+        : 'https://www.google.com/maps',
+    );
+  }
+
+  async function pasteLink() {
+    const text = (await Clipboard.getStringAsync())?.trim();
+    if (!text) {
+      setMpError('Nothing on the clipboard to paste.');
+      return;
+    }
+    setMpError(null);
+    setMpUrl(text);
+  }
+
+  async function handleSaveMeetingPoint() {
     if (!mpUrl.trim()) return;
     setMpError(null);
     setMpSubmitting(true);
     try {
-      await meetingPointsApi.create(activityId, {
+      const dto = {
         label: mpLabel || undefined,
         googleMapsUrl: mpUrl,
-        time: mpTime.toISOString(),
-      });
-      setMpLabel('');
-      setMpUrl('');
-      setMpTime(new Date());
+        time: mpTime ? mpTime.toISOString() : undefined,
+      };
+      if (mpMode === 'edit' && currentPoint) await meetingPointsApi.update(currentPoint.id, dto);
+      else await meetingPointsApi.create(activityId, dto);
+
+      setMpMode(null);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
     } catch {
       setMpError("Couldn't read that Maps link — try a full (non-shortened) URL.");
@@ -210,16 +228,23 @@ export default function ActivityDetailScreen() {
   }
 
   async function handleInviteVisitor() {
-    if (!visitorEmail.trim()) return;
+    if (!visitorEmail.trim() || !visitorFirstName.trim() || !visitorLastName.trim()) return;
     setVisitorMessage(null);
     setVisitorSubmitting(true);
     try {
-      const result = await activityInvitationsApi.invite(activityId, { email: visitorEmail });
-      setVisitorMessage(
-        result.type === 'added' ? `${visitorEmail} added as a visitor.` : `Invitation sent to ${visitorEmail}.`,
-      );
+      const result = await activityInvitationsApi.invite(activityId, {
+        email: visitorEmail,
+        firstName: visitorFirstName,
+        lastName: visitorLastName,
+        ...(visitorPhone.trim() ? { phone: visitorPhone.trim() } : {}),
+      });
+      const who = `${visitorFirstName} ${visitorLastName}`.trim();
+      setVisitorMessage(result.type === 'added' ? `${who} added.` : `Invitation sent to ${who}.`);
       setVisitorEmail('');
-      queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'guests'] });
+      setVisitorFirstName('');
+      setVisitorLastName('');
+      setVisitorPhone('');
+      refreshRollCall();
     } catch {
       setVisitorMessage('Failed to invite visitor.');
     } finally {
@@ -227,39 +252,66 @@ export default function ActivityDetailScreen() {
     }
   }
 
+  const markedCount = rollCall.filter((e) => e.attendance !== null).length;
+  const presentCount = rollCall.filter((e) => e.attendance === 'present').length;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <Text style={styles.title}>{activity?.title ?? '…'}</Text>
       {activity && (
         <>
           <Text style={styles.muted}>
-            {new Date(activity.startAt).toLocaleString()}
-            {activity.endAt ? ` → ${new Date(activity.endAt).toLocaleString()}` : ''} ·{' '}
-            {activity.transportMode} · {activity.status}
-            {!activity.requiresRsvp ? ' · no RSVP required' : ''}
+            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)} ·{' '}
+            {activity.status}
           </Text>
           {activity.description && <Text style={styles.desc}>{activity.description}</Text>}
 
-          <Text style={styles.sectionTitle}>Meeting points</Text>
-          {meetingPoints.map((mp) => (
-            <TouchableOpacity
-              key={mp.id}
-              style={styles.meetingPointRow}
-              onPress={() => Linking.openURL(mp.googleMapsUrl)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={mp.id === nextMeetingPoint?.id ? styles.meetingPointNext : undefined}>
-                  {mp.label || 'Meeting point'} — {new Date(mp.time).toLocaleString()}
-                  {mp.id === nextMeetingPoint?.id ? ' (next)' : ''}
-                </Text>
-              </View>
-              <Text style={styles.link}>Directions</Text>
+          {isLeader && activity.status === 'published' && (
+            <TouchableOpacity style={styles.button} onPress={handleStart}>
+              <Text style={styles.buttonText}>Start event</Text>
             </TouchableOpacity>
-          ))}
-          {meetingPoints.length === 0 && <Text style={styles.muted}>No meeting points set yet.</Text>}
+          )}
+          {isLeader && (activity.status === 'published' || activity.status === 'in_progress') && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleEnd}>
+              <Text style={styles.secondaryButtonText}>End event</Text>
+            </TouchableOpacity>
+          )}
+          {activity.status === 'completed' && (
+            <Text style={styles.muted}>This event has ended — location sharing is closed.</Text>
+          )}
 
-          {isLeader && (
-            <View style={{ marginTop: 8 }}>
+          {/* ---- where the group is right now ---- */}
+          <Text style={styles.sectionTitle}>Meeting point</Text>
+          {currentPoint ? (
+            <View style={styles.currentPoint}>
+              <Text style={styles.currentPointLabel}>{currentPoint.label || 'Meeting point'}</Text>
+              <Text style={styles.muted}>{new Date(currentPoint.time).toLocaleString()}</Text>
+              <View style={styles.pointActions}>
+                <TouchableOpacity onPress={() => Linking.openURL(currentPoint.googleMapsUrl)}>
+                  <Text style={styles.link}>Directions</Text>
+                </TouchableOpacity>
+                {isLeader && (
+                  <TouchableOpacity onPress={() => openEditor('edit')}>
+                    <Text style={styles.link}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.muted}>No meeting point set yet.</Text>
+          )}
+
+          {isLeader && mpMode === null && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => openEditor('add')}>
+              <Text style={styles.secondaryButtonText}>+ Add meeting point (move the group on)</Text>
+            </TouchableOpacity>
+          )}
+
+          {isLeader && mpMode !== null && (
+            <View style={styles.editor}>
+              <Text style={styles.editorTitle}>
+                {mpMode === 'edit' ? 'Edit meeting point' : 'New meeting point'}
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Label (optional)"
@@ -270,40 +322,114 @@ export default function ActivityDetailScreen() {
                 style={styles.input}
                 placeholder="Google Maps URL"
                 autoCapitalize="none"
+                autoCorrect={false}
                 value={mpUrl}
                 onChangeText={setMpUrl}
               />
+              <View style={styles.pickerRow}>
+                <TouchableOpacity onPress={useCurrentLocation}>
+                  <Text style={styles.tap}>Use my location</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={openGoogleMaps}>
+                  <Text style={styles.tap}>Open Google Maps</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={pasteLink}>
+                  <Text style={styles.tap}>Paste link</Text>
+                </TouchableOpacity>
+              </View>
               <TouchableOpacity style={styles.input} onPress={() => setShowMpPicker(true)}>
-                <Text>{mpTime.toLocaleString()}</Text>
+                <Text>{mpTime ? mpTime.toLocaleString() : 'Time (optional — defaults to now)'}</Text>
               </TouchableOpacity>
               {showMpPicker && (
                 <DateTimePicker
-                  value={mpTime}
+                  value={mpTime ?? new Date()}
                   mode="datetime"
-                  onChange={(_event, selectedDate) => {
+                  onChange={(_event, selected) => {
                     setShowMpPicker(Platform.OS === 'ios');
-                    if (selectedDate) setMpTime(selectedDate);
+                    if (selected) setMpTime(selected);
                   }}
                 />
               )}
-              <TouchableOpacity style={styles.secondaryButton} onPress={handleAddMeetingPoint} disabled={mpSubmitting}>
-                <Text style={styles.secondaryButtonText}>{mpSubmitting ? 'Adding…' : 'Add meeting point'}</Text>
-              </TouchableOpacity>
+              <View style={styles.editorActions}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleSaveMeetingPoint}
+                  disabled={mpSubmitting}
+                >
+                  <Text style={styles.buttonText}>{mpSubmitting ? 'Saving…' : 'Save'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setMpMode(null)}>
+                  <Text style={styles.link}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
               {mpError && <Text style={styles.error}>{mpError}</Text>}
             </View>
           )}
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleAddToCalendar}>
-            <Text style={styles.secondaryButtonText}>Add to Calendar</Text>
-          </TouchableOpacity>
-          {calendarMessage && <Text style={styles.muted}>{calendarMessage}</Text>}
+          {/* ---- who's here: RSVP and attendance in one list ---- */}
+          {isLeader && currentPoint && (
+            <>
+              <Text style={styles.sectionTitle}>
+                Who&rsquo;s here{'  '}
+                <Text style={styles.muted}>
+                  {presentCount} present · {markedCount}/{rollCall.length} checked
+                </Text>
+              </Text>
+              {earlierPoints.length > 0 && (
+                <Text style={styles.hint}>
+                  Showing whoever made the previous stop. People who declined aren&rsquo;t listed.
+                </Text>
+              )}
 
-          {isLeader && activity.status === 'draft' && (
-            <TouchableOpacity style={styles.button} onPress={handlePublish}>
-              <Text style={styles.buttonText}>Publish &amp; notify members</Text>
-            </TouchableOpacity>
+              {rollCall.map((entry) => (
+                <View key={entry.user.id} style={styles.personRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.personName}>
+                      {entry.user.name}
+                      {entry.isVisitor ? '  ·  visitor' : ''}
+                    </Text>
+                    <Text style={styles.muted}>
+                      {entry.rsvpStatus === 'approved' ? 'Coming' : 'No reply yet'}
+                      {entry.attendance ? ` · ${entry.attendance}` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.personActions}>
+                    <TouchableOpacity onPress={() => handleMarkAttendance(entry.user.id, 'present')}>
+                      <Text
+                        style={[styles.tap, entry.attendance === 'present' && styles.tapActive]}
+                      >
+                        Here
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleMarkAttendance(entry.user.id, 'absent')}>
+                      <Text style={[styles.tap, entry.attendance === 'absent' && styles.tapDanger]}>
+                        Missing
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleRequestLocation(entry.user.id)}>
+                      <Text style={styles.tap}>Locate</Text>
+                    </TouchableOpacity>
+                    {/* Answer for them if they replied by phone rather than in the app. */}
+                    {entry.rsvpStatus !== 'approved' && (
+                      <TouchableOpacity
+                        onPress={() => handleRsvpForMember(entry.user.id, 'approved')}
+                      >
+                        <Text style={styles.tap}>Confirm</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity onPress={() => handleRsvpForMember(entry.user.id, 'declined')}>
+                      <Text style={styles.tapMuted}>Won&rsquo;t arrive</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              {rollCall.length === 0 && (
+                <Text style={styles.muted}>Nobody expected at this meeting point.</Text>
+              )}
+            </>
           )}
 
+          {/* ---- member's own view ---- */}
           {activity.status !== 'draft' && !isLeader && (
             <View style={styles.rsvpBox}>
               <Text style={styles.sectionTitle}>Your RSVP</Text>
@@ -339,80 +465,87 @@ export default function ActivityDetailScreen() {
               )}
             </View>
           )}
-        </>
-      )}
 
-      {isLeader && rsvpsQuery.data && (
-        <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>RSVP dashboard</Text>
-          {rsvpsQuery.data.rsvps.map((rsvp) => (
-            <View key={rsvp.id} style={styles.dashboardRow}>
-              <View style={{ flex: 1 }}>
-                <Text>{rsvp.user.name}</Text>
-                <Text style={styles.muted}>
-                  {rsvp.status}
-                  {rsvp.note ? ` — ${rsvp.note}` : ''}
+          {/* Who else is coming. Names only — attendance is the leader's view. */}
+          {!isLeader && activity.status !== 'draft' && (
+            <View style={styles.rsvpBox}>
+              <Text style={styles.sectionTitle}>
+                Coming{' '}
+                <Text style={styles.muted}>({attendeesQuery.data?.attendees.length ?? 0})</Text>
+              </Text>
+              {attendeesQuery.data?.attendees.map((attendee) => (
+                <Text key={attendee.user.id} style={styles.attendeeName}>
+                  {attendee.user.name}
+                  {attendee.isVisitor ? '  ·  visitor' : ''}
                 </Text>
-              </View>
-              {rsvp.status === 'approved' && (
-                <TouchableOpacity onPress={() => handleRequestLocation(rsvp.userId)}>
-                  <Text style={styles.link}>Request location</Text>
-                </TouchableOpacity>
+              ))}
+              {(attendeesQuery.data?.attendees.length ?? 0) === 0 && (
+                <Text style={styles.muted}>Nobody has confirmed yet.</Text>
               )}
             </View>
-          ))}
-          {rsvpsQuery.data.rsvps.length === 0 && <Text style={styles.muted}>No RSVPs yet.</Text>}
-        </View>
-      )}
-
-      {isLeader && rsvpsQuery.data && (
-        <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>Attendance</Text>
-          <Text style={styles.muted}>Roll call for who actually showed up.</Text>
-          {rsvpsQuery.data.rsvps
-            .filter((rsvp) => rsvp.status === 'approved')
-            .map((rsvp) => {
-              const record = attendanceByUser.get(rsvp.userId);
-              return (
-                <View key={rsvp.id} style={styles.dashboardRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text>{rsvp.user.name}</Text>
-                    {record && <Text style={styles.muted}>{record.status}</Text>}
-                  </View>
-                  <TouchableOpacity onPress={() => handleMarkAttendance(rsvp.userId, 'present')}>
-                    <Text style={[styles.link, { marginRight: 12 }]}>Present</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleMarkAttendance(rsvp.userId, 'absent')}>
-                    <Text style={styles.link}>Absent</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-        </View>
+          )}
+        </>
       )}
 
       {isLeader && (
         <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>Visitors</Text>
-          <Text style={styles.muted}>People invited to just this activity, without joining the group.</Text>
-          <View style={{ marginTop: 8 }}>
-            <TextInput
-              style={styles.input}
-              placeholder="visitor@example.com"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={visitorEmail}
-              onChangeText={setVisitorEmail}
-            />
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleInviteVisitor} disabled={visitorSubmitting}>
-              <Text style={styles.secondaryButtonText}>{visitorSubmitting ? 'Sending…' : 'Invite visitor'}</Text>
+          <Text style={styles.sectionTitle}>Add a visitor</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="First name"
+            value={visitorFirstName}
+            onChangeText={setVisitorFirstName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Last name"
+            value={visitorLastName}
+            onChangeText={setVisitorLastName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone (optional)"
+            keyboardType="phone-pad"
+            value={visitorPhone}
+            onChangeText={setVisitorPhone}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="visitor@example.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            value={visitorEmail}
+            onChangeText={setVisitorEmail}
+          />
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleInviteVisitor}
+            disabled={visitorSubmitting}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {visitorSubmitting ? 'Sending…' : 'Invite visitor'}
+            </Text>
+          </TouchableOpacity>
+          {visitorMessage && <Text style={styles.muted}>{visitorMessage}</Text>}
+        </View>
+      )}
+
+      {isLeader && earlierPoints.length > 0 && (
+        <View style={styles.rsvpBox}>
+          <Text style={styles.sectionTitle}>Earlier stops</Text>
+          {earlierPoints.map((mp) => (
+            <TouchableOpacity
+              key={mp.id}
+              style={styles.dashboardRow}
+              onPress={() => Linking.openURL(mp.googleMapsUrl)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text>{mp.label || 'Meeting point'}</Text>
+                <Text style={styles.muted}>{new Date(mp.time).toLocaleString()}</Text>
+              </View>
+              <Text style={styles.link}>Directions</Text>
             </TouchableOpacity>
-            {visitorMessage && <Text style={styles.muted}>{visitorMessage}</Text>}
-          </View>
-          {guestsQuery.data?.guests.map((guest) => (
-            <View key={guest.id} style={styles.dashboardRow}>
-              <Text>{guest.user.name} ({guest.user.email})</Text>
-            </View>
           ))}
         </View>
       )}
@@ -425,21 +558,35 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '600' },
   desc: { marginTop: 8 },
   muted: { color: '#888', marginTop: 4 },
+  hint: { color: '#888', fontSize: 12, marginBottom: 8 },
   error: { color: 'crimson', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 24, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 8 },
-  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 16 },
+  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   buttonText: { color: 'white', fontWeight: '600' },
   secondaryButton: { borderWidth: 1, borderColor: '#2563eb', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   secondaryButtonText: { color: '#2563eb', fontWeight: '600' },
   link: { color: '#2563eb', fontWeight: '600' },
+  currentPoint: { borderWidth: 2, borderColor: '#2563eb', backgroundColor: '#eff6ff', borderRadius: 10, padding: 14 },
+  currentPointLabel: { fontSize: 16, fontWeight: '600' },
+  pointActions: { flexDirection: 'row', gap: 20, marginTop: 10 },
+  editor: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 12, marginTop: 12 },
+  editorTitle: { fontWeight: '600', marginBottom: 8 },
+  editorActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 12 },
+  personRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  personName: { fontWeight: '600' },
+  attendeeName: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  personActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 },
+  tap: { color: '#2563eb', fontWeight: '600' },
+  tapActive: { color: '#16a34a' },
+  tapDanger: { color: '#dc2626' },
+  tapMuted: { color: '#94a3b8' },
   rsvpBox: { marginTop: 20 },
   rsvpRow: { flexDirection: 'row', gap: 8 },
   rsvpButton: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, alignItems: 'center' },
   rsvpApproved: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
   rsvpDeclined: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
   rsvpButtonText: { fontWeight: '600' },
-  dashboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  meetingPointRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  meetingPointNext: { fontWeight: '600', color: '#2563eb' },
+  dashboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
 });

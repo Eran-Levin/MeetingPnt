@@ -19,7 +19,11 @@ export interface GeoPoint {
 export interface User {
   id: string;
   email: string;
+  firstName: string;
+  lastName: string;
+  /** `firstName lastName`, derived server-side so every screen renders a person the same way. */
   name: string;
+  phone: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;
@@ -45,11 +49,14 @@ export interface GroupMember {
 }
 
 export interface GroupMemberWithUser extends GroupMember {
-  user: Pick<User, 'id' | 'name' | 'email'>;
+  /** The roster carries the phone number — it's how a leader reaches someone who hasn't shown up. */
+  user: Pick<User, 'id' | 'name' | 'email' | 'phone'>;
 }
 
 export interface GroupWithRole extends Group {
   isLeader: boolean;
+  /** Start of the soonest activity that hasn't finished yet, or null if nothing is scheduled. */
+  nextActivityAt: string | null;
 }
 
 export interface Invitation {
@@ -77,6 +84,10 @@ export interface ActivityGuestWithUser extends ActivityGuest {
 
 export interface InvitationPreview {
   email: string;
+  /** What the leader entered when inviting — the sign-up form starts from these. */
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
   group: Pick<Group, 'id' | 'name'>;
 }
 
@@ -87,7 +98,9 @@ export interface Activity {
   title: string;
   description: string | null;
   startAt: string;
-  endAt: string | null;
+  endAt: string;
+  /** Multi-day/date-only activity: clock times are not meaningful and are hidden in the UI. */
+  allDay: boolean;
   transportMode: TransportMode;
   requiresRsvp: boolean;
   status: ActivityStatus;
@@ -96,9 +109,28 @@ export interface Activity {
   updatedAt: string;
 }
 
+/** Attendance is recorded per meeting point, not per activity — a group that moves between
+ * sites needs to know who was present at each one. Activity-level participation is derived
+ * from these (see ActivityParticipation). */
+/** An activity carrying enough group context to render in a cross-group timeline. */
+export interface ActivityWithGroup extends Activity {
+  group: Pick<Group, 'id' | 'name'>;
+  isLeader: boolean;
+  /** The caller's own RSVP, so the timeline can flag events still awaiting a reply. Null for a
+   * leader, who doesn't RSVP to their own event. */
+  myRsvpStatus: RsvpStatus | null;
+}
+
+/** Someone confirmed as coming, as shown to fellow members. Deliberately carries no attendance
+ * data — the roll call is the leader's view, not something peers see about each other. */
+export interface Attendee {
+  user: Pick<User, 'id' | 'name'>;
+  isVisitor: boolean;
+}
+
 export interface Attendance {
   id: string;
-  activityId: string;
+  meetingPointId: string;
   userId: string;
   status: AttendanceStatus;
   markedBy: string;
@@ -107,6 +139,27 @@ export interface Attendance {
 
 export interface AttendanceWithUser extends Attendance {
   user: Pick<User, 'id' | 'name' | 'email'>;
+}
+
+/**
+ * One person on the roll call for a meeting point, merging their RSVP with whether they've
+ * been marked present there. The roster narrows as the group moves: the first meeting point
+ * expects everyone who hasn't declined, each later one expects whoever made the previous stop.
+ */
+export interface RollCallEntry {
+  user: Pick<User, 'id' | 'name' | 'email'>;
+  isVisitor: boolean;
+  rsvpStatus: RsvpStatus;
+  /** null until the leader marks them at this meeting point. */
+  attendance: AttendanceStatus | null;
+}
+
+/** Roll-up across every meeting point of one activity: attended if present at any of them. */
+export interface ActivityParticipation {
+  user: Pick<User, 'id' | 'name' | 'email'>;
+  attended: boolean;
+  presentCount: number;
+  totalMeetingPoints: number;
 }
 
 export interface Message {
@@ -134,6 +187,8 @@ export interface Rsvp {
 
 export interface RsvpWithUser extends Rsvp {
   user: Pick<User, 'id' | 'name' | 'email'>;
+  /** True for an activity guest ("visitor") rather than a member of the group. */
+  isVisitor: boolean;
 }
 
 export interface MeetingPoint {

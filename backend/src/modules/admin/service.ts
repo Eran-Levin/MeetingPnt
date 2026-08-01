@@ -2,12 +2,16 @@ import type { Role, User as SharedUser } from '@meetingpnt/shared';
 import type { User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { displayName } from '../../lib/userName.js';
 
 function toSharedUser(user: User): SharedUser {
   return {
     id: user.id,
     email: user.email,
-    name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    name: displayName(user),
+    phone: user.phone,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
@@ -22,7 +26,9 @@ export async function listUsers(params: { search?: string; role?: Role }) {
         ? {
             OR: [
               { email: { contains: params.search, mode: 'insensitive' } },
-              { name: { contains: params.search, mode: 'insensitive' } },
+              { firstName: { contains: params.search, mode: 'insensitive' } },
+              { lastName: { contains: params.search, mode: 'insensitive' } },
+              { phone: { contains: params.search, mode: 'insensitive' } },
             ],
           }
         : {}),

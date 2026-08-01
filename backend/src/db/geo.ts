@@ -44,29 +44,36 @@ export async function insertMeetingPoint(input: {
   return rows[0]!;
 }
 
+/**
+ * Ordered by creation, not by `time`: this is the sequence the group actually moves through.
+ * Sorting by `time` breaks as soon as a point is dropped mid-event on an activity scheduled for
+ * the future — "now" sorts before the planned start, so the newest stop would appear first.
+ * Callers rely on this order for "the initial point", "the current point" and the roll-call
+ * carry-forward, and getCurrentMeetingPoint takes the last of them as the ETA target.
+ */
 export async function listMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
   return prisma.$queryRaw<MeetingPointRow[]>`
     SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
-    WHERE activity_id = ${activityId} ORDER BY time ASC
+    WHERE activity_id = ${activityId} ORDER BY created_at ASC
   `;
 }
 
-/** The meeting point OMW/ping ETA should target: whichever time is soonest and hasn't passed yet. */
-export async function getNextUpcomingMeetingPoint(activityId: string): Promise<MeetingPointRow | null> {
+/**
+ * Where the group is now, and therefore where an "On My Way" ETA is measured to: the most
+ * recently added meeting point.
+ *
+ * This deliberately matches what the apps display as the current point. Picking the soonest
+ * *future* time instead looks reasonable but diverges the moment a point is dropped mid-event on
+ * an activity scheduled ahead — a member would be shown the market and have their ETA computed to
+ * the clock tower. "Where I'm told to go" and "where my ETA is measured to" must be the same place.
+ */
+export async function getCurrentMeetingPoint(activityId: string): Promise<MeetingPointRow | null> {
   const rows = await prisma.$queryRaw<MeetingPointRow[]>`
     SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
-    WHERE activity_id = ${activityId} AND time >= now()
-    ORDER BY time ASC LIMIT 1
-  `;
-  if (rows[0]) return rows[0];
-
-  // All meeting points have passed — fall back to the most recent one rather than none at all.
-  const fallback = await prisma.$queryRaw<MeetingPointRow[]>`
-    SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
     WHERE activity_id = ${activityId}
-    ORDER BY time DESC LIMIT 1
+    ORDER BY created_at DESC LIMIT 1
   `;
-  return fallback[0] ?? null;
+  return rows[0] ?? null;
 }
 
 export async function getMeetingPointById(id: string): Promise<MeetingPointRow | null> {
@@ -104,6 +111,21 @@ export async function updateMeetingPoint(
     RETURNING ${MEETING_POINT_COLUMNS}
   `;
   return rows[0] ?? null;
+}
+
+/**
+ * Moving an activity moves its meeting points with it. Times are shifted by the same delta
+ * rather than rewritten, so "gather 15 minutes before we start" survives a reschedule — the
+ * leader set that offset deliberately and shouldn't have to re-enter it.
+ */
+export async function shiftMeetingPointTimes(activityId: string, deltaMs: number): Promise<void> {
+  if (deltaMs === 0) return;
+  const seconds = Math.round(deltaMs / 1000);
+  await prisma.$executeRaw`
+    UPDATE meeting_points
+    SET time = time + (${seconds} * INTERVAL '1 second')
+    WHERE activity_id = ${activityId}
+  `;
 }
 
 const LOCATION_SNAPSHOT_COLUMNS = Prisma.sql`

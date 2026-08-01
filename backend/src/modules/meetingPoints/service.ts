@@ -67,7 +67,8 @@ export async function createMeetingPoint(
     label: dto.label,
     googleMapsUrl: dto.googleMapsUrl,
     location,
-    time: new Date(dto.time),
+    // A point dropped mid-event has no explicit time — it's happening now.
+    time: dto.time ? new Date(dto.time) : new Date(),
     createdBy: requesterId,
   });
 

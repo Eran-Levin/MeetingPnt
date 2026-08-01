@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import type { CreateActivityDto } from '@meetingpnt/shared';
 import { env } from '../src/config/env.js';
+import { listMeetingPoints } from '../src/db/geo.js';
 import { prisma } from '../src/db/prisma.js';
 import { hashPassword } from '../src/lib/password.js';
 import * as activitiesService from '../src/modules/activities/service.js';
@@ -23,6 +24,23 @@ function daysFromNow(days: number, hour: number, minute = 0): Date {
   return date;
 }
 
+function hoursFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+/** All-day activities span whole days, so their bounds sit at midnight and one second to midnight. */
+function startOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date: Date): Date {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 0);
+  return d;
+}
+
 /** The most recent occurrence of `dayOfWeek` on/before today, offset by `weeksAgo` more weeks
  * (negative pushes forward, e.g. -1 lands on next week's occurrence instead). */
 function weekdayAnchor(dayOfWeek: number, weeksAgo: number, hour: number, minute = 0): Date {
@@ -39,11 +57,29 @@ function mapsUrl(lat: number, lng: number): string {
   return `https://www.google.com/maps/@${lat.toFixed(4)},${lng.toFixed(4)},17z`;
 }
 
+/** Callers pass a full name; the split mirrors what the invite form collects. */
 async function ensureUser(email: string, name: string, role: 'admin' | 'leader' | 'user') {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return existing;
   const passwordHash = await hashPassword(TEST_PASSWORD);
-  return prisma.user.create({ data: { email, name, role, passwordHash } });
+  const [firstName, ...rest] = name.trim().split(' ');
+  return prisma.user.create({
+    data: {
+      email,
+      firstName: firstName!,
+      lastName: rest.join(' '),
+      phone: seededPhone(email),
+      role,
+      passwordHash,
+    },
+  });
+}
+
+/** Stable fake numbers so the roster has something to show without being real. */
+function seededPhone(email: string): string {
+  let hash = 0;
+  for (const char of email) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return `+972 5${(hash % 10)}-${String(hash % 1000).padStart(3, '0')}-${String(hash % 10000).padStart(4, '0')}`;
 }
 
 async function ensureMembership(groupId: string, userId: string) {
@@ -51,6 +87,16 @@ async function ensureMembership(groupId: string, userId: string) {
     where: { groupId_userId: { groupId, userId } },
     create: { groupId, userId, status: 'active' },
     update: { status: 'active' },
+  });
+}
+
+/** Writes an RSVP straight to the table. Seeded history includes events that have already run,
+ * and the service layer rightly refuses a member RSVP once an activity has started. */
+async function recordRsvp(activityId: string, userId: string, status: 'approved' | 'declined') {
+  await prisma.rsvp.upsert({
+    where: { activityId_userId: { activityId, userId } },
+    create: { activityId, userId, status, respondedAt: new Date() },
+    update: { status, respondedAt: new Date() },
   });
 }
 
@@ -117,7 +163,10 @@ async function main() {
     const dto: CreateActivityDto = {
       title: 'Street Photography Walk',
       description: 'Bring your camera and comfortable shoes — we cover a few miles.',
-      startAt: weekdayAnchor(0, -1, 9, 0).toISOString(), // next Sunday, 9:00 AM
+      // Anchored to the most recent Sunday, so the first occurrence has genuinely happened and
+      // the later ones are still ahead. A future event must never look like it already ran.
+      startAt: weekdayAnchor(0, 0, 9, 0).toISOString(),
+      endAt: weekdayAnchor(0, 0, 12, 0).toISOString(),
       transportMode: 'walking',
       requiresRsvp: true,
       recurrence: {
@@ -138,26 +187,48 @@ async function main() {
     const occurrences = await activitiesService.createActivity(photoGroupA.id, photoLeader.id, dto);
 
     // Publish the first two occurrences individually; leave the third as a draft.
-    await activitiesService.publishActivity(occurrences[0]!.id, photoLeader.id);
+    const past = occurrences[0]!;
+    await activitiesService.publishActivity(past.id, photoLeader.id);
     await activitiesService.publishActivity(occurrences[1]!.id, photoLeader.id);
 
-    // Mid-session move: a second meeting point on the first occurrence, 90 minutes later.
-    const firstStart = new Date(occurrences[0]!.startAt);
-    await meetingPointsService.createMeetingPoint(occurrences[0]!.id, photoLeader.id, {
+    // People replied before the walk, so this bypasses the start-time lock that (correctly)
+    // stops a member RSVPing to an event that has already begun.
+    const roster5 = roster.slice(0, 5);
+    for (const member of roster5) await recordRsvp(past.id, member.id, 'approved');
+
+    // Cross-group visitor: someone outside her regular roster, invited to just this occurrence.
+    const visitor = members[10]!;
+    await ensureGuest(past.id, visitor.id, photoLeader.id);
+    await recordRsvp(past.id, visitor.id, 'approved');
+
+    // The walk ran: she started it, moved the group to a second point, then ended it. Only this
+    // past occurrence has more than its initial meeting point.
+    await activitiesService.startActivity(past.id, photoLeader.id);
+    const firstStart = new Date(past.startAt);
+    await meetingPointsService.createMeetingPoint(past.id, photoLeader.id, {
       label: 'Move to the riverside viewpoint',
       googleMapsUrl: mapsUrl(40.7605, -73.978),
       time: new Date(firstStart.getTime() + 90 * 60_000).toISOString(),
     });
 
-    // Half the roster confirms attendance on the first occurrence.
-    for (const member of roster.slice(0, 5)) {
-      await rsvpsService.upsertRsvp(occurrences[0]!.id, member.id, { status: 'approved' });
+    // Roll call at each stop. Two people peeled off before the riverside, which is exactly the
+    // narrowing the roll-call carry-forward exists to capture.
+    const [clockTower, riverside] = await listMeetingPoints(past.id);
+    const walkers = [...roster5, visitor];
+    if (clockTower) {
+      await attendanceService.updateAttendance(clockTower.id, photoLeader.id, {
+        entries: walkers.map((m) => ({ userId: m.id, status: 'present' as const })),
+      });
     }
-
-    // Cross-group visitor: someone outside her regular roster, invited to just this occurrence.
-    const visitor = members[10]!;
-    await ensureGuest(occurrences[0]!.id, visitor.id, photoLeader.id);
-    await rsvpsService.upsertRsvp(occurrences[0]!.id, visitor.id, { status: 'approved' });
+    if (riverside) {
+      await attendanceService.updateAttendance(riverside.id, photoLeader.id, {
+        entries: walkers.map((m, i) => ({
+          userId: m.id,
+          status: i < 4 ? ('present' as const) : ('absent' as const),
+        })),
+      });
+    }
+    await activitiesService.endActivity(past.id, photoLeader.id);
 
     // Leader posts a one-way heads-up; members can't reply here.
     await groupsService.updateGroup(photoGroupA.id, photoLeader.id, { chatMode: 'announcements' });
@@ -182,7 +253,9 @@ async function main() {
     const dto: CreateActivityDto = {
       title: 'Golden Hour Portrait Session',
       description: 'Small group, bring a friend to model or be modeled.',
-      startAt: daysFromNow(10, 18, 30).toISOString(),
+      // Later today, published but not started — something to actually run when testing.
+      startAt: hoursFromNow(2).toISOString(),
+      endAt: hoursFromNow(4).toISOString(),
       transportMode: 'walking',
       requiresRsvp: true,
       meetingPoints: [
@@ -210,6 +283,7 @@ async function main() {
       title: 'Vinyasa Flow Class',
       description: 'Mats provided. Arrive 5 minutes early to set up.',
       startAt: weekdayAnchor(1, 2, 7, 0).toISOString(), // a Monday, ~2 weeks ago
+      endAt: weekdayAnchor(1, 2, 8, 0).toISOString(),
       transportMode: 'driving',
       requiresRsvp: false,
       recurrence: {
@@ -227,14 +301,17 @@ async function main() {
     const seriesId = occurrences[0]!.seriesId!;
     await activitiesService.publishSeries(seriesId, yogaLeader.id);
 
-    // Roll call already taken for the first (past) occurrence, for billing purposes.
+    // Roll call already taken at the first (past) occurrence's studio, for billing purposes.
     const firstOccurrence = occurrences[0]!;
-    await attendanceService.updateAttendance(firstOccurrence.id, yogaLeader.id, {
-      entries: roster.map((member, i) => ({
-        userId: member.id,
-        status: i < 6 ? 'present' : 'absent',
-      })),
-    });
+    const [studioPoint] = await listMeetingPoints(firstOccurrence.id);
+    if (studioPoint) {
+      await attendanceService.updateAttendance(studioPoint.id, yogaLeader.id, {
+        entries: roster.map((member, i) => ({
+          userId: member.id,
+          status: i < 6 ? 'present' : 'absent',
+        })),
+      });
+    }
 
     await prisma.message.create({
       data: { groupId: yogaGroupA.id, authorId: yogaLeader.id, body: 'Welcome to the term! See everyone Monday.' },
@@ -257,6 +334,7 @@ async function main() {
       title: 'Restorative Yoga Class',
       description: 'Gentle, slow-paced session with props.',
       startAt: weekdayAnchor(2, -1, 19, 0).toISOString(), // next Tuesday, 7 PM
+      endAt: weekdayAnchor(2, -1, 20, 15).toISOString(),
       transportMode: 'driving',
       requiresRsvp: false,
       recurrence: {
@@ -297,6 +375,7 @@ async function main() {
       title: 'Pre-Trip Meet & Greet',
       description: "Come meet the group before we head out — we'll cover logistics and gear.",
       startAt: daysFromNow(23, 18, 0).toISOString(),
+      endAt: daysFromNow(23, 20, 0).toISOString(),
       transportMode: 'walking',
       requiresRsvp: true,
       meetingPoints: [
@@ -309,13 +388,14 @@ async function main() {
       await rsvpsService.upsertRsvp(meetGreet!.id, member.id, { status: 'approved' });
     }
 
-    // Tour 1: a 7-day trek.
-    const tour1Start = daysFromNow(30, 7, 0);
+    // Tour 1: a 7-day trek. Date-only — the daily schedule lives in the meeting points.
+    const tour1Start = startOfDay(daysFromNow(30, 0, 0));
     const tour1Dto: CreateActivityDto = {
       title: 'Peru Andes Trek',
       description: '7-day guided trek through the Andes, including two nights of camping.',
       startAt: tour1Start.toISOString(),
-      endAt: daysFromNow(37, 20, 0).toISOString(),
+      endAt: endOfDay(daysFromNow(37, 0, 0)).toISOString(),
+      allDay: true,
       transportMode: 'driving',
       requiresRsvp: true,
     };
@@ -324,29 +404,22 @@ async function main() {
     for (const member of roster.slice(0, 8)) {
       await rsvpsService.upsertRsvp(tour1!.id, member.id, { status: 'approved' });
     }
+    // Only the first gathering point is known up front. The rest of the itinerary ("Day 3, 7 AM
+    // at the trailhead") gets sent from the guide's phone as the trip unfolds.
     await meetingPointsService.createMeetingPoint(tour1!.id, tourLeader.id, {
       label: 'Day 1 — Hotel lobby pickup',
       googleMapsUrl: mapsUrl(-13.5319, -71.9675),
       time: tour1Start.toISOString(),
     });
-    await meetingPointsService.createMeetingPoint(tour1!.id, tourLeader.id, {
-      label: 'Day 3 — Trailhead departure',
-      googleMapsUrl: mapsUrl(-13.2833, -72.2167),
-      time: new Date(tour1Start.getTime() + 2 * 86_400_000 - 60 * 60_000).toISOString(),
-    });
-    await meetingPointsService.createMeetingPoint(tour1!.id, tourLeader.id, {
-      label: 'Day 7 — Return transport pickup',
-      googleMapsUrl: mapsUrl(-13.5319, -71.9675),
-      time: new Date(tour1Start.getTime() + 6 * 86_400_000 + 10 * 60 * 60_000).toISOString(),
-    });
 
-    // Tour 2: a later, non-overlapping trip.
-    const tour2Start = daysFromNow(90, 8, 0);
+    // Tour 2: a later, non-overlapping trip. Also date-only.
+    const tour2Start = startOfDay(daysFromNow(90, 0, 0));
     const tour2Dto: CreateActivityDto = {
       title: 'Iceland Ring Road',
       description: '7-day self-drive-style guided loop around Iceland.',
       startAt: tour2Start.toISOString(),
-      endAt: daysFromNow(97, 19, 0).toISOString(),
+      endAt: endOfDay(daysFromNow(97, 0, 0)).toISOString(),
+      allDay: true,
       transportMode: 'driving',
       requiresRsvp: true,
     };
@@ -356,11 +429,6 @@ async function main() {
       label: 'Day 1 — Airport arrivals',
       googleMapsUrl: mapsUrl(63.985, -22.6056),
       time: tour2Start.toISOString(),
-    });
-    await meetingPointsService.createMeetingPoint(tour2!.id, tourLeader.id, {
-      label: 'Day 4 — Waterfall parking lot',
-      googleMapsUrl: mapsUrl(63.6172, -19.9789),
-      time: new Date(tour2Start.getTime() + 3 * 86_400_000 - 2 * 60 * 60_000).toISOString(),
     });
   }
 

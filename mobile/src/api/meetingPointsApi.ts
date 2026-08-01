@@ -1,4 +1,8 @@
-import type { CreateMeetingPointDto, MeetingPoint } from '@meetingpnt/shared';
+import type {
+  CreateMeetingPointDto,
+  MeetingPoint,
+  UpdateMeetingPointDto,
+} from '@meetingpnt/shared';
 import { apiFetch } from './client';
 
 export const meetingPointsApi = {
@@ -7,6 +11,11 @@ export const meetingPointsApi = {
   create: (activityId: string, dto: CreateMeetingPointDto) =>
     apiFetch<{ meetingPoint: MeetingPoint }>(`/api/activities/${activityId}/meeting-points`, {
       method: 'POST',
+      body: dto,
+    }),
+  update: (meetingPointId: string, dto: UpdateMeetingPointDto) =>
+    apiFetch<{ meetingPoint: MeetingPoint }>(`/api/meeting-points/${meetingPointId}`, {
+      method: 'PATCH',
       body: dto,
     }),
 };

@@ -30,12 +30,6 @@
     "plugins": [
       "expo-router",
       [
-        "expo-calendar",
-        {
-          "calendarPermission": "MeetingPnt needs calendar access to add activities you RSVP to."
-        }
-      ],
-      [
         "expo-notifications",
         {
           "color": "#2563eb"

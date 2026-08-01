@@ -6,7 +6,10 @@ import { corsOrigins } from './config/env.js';
 import { UPLOADS_DIR } from './lib/storage.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { adminRouter } from './modules/admin/routes.js';
-import { attendanceRouter } from './modules/attendance/routes.js';
+import {
+  activityAttendanceRouter,
+  meetingPointAttendanceRouter,
+} from './modules/attendance/routes.js';
 import { authRouter } from './modules/auth/routes.js';
 import { chatRouter } from './modules/chat/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
@@ -53,8 +56,9 @@ export function createApp() {
   app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
   app.use('/api/activities', activitiesRouter);
   app.use('/api/activities', rsvpsRouter);
-  app.use('/api/activities', attendanceRouter);
+  app.use('/api/activities', activityAttendanceRouter);
   app.use('/api/activities/:activityId/meeting-points', activityMeetingPointsRouter);
+  app.use('/api/meeting-points/:meetingPointId/attendance', meetingPointAttendanceRouter);
   app.use('/api/meeting-points', meetingPointsRouter);
   app.use('/api/activities', locationsRouter);
   app.use('/api/activities/:activityId', activityInvitationsRouter);

@@ -7,11 +7,12 @@ import type {
 import { LocationSource, SocketEvents } from '@meetingpnt/shared';
 import {
   getLatestSnapshotsForActivity,
-  getNextUpcomingMeetingPoint,
+  getCurrentMeetingPoint,
   insertLocationSnapshot,
   type LocationSnapshotRow,
 } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
+import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { getEta } from '../../lib/googleMapsClient.js';
@@ -39,6 +40,14 @@ async function assertApprovedRsvp(activityId: string, userId: string) {
   }
 }
 
+/** Once an event is over there's no legitimate reason to keep locating people, so ending an
+ * activity closes the location features off. */
+function assertActivityLive(activity: { status: string }) {
+  if (activity.status === 'completed' || activity.status === 'cancelled') {
+    throw new HttpError(409, 'This activity has ended; location sharing is closed');
+  }
+}
+
 async function recordSnapshot(
   activityId: string,
   userId: string,
@@ -49,9 +58,10 @@ async function recordSnapshot(
   if (!activity) {
     throw new HttpError(404, 'Activity not found');
   }
+  assertActivityLive(activity);
   await assertApprovedRsvp(activityId, userId);
 
-  const meetingPoint = await getNextUpcomingMeetingPoint(activityId);
+  const meetingPoint = await getCurrentMeetingPoint(activityId);
   if (!meetingPoint) {
     throw new HttpError(409, 'No meeting point has been set for this activity yet');
   }
@@ -99,6 +109,7 @@ export async function requestPing(activityId: string, requesterId: string, dto: 
   if (!group || group.leaderId !== requesterId) {
     throw new HttpError(403, 'Only the group leader can request a location');
   }
+  assertActivityLive(activity);
 
   await assertApprovedRsvp(activityId, dto.userId);
 
@@ -134,7 +145,7 @@ export async function getLatestLocations(activityId: string, requesterId: string
     user: userById.has(row.userId)
       ? {
           id: userById.get(row.userId)!.id,
-          name: userById.get(row.userId)!.name,
+          name: displayName(userById.get(row.userId)!),
           email: userById.get(row.userId)!.email,
         }
       : null,

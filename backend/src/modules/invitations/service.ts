@@ -6,6 +6,7 @@ import type {
 } from '@meetingpnt/shared';
 import type { Invitation } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
+import { displayName } from '../../lib/userName.js';
 import { env } from '../../config/env.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { sendInvitationEmail } from '../../lib/resendClient.js';
@@ -27,6 +28,19 @@ function toSharedInvitation(invitation: Invitation): SharedInvitation {
 
 function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
+}
+
+/**
+ * Someone who already has an account owns their own name — the leader's guess at it doesn't
+ * overwrite it. A phone number is different: if we don't have one, the one the leader typed is
+ * better than nothing, and it's exactly what they need to reach this person mid-event.
+ */
+async function fillMissingContactDetails(userId: string, dto: InviteMemberDto) {
+  if (!dto.phone) return;
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user && !user.phone) {
+    await prisma.user.update({ where: { id: userId }, data: { phone: dto.phone } });
+  }
 }
 
 async function assertGroupLeader(groupId: string, requesterId: string) {
@@ -65,6 +79,7 @@ export async function inviteMember(groupId: string, requesterId: string, dto: In
       });
     }
 
+    await fillMissingContactDetails(existingUser.id, dto);
     return { type: 'added' as const };
   }
 
@@ -73,6 +88,9 @@ export async function inviteMember(groupId: string, requesterId: string, dto: In
     data: {
       groupId,
       email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phone: dto.phone,
       tokenHash: hashToken(rawToken),
       invitedBy: requesterId,
       expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
@@ -83,7 +101,7 @@ export async function inviteMember(groupId: string, requesterId: string, dto: In
   await sendInvitationEmail({
     to: dto.email,
     groupName: group.name,
-    inviterName: inviter?.name ?? 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
     acceptUrl,
   });
 
@@ -119,6 +137,7 @@ export async function inviteActivityGuest(
       update: {},
     });
 
+    await fillMissingContactDetails(existingUser.id, dto);
     return { type: 'added' as const };
   }
 
@@ -128,6 +147,9 @@ export async function inviteActivityGuest(
       groupId: activity.groupId,
       activityId,
       email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phone: dto.phone,
       tokenHash: hashToken(rawToken),
       invitedBy: requesterId,
       expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
@@ -138,7 +160,7 @@ export async function inviteActivityGuest(
   await sendInvitationEmail({
     to: dto.email,
     groupName: `${group.name} — ${activity.title}`,
-    inviterName: inviter?.name ?? 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
     acceptUrl,
   });
 
@@ -163,7 +185,7 @@ export async function listActivityGuests(activityId: string, requesterId: string
     userId: g.userId,
     invitedBy: g.invitedBy,
     createdAt: g.createdAt.toISOString(),
-    user: { id: g.user.id, name: g.user.name, email: g.user.email },
+    user: { id: g.user.id, name: displayName(g.user), email: g.user.email },
   }));
 }
 
@@ -208,7 +230,15 @@ export async function previewInvitation(rawToken: string): Promise<InvitationPre
     throw new HttpError(410, 'This invitation link is invalid or has expired');
   }
 
-  return { email: invitation.email, group: { id: invitation.group.id, name: invitation.group.name } };
+  // The details the leader typed come back so the sign-up form arrives pre-filled — the invitee
+  // confirms rather than retypes.
+  return {
+    email: invitation.email,
+    firstName: invitation.firstName,
+    lastName: invitation.lastName,
+    phone: invitation.phone,
+    group: { id: invitation.group.id, name: invitation.group.name },
+  };
 }
 
 /** Called from the auth register flow. Validates and consumes the token, joining the new user

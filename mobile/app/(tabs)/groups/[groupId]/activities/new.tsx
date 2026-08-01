@@ -14,10 +14,11 @@ export default function NewActivityScreen() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // Timed activities are entered as one date plus two clock times; all-day ones as two dates.
+  const [allDay, setAllDay] = useState(false);
   const [startAt, setStartAt] = useState(new Date(Date.now() + 60 * 60 * 1000));
-  const [showPicker, setShowPicker] = useState(false);
-  const [endAt, setEndAt] = useState<Date | null>(null);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [endAt, setEndAt] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000));
+  const [picker, setPicker] = useState<null | 'date' | 'startTime' | 'endTime' | 'endDate'>(null);
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
   const [repeats, setRepeats] = useState(false);
@@ -37,14 +38,30 @@ export default function NewActivityScreen() {
       setError('Pick at least one day of the week to repeat on.');
       return;
     }
+    // All-day activities cover whole days; timed ones share a date and differ only by clock time.
+    const start = new Date(startAt);
+    const end = new Date(endAt);
+    if (allDay) {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 0);
+    } else {
+      end.setFullYear(start.getFullYear(), start.getMonth(), start.getDate());
+    }
+
+    if (end <= start) {
+      setError(allDay ? 'The end date must not be before the start date.' : 'The end time must be after the start time.');
+      return;
+    }
+
     setError(null);
     setSubmitting(true);
     try {
       const result = await activitiesApi.create(groupId, {
         title,
         description: description || undefined,
-        startAt: startAt.toISOString(),
-        endAt: endAt ? endAt.toISOString() : undefined,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        allDay,
         transportMode,
         requiresRsvp,
         recurrence: repeats
@@ -80,30 +97,46 @@ export default function NewActivityScreen() {
         onChangeText={setDescription}
       />
 
-      <TouchableOpacity style={styles.input} onPress={() => setShowPicker(true)}>
-        <Text>{startAt.toLocaleString()}</Text>
+      <View style={styles.repeatRow}>
+        <Text style={styles.label}>Spans whole days (multi-day trip)</Text>
+        <Switch value={allDay} onValueChange={setAllDay} />
+      </View>
+
+      <TouchableOpacity style={styles.input} onPress={() => setPicker('date')}>
+        <Text>
+          {allDay ? 'Start date: ' : 'Date: '}
+          {startAt.toLocaleDateString()}
+        </Text>
       </TouchableOpacity>
-      {showPicker && (
-        <DateTimePicker
-          value={startAt}
-          mode="datetime"
-          onChange={(_event, selectedDate) => {
-            setShowPicker(Platform.OS === 'ios');
-            if (selectedDate) setStartAt(selectedDate);
-          }}
-        />
+
+      {allDay ? (
+        <TouchableOpacity style={styles.input} onPress={() => setPicker('endDate')}>
+          <Text>End date: {endAt.toLocaleDateString()}</Text>
+        </TouchableOpacity>
+      ) : (
+        <>
+          <TouchableOpacity style={styles.input} onPress={() => setPicker('startTime')}>
+            <Text>
+              Start time: {startAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.input} onPress={() => setPicker('endTime')}>
+            <Text>
+              End time: {endAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          </TouchableOpacity>
+        </>
       )}
 
-      <TouchableOpacity style={styles.input} onPress={() => setShowEndPicker(true)}>
-        <Text>{endAt ? endAt.toLocaleString() : 'End date & time (optional)'}</Text>
-      </TouchableOpacity>
-      {showEndPicker && (
+      {picker && (
         <DateTimePicker
-          value={endAt ?? startAt}
-          mode="datetime"
-          onChange={(_event, selectedDate) => {
-            setShowEndPicker(Platform.OS === 'ios');
-            if (selectedDate) setEndAt(selectedDate);
+          value={picker === 'endDate' || picker === 'endTime' ? endAt : startAt}
+          mode={picker === 'startTime' || picker === 'endTime' ? 'time' : 'date'}
+          onChange={(_event, selected) => {
+            setPicker(Platform.OS === 'ios' ? picker : null);
+            if (!selected) return;
+            if (picker === 'endDate' || picker === 'endTime') setEndAt(selected);
+            else setStartAt(selected);
           }}
         />
       )}

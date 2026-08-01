@@ -9,17 +9,24 @@ interface Props {
   activityId: string;
 }
 
+const fieldClass =
+  'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+
+/**
+ * Invites someone to this one activity without adding them to the group. Once they have an
+ * account they appear in the RSVP dashboard above, tagged as a visitor — so this panel only
+ * covers adding them and chasing invitations that haven't been accepted yet.
+ */
 export function ActivityVisitorsPanel({ activityId }: Props) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
 
-  const guestsQuery = useQuery({
-    queryKey: ['activities', activityId, 'guests'],
-    queryFn: () => activityInvitationsApi.listGuests(activityId),
-  });
   const invitationsQuery = useQuery({
     queryKey: ['activities', activityId, 'invitations'],
     queryFn: () => activityInvitationsApi.listPending(activityId),
@@ -31,12 +38,23 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
     setError(null);
     setInviting(true);
     try {
-      const result = await activityInvitationsApi.invite(activityId, { email });
+      const result = await activityInvitationsApi.invite(activityId, {
+        email,
+        firstName,
+        lastName,
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+      });
+      const who = `${firstName} ${lastName}`.trim();
       setMessage(
-        result.type === 'added' ? `${email} added as a visitor.` : `Invitation sent to ${email}.`,
+        result.type === 'added'
+          ? `${who} added as a visitor — they're now in the RSVP list.`
+          : `Invitation sent to ${who} at ${email}.`,
       );
       setEmail('');
-      queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'guests'] });
+      setFirstName('');
+      setLastName('');
+      setPhone('');
+      queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'invitations'] });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to invite visitor');
@@ -46,50 +64,65 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
   }
 
   return (
-    <section className="mt-8">
-      <h2 className="text-lg font-semibold text-slate-900">Visitors</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        People invited to just this activity, without joining the group.
+    <Card className="mt-3">
+      <p className="text-sm font-medium text-slate-700">Invite a visitor</p>
+      <p className="mt-1 text-xs text-slate-500">
+        Someone joining just this activity, without joining the group.
       </p>
 
-      <Card className="mt-3">
-        <form onSubmit={handleInvite} className="flex gap-2">
+      <form onSubmit={handleInvite} className="mt-3 flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <input
+            placeholder="First name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            className={fieldClass}
+          />
+          <input
+            placeholder="Last name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            className={fieldClass}
+          />
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="email"
             placeholder="visitor@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`flex-1 ${fieldClass}`}
+          />
+          <input
+            type="tel"
+            placeholder="Phone (optional)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={`flex-1 ${fieldClass}`}
           />
           <Button type="submit" disabled={inviting}>
-            {inviting ? 'Sending…' : 'Invite visitor'}
+            {inviting ? 'Sending…' : 'Invite'}
           </Button>
-        </form>
-        {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      </Card>
-
-      {(guestsQuery.data?.guests.length ?? 0) > 0 && (
-        <Card className="mt-3 divide-y divide-slate-100 p-0">
-          {guestsQuery.data?.guests.map((guest) => (
-            <div key={guest.id} className="px-4 py-3 text-sm text-slate-700">
-              {guest.user.name} <span className="text-slate-400">({guest.user.email})</span>
-            </div>
-          ))}
-        </Card>
-      )}
+        </div>
+      </form>
+      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
-        <Card className="mt-3 divide-y divide-slate-100 p-0">
-          <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">Pending</p>
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Awaiting sign-up
+          </p>
           {invitationsQuery.data.invitations.map((invitation) => (
-            <div key={invitation.id} className="px-4 py-3 text-sm text-slate-500">
+            <p key={invitation.id} className="mt-1 text-sm text-slate-500">
               {invitation.email}
-            </div>
+            </p>
           ))}
-        </Card>
+        </div>
       )}
-    </section>
+    </Card>
   );
 }

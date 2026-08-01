@@ -1,4 +1,5 @@
 import type { GroupChatMode, GroupStatus } from '@meetingpnt/shared';
+import { formatActivityWhen } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -14,8 +15,10 @@ import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Select } from '../../components/ui/Select.js';
 import { useAuthStore } from '../../store/authStore.js';
 
-const GROUP_STATUSES: GroupStatus[] = ['planned', 'in_progress', 'completed'];
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
+
+const inviteFieldClass =
+  'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +29,9 @@ export function GroupDetailPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -55,13 +61,22 @@ export function GroupDetailPage() {
     setInviteError(null);
     setInviting(true);
     try {
-      const result = await invitationsApi.invite(groupId, { email });
+      const result = await invitationsApi.invite(groupId, {
+        email,
+        firstName,
+        lastName,
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+      });
+      const who = `${firstName} ${lastName}`.trim();
       setInviteMessage(
         result.type === 'added'
-          ? `${email} was added to the group.`
-          : `Invitation sent to ${email}.`,
+          ? `${who} was added to the group.`
+          : `Invitation sent to ${who} at ${email}.`,
       );
       setEmail('');
+      setFirstName('');
+      setLastName('');
+      setPhone('');
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'invitations'] });
     } catch (err) {
@@ -135,21 +150,23 @@ export function GroupDetailPage() {
         </div>
         {groupQuery.data && (
           <div className="flex shrink-0 items-center gap-2">
-            {isLeader ? (
-              <Select
-                value={groupQuery.data.group.status}
-                onChange={(e) => handleStatusChange(e.target.value as GroupStatus)}
-                className="py-1.5"
-              >
-                {GROUP_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status.replace('_', ' ')}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              <Badge status={groupQuery.data.group.status} />
-            )}
+            <Badge status={groupQuery.data.group.status} />
+            {/* Planned vs in progress follows the events, so the only status call left to the
+                leader is whether the group is finished with. */}
+            {isLeader &&
+              (groupQuery.data.group.status === 'completed' ? (
+                <Button variant="secondary" size="sm" onClick={() => handleStatusChange('planned')}>
+                  Reopen group
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleStatusChange('completed')}
+                >
+                  Close group
+                </Button>
+              ))}
             {isLeader && (
               <Select
                 value={groupQuery.data.group.chatMode}
@@ -177,10 +194,18 @@ export function GroupDetailPage() {
         <Card className="mt-3 divide-y divide-slate-100 p-0">
           {membersQuery.data?.members.map((member) => (
             <div key={member.id} className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm text-slate-700">
-                {member.user.name}{' '}
+              <div className="text-sm">
+                <span className="text-slate-700">{member.user.name}</span>{' '}
                 <span className="text-slate-400">({member.user.email})</span>
-              </span>
+                {member.user.phone && (
+                  <a
+                    href={`tel:${member.user.phone}`}
+                    className="ml-2 text-slate-500 hover:text-blue-600 hover:underline"
+                  >
+                    {member.user.phone}
+                  </a>
+                )}
+              </div>
               {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
                 <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.userId)}>
                   Remove
@@ -195,18 +220,45 @@ export function GroupDetailPage() {
 
         {isLeader && (
           <Card className="mt-3">
-            <form onSubmit={handleInvite} className="flex gap-2">
-              <input
-                type="email"
-                placeholder="member@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <Button type="submit" disabled={inviting}>
-                {inviting ? 'Sending…' : 'Invite member'}
-              </Button>
+            {/* The leader already knows who they're adding, so the roster is complete from the
+                moment the invitation goes out rather than after the invitee signs up. */}
+            <form onSubmit={handleInvite} className="flex flex-col gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input
+                  placeholder="First name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  className={inviteFieldClass}
+                />
+                <input
+                  placeholder="Last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  className={inviteFieldClass}
+                />
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="email"
+                  placeholder="member@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={`flex-1 ${inviteFieldClass}`}
+                />
+                <input
+                  type="tel"
+                  placeholder="Phone (optional)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={`flex-1 ${inviteFieldClass}`}
+                />
+                <Button type="submit" disabled={inviting}>
+                  {inviting ? 'Sending…' : 'Invite member'}
+                </Button>
+              </div>
             </form>
             {inviteMessage && <p className="mt-2 text-sm text-green-600">{inviteMessage}</p>}
             {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
@@ -246,7 +298,7 @@ export function GroupDetailPage() {
               <Card className="flex items-center justify-between transition-shadow hover:shadow-md">
                 <span className="font-medium text-slate-900">{activity.title}</span>
                 <span className="flex items-center gap-2 text-sm text-slate-500">
-                  {new Date(activity.startAt).toLocaleString()}
+                  {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
                   <Badge status={activity.status} />
                 </span>
               </Card>
@@ -277,7 +329,7 @@ export function GroupDetailPage() {
                       to={`/activities/${activity.id}`}
                       className="flex items-center justify-between py-2 text-sm hover:text-blue-600"
                     >
-                      <span>{new Date(activity.startAt).toLocaleString()}</span>
+                      <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}</span>
                       <Badge status={activity.status} />
                     </Link>
                   ))}

@@ -7,13 +7,17 @@ import { signAccessToken } from '../../lib/jwt.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { generateRefreshToken, hashRefreshToken } from '../../lib/refreshToken.js';
 import { consumeInvitation } from '../invitations/service.js';
+import { displayName } from '../../lib/userName.js';
 import type { User } from '@prisma/client';
 
 function toSharedUser(user: User): SharedUser {
   return {
     id: user.id,
     email: user.email,
-    name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    name: displayName(user),
+    phone: user.phone,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
@@ -46,7 +50,9 @@ export async function register(input: RegisterDto) {
     data: {
       email: input.email,
       passwordHash,
-      name: input.name,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phone: input.phone,
       role: 'user',
     },
   });

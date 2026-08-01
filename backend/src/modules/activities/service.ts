@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { Activity as SharedActivity, CreateActivityDto, UpdateActivityDto } from '@meetingpnt/shared';
+import type {
+  ActivityWithGroup,
+  Activity as SharedActivity,
+  CreateActivityDto,
+  UpdateActivityDto,
+} from '@meetingpnt/shared';
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
-import { insertMeetingPoint } from '../../db/geo.js';
+import { insertMeetingPoint, shiftMeetingPointTimes } from '../../db/geo.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { buildIcsEvent } from '../../lib/ics.js';
@@ -18,7 +23,8 @@ function toSharedActivity(activity: Activity): SharedActivity {
     title: activity.title,
     description: activity.description,
     startAt: activity.startAt.toISOString(),
-    endAt: activity.endAt ? activity.endAt.toISOString() : null,
+    endAt: activity.endAt.toISOString(),
+    allDay: activity.allDay,
     transportMode: activity.transportMode,
     requiresRsvp: activity.requiresRsvp,
     status: activity.status,
@@ -80,6 +86,10 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
     : [firstStartAt];
   const seriesId = dto.recurrence ? randomUUID() : null;
 
+  // Each occurrence keeps the same duration as the first — carrying the literal endAt across
+  // would give every session in a series the first session's end.
+  const durationMs = new Date(dto.endAt).getTime() - firstStartAt.getTime();
+
   const activities = await prisma.$transaction(
     occurrenceDates.map((startAt) =>
       prisma.activity.create({
@@ -89,7 +99,8 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
           title: dto.title,
           description: dto.description,
           startAt,
-          endAt: dto.endAt ? new Date(dto.endAt) : null,
+          endAt: new Date(startAt.getTime() + durationMs),
+          allDay: dto.allDay,
           transportMode: dto.transportMode,
           requiresRsvp: dto.requiresRsvp,
           createdBy: requesterId,
@@ -185,6 +196,21 @@ export async function updateActivity(activityId: string, requesterId: string, dt
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
 
+  // A patch may move only one end, so the range has to be re-checked against the stored value —
+  // the schema can only compare the two when both are present in the request.
+  const nextStartAt = dto.startAt !== undefined ? new Date(dto.startAt) : activity.startAt;
+  const nextEndAt = dto.endAt !== undefined ? new Date(dto.endAt) : activity.endAt;
+  if (nextEndAt <= nextStartAt) {
+    throw new HttpError(400, 'The end must be after the start');
+  }
+
+  // An event that hasn't run yet can't be scheduled into the past. Once it has started or
+  // finished, back-dating is allowed — that's a leader correcting the record, not planning.
+  const notYetRun = activity.status === 'draft' || activity.status === 'published';
+  if (notYetRun && dto.startAt !== undefined && nextStartAt.getTime() < Date.now()) {
+    throw new HttpError(400, "You can't schedule an event in the past");
+  }
+
   const updated = await prisma.activity.update({
     where: { id: activityId },
     data: {
@@ -192,10 +218,14 @@ export async function updateActivity(activityId: string, requesterId: string, dt
       ...(dto.description !== undefined ? { description: dto.description } : {}),
       ...(dto.startAt !== undefined ? { startAt: new Date(dto.startAt) } : {}),
       ...(dto.endAt !== undefined ? { endAt: new Date(dto.endAt) } : {}),
+      ...(dto.allDay !== undefined ? { allDay: dto.allDay } : {}),
       ...(dto.transportMode !== undefined ? { transportMode: dto.transportMode } : {}),
       ...(dto.requiresRsvp !== undefined ? { requiresRsvp: dto.requiresRsvp } : {}),
     },
   });
+
+  await shiftMeetingPointTimes(activityId, nextStartAt.getTime() - activity.startAt.getTime());
+
   return toSharedActivity(updated);
 }
 
@@ -243,13 +273,107 @@ export async function publishActivity(activityId: string, requesterId: string) {
   return toSharedActivity(updated);
 }
 
+/** Marks an event as running. Purely a signal to members and the leader's own UI —
+ * nothing is gated on it, unlike ending. */
+export async function startActivity(activityId: string, requesterId: string) {
+  const activity = await getActivityOrThrow(activityId);
+  await assertGroupLeader(activity.groupId, requesterId);
+
+  if (activity.status !== 'published') {
+    throw new HttpError(409, 'Only a published activity can be started');
+  }
+
+  // A leader can't be in two places at once, so only one of their events runs at a time.
+  const alreadyRunning = await prisma.activity.findFirst({
+    where: { status: 'in_progress', group: { leaderId: requesterId } },
+  });
+  if (alreadyRunning) {
+    throw new HttpError(
+      409,
+      `You're already running "${alreadyRunning.title}". End it before starting another.`,
+    );
+  }
+
+  const updated = await prisma.activity.update({
+    where: { id: activityId },
+    data: { status: 'in_progress' },
+  });
+  return toSharedActivity(updated);
+}
+
+/** Ends an event. Location sharing and pings stop working from here on — there's no reason
+ * to keep locating people after an event is over (see locations/service.ts). */
+export async function endActivity(activityId: string, requesterId: string) {
+  const activity = await getActivityOrThrow(activityId);
+  await assertGroupLeader(activity.groupId, requesterId);
+
+  if (activity.status !== 'published' && activity.status !== 'in_progress') {
+    throw new HttpError(409, 'Only a published or in-progress activity can be ended');
+  }
+
+  const updated = await prisma.activity.update({
+    where: { id: activityId },
+    data: { status: 'completed' },
+  });
+  return toSharedActivity(updated);
+}
+
 export async function listActivities(groupId: string, requesterId: string) {
-  await assertMembership(groupId, requesterId);
+  const group = await assertMembership(groupId, requesterId);
+  const isLeader = group.leaderId === requesterId;
   const activities = await prisma.activity.findMany({
-    where: { groupId },
+    // Drafts are the leader's own planning space — members only see what's been published.
+    where: { groupId, ...(isLeader ? {} : { status: { not: 'draft' } }) },
     orderBy: { startAt: 'asc' },
   });
   return activities.map(toSharedActivity);
+}
+
+/** How far back the timeline reaches, so a leader can still finish a roll call after the fact. */
+const TIMELINE_LOOKBACK_DAYS = 7;
+
+/**
+ * Every activity the caller can act on, across all their groups, oldest first. This is what the
+ * mobile home screen is built from — the leader's day is a timeline of events, not a list of groups.
+ */
+export async function listMyActivities(userId: string): Promise<ActivityWithGroup[]> {
+  const groups = await prisma.group.findMany({
+    where: { OR: [{ leaderId: userId }, { members: { some: { userId, status: 'active' } } }] },
+    select: { id: true },
+  });
+  // Visitors are attached to one activity without belonging to its group, so pick those up too.
+  const guestOf = await prisma.activityGuest.findMany({
+    where: { userId },
+    select: { activityId: true },
+  });
+
+  const since = new Date();
+  since.setDate(since.getDate() - TIMELINE_LOOKBACK_DAYS);
+
+  const activities = await prisma.activity.findMany({
+    where: {
+      endAt: { gte: since },
+      OR: [
+        { groupId: { in: groups.map((g) => g.id) } },
+        { id: { in: guestOf.map((g) => g.activityId) } },
+      ],
+    },
+    include: {
+      group: { select: { id: true, name: true, leaderId: true } },
+      // The caller's own RSVP only — enough to flag "you haven't replied" without loading everyone's.
+      rsvps: { where: { userId }, select: { status: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+
+  return activities
+    .filter((activity) => activity.group.leaderId === userId || activity.status !== 'draft')
+    .map((activity) => ({
+      ...toSharedActivity(activity),
+      group: { id: activity.group.id, name: activity.group.name },
+      isLeader: activity.group.leaderId === userId,
+      myRsvpStatus: activity.rsvps[0]?.status ?? null,
+    }));
 }
 
 export async function getActivity(activityId: string, requesterId: string) {

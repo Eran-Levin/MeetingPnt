@@ -46,8 +46,18 @@ export default function AcceptInviteScreen() {
         Join <Text style={{ fontWeight: '600' }}>{data.group.name}</Text> on MeetingPnt as{' '}
         {data.email}.
       </Text>
+      {/* Carries through whatever the leader filled in, so signing up is password-only. */}
       <Link
-        href={{ pathname: '/(auth)/register', params: { invitationToken: token, email: data.email } }}
+        href={{
+          pathname: '/(auth)/register',
+          params: {
+            invitationToken: token,
+            email: data.email,
+            firstName: data.firstName ?? '',
+            lastName: data.lastName ?? '',
+            phone: data.phone ?? '',
+          },
+        }}
         style={styles.link}
       >
         Create your account

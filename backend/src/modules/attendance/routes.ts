@@ -4,16 +4,42 @@ import { authenticate } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import * as attendanceService from './service.js';
 
-export const attendanceRouter = Router();
+/** Roll call for one meeting point: /api/meeting-points/:id/attendance */
+export const meetingPointAttendanceRouter = Router({ mergeParams: true });
 
-attendanceRouter.use(authenticate);
+meetingPointAttendanceRouter.use(authenticate);
 
-attendanceRouter.put('/:id/attendance', validate(updateAttendanceSchema), async (req, res, next) => {
+meetingPointAttendanceRouter.put<{ meetingPointId: string }>(
+  '/',
+  validate(updateAttendanceSchema),
+  async (req, res, next) => {
+    try {
+      const attendance = await attendanceService.updateAttendance(
+        req.params.meetingPointId,
+        req.user!.id,
+        req.body,
+      );
+      res.json({ attendance });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+meetingPointAttendanceRouter.get<{ meetingPointId: string }>('/roll-call', async (req, res, next) => {
   try {
-    const attendance = await attendanceService.updateAttendance(
-      req.params.id as string,
+    const entries = await attendanceService.getRollCall(req.params.meetingPointId, req.user!.id);
+    res.json({ entries });
+  } catch (err) {
+    next(err);
+  }
+});
+
+meetingPointAttendanceRouter.get<{ meetingPointId: string }>('/', async (req, res, next) => {
+  try {
+    const attendance = await attendanceService.listAttendance(
+      req.params.meetingPointId,
       req.user!.id,
-      req.body,
     );
     res.json({ attendance });
   } catch (err) {
@@ -21,10 +47,30 @@ attendanceRouter.put('/:id/attendance', validate(updateAttendanceSchema), async 
   }
 });
 
-attendanceRouter.get('/:id/attendance', async (req, res, next) => {
+/** Activity-wide views: /api/activities/:id/attendance and .../participation */
+export const activityAttendanceRouter = Router();
+
+activityAttendanceRouter.use(authenticate);
+
+activityAttendanceRouter.get('/:id/attendance', async (req, res, next) => {
   try {
-    const attendance = await attendanceService.listAttendance(req.params.id as string, req.user!.id);
+    const attendance = await attendanceService.listActivityAttendance(
+      req.params.id as string,
+      req.user!.id,
+    );
     res.json({ attendance });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activityAttendanceRouter.get('/:id/participation', async (req, res, next) => {
+  try {
+    const participation = await attendanceService.listActivityParticipation(
+      req.params.id as string,
+      req.user!.id,
+    );
+    res.json({ participation });
   } catch (err) {
     next(err);
   }

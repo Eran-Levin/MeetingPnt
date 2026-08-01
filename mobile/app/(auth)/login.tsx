@@ -18,7 +18,7 @@ export default function LoginScreen() {
     try {
       const data = await authApi.login({ email, password });
       await establishSession(data);
-      router.replace('/(tabs)/groups');
+      router.replace('/(tabs)/activities');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {
@@ -41,6 +41,8 @@ export default function LoginScreen() {
         style={styles.input}
         placeholder="Password"
         secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
         value={password}
         onChangeText={setPassword}
       />

@@ -13,6 +13,10 @@ export const activitiesApi = {
     apiFetch<{ activity: Activity }>(`/api/activities/${id}`, { method: 'PATCH', body: dto }),
   publish: (id: string) =>
     apiFetch<{ activity: Activity }>(`/api/activities/${id}/publish`, { method: 'POST' }),
+  start: (id: string) =>
+    apiFetch<{ activity: Activity }>(`/api/activities/${id}/start`, { method: 'POST' }),
+  end: (id: string) =>
+    apiFetch<{ activity: Activity }>(`/api/activities/${id}/end`, { method: 'POST' }),
   publishSeries: (seriesId: string) =>
     apiFetch<{ activities: Activity[] }>(`/api/activities/series/${seriesId}/publish`, {
       method: 'POST',
