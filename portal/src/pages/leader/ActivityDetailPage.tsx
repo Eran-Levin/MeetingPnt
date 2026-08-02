@@ -6,7 +6,7 @@ import { activitiesApi } from '../../api/activitiesApi.js';
 import { ApiError } from '../../api/client.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
-import { ActivityScheduleEditor } from '../../components/ActivityScheduleEditor.js';
+import { ActivityEditor } from '../../components/ActivityEditor.js';
 import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
 import { MeetingPointsPanel } from '../../components/MeetingPointsPanel.js';
 import { Badge } from '../../components/ui/Badge.js';
@@ -106,7 +106,7 @@ export function ActivityDetailPage() {
                 onClick={() => setEditingSchedule(true)}
                 className="text-sm font-medium text-blue-600 hover:underline"
               >
-                Change
+                Edit event
               </button>
             )}
             <span>&middot;</span>
@@ -114,12 +114,12 @@ export function ActivityDetailPage() {
             <Badge status={activity.status} />
             {!activity.requiresRsvp && (
               <span className="inline-block whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                no RSVP required
+                attendance not approved
               </span>
             )}
           </div>
           {editingSchedule && (
-            <ActivityScheduleEditor activity={activity} onDone={() => setEditingSchedule(false)} />
+            <ActivityEditor activity={activity} onDone={() => setEditingSchedule(false)} />
           )}
 
           {activity.description && <p className="mt-3 text-sm text-slate-700">{activity.description}</p>}
@@ -158,7 +158,11 @@ export function ActivityDetailPage() {
         </Card>
       )}
 
-      {isLeader && (
+      {/* Nothing to chase when attendance isn't approved: everyone is already counted as coming,
+          so the dashboard would be a wall of identical rows. Inviting a visitor goes with it —
+          on a trip day the roster is the manifest, not something you top up. Marking someone as
+          not coming still works from the roll call on the leader's phone. */}
+      {isLeader && activity?.requiresRsvp && (
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-slate-900">RSVP dashboard</h2>
           {rsvpError && (
@@ -234,8 +238,13 @@ export function ActivityDetailPage() {
         </section>
       )}
 
-      {/* The initial meeting point is planned here; further stops and the roll call are on mobile. */}
-      {isLeader && <MeetingPointsPanel activityId={activityId} />}
+      {/* The route is planned here; walking it and the roll call happen on the leader's phone. */}
+      {isLeader && activity && (
+        <MeetingPointsPanel
+          activityId={activityId}
+          currentMeetingPointId={activity.currentMeetingPointId}
+        />
+      )}
     </PageContainer>
   );
 }

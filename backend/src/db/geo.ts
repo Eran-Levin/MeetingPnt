@@ -6,7 +6,7 @@ import { prisma } from './prisma.js';
 const MEETING_POINT_COLUMNS = Prisma.sql`
   id, group_id AS "groupId", activity_id AS "activityId", label, google_maps_url AS "googleMapsUrl",
   ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng,
-  time, created_by AS "createdBy", created_at AS "createdAt"
+  time, arrived_at AS "arrivedAt", created_by AS "createdBy", created_at AS "createdAt"
 `;
 
 export interface MeetingPointRow {
@@ -18,6 +18,7 @@ export interface MeetingPointRow {
   lat: number;
   lng: number;
   time: Date;
+  arrivedAt: Date | null;
   createdBy: string;
   createdAt: Date;
 }
@@ -29,15 +30,17 @@ export async function insertMeetingPoint(input: {
   googleMapsUrl: string;
   location: GeoPoint;
   time: Date;
+  /** Set when the leader creates a stop by arriving at it, rather than planning it in advance. */
+  arrivedAt?: Date | null;
   createdBy: string;
 }): Promise<MeetingPointRow> {
   const id = randomUUID();
   const rows = await prisma.$queryRaw<MeetingPointRow[]>`
-    INSERT INTO meeting_points (id, group_id, activity_id, label, google_maps_url, location, time, created_by, created_at)
+    INSERT INTO meeting_points (id, group_id, activity_id, label, google_maps_url, location, time, arrived_at, created_by, created_at)
     VALUES (
       ${id}, ${input.groupId}, ${input.activityId}, ${input.label ?? null}, ${input.googleMapsUrl},
       ST_SetSRID(ST_MakePoint(${input.location.lng}, ${input.location.lat}), 4326)::geography,
-      ${input.time}, ${input.createdBy}, now()
+      ${input.time}, ${input.arrivedAt ?? null}, ${input.createdBy}, now()
     )
     RETURNING ${MEETING_POINT_COLUMNS}
   `;
@@ -45,11 +48,13 @@ export async function insertMeetingPoint(input: {
 }
 
 /**
- * Ordered by creation, not by `time`: this is the sequence the group actually moves through.
- * Sorting by `time` breaks as soon as a point is dropped mid-event on an activity scheduled for
- * the future — "now" sorts before the planned start, so the newest stop would appear first.
- * Callers rely on this order for "the initial point", "the current point" and the roll-call
- * carry-forward, and getCurrentMeetingPoint takes the last of them as the ETA target.
+ * The activity's itinerary in the order the group walks it, ordered by creation rather than by
+ * `time`. Sorting by `time` breaks as soon as a point is dropped mid-event on an activity
+ * scheduled for the future — "now" sorts before the planned start, so the newest stop would
+ * appear first.
+ *
+ * This is the whole plan, including stops nobody has reached yet. Where the group actually *is*
+ * is `Activity.currentMeetingPointId`; which stops they have already walked is `arrivedAt`.
  */
 export async function listMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
   return prisma.$queryRaw<MeetingPointRow[]>`
@@ -58,20 +63,59 @@ export async function listMeetingPoints(activityId: string): Promise<MeetingPoin
   `;
 }
 
+/** The stops the group has actually reached, oldest first. */
+export async function listArrivedMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
+  return prisma.$queryRaw<MeetingPointRow[]>`
+    SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
+    WHERE activity_id = ${activityId} AND arrived_at IS NOT NULL
+    ORDER BY arrived_at ASC
+  `;
+}
+
 /**
- * Where the group is now, and therefore where an "On My Way" ETA is measured to: the most
- * recently added meeting point.
+ * Where the group is now, and therefore where an "On My Way" ETA is measured to.
  *
- * This deliberately matches what the apps display as the current point. Picking the soonest
- * *future* time instead looks reasonable but diverges the moment a point is dropped mid-event on
- * an activity scheduled ahead — a member would be shown the market and have their ETA computed to
- * the clock tower. "Where I'm told to go" and "where my ETA is measured to" must be the same place.
+ * Read from the stored pointer rather than inferred from the list. It used to be "the most
+ * recently created point", which held only while points were created as the group arrived; now
+ * that a leader can plan five stops before setting off, the newest point is the *last* stop and
+ * inferring from it would send everyone to the end of the route before the event had begun.
+ *
+ * Whatever this returns must also be what the apps display: "where I'm told to go" and "where my
+ * ETA is measured to" have to be the same place.
  */
 export async function getCurrentMeetingPoint(activityId: string): Promise<MeetingPointRow | null> {
+  const activity = await prisma.activity.findUnique({
+    where: { id: activityId },
+    select: { currentMeetingPointId: true },
+  });
+  if (!activity?.currentMeetingPointId) return null;
+  return getMeetingPointById(activity.currentMeetingPointId);
+}
+
+/**
+ * The next stop on the plan that the group hasn't reached — what "Next meeting point" pre-fills
+ * from. Null once they're off the end of the itinerary, where the leader is improvising.
+ */
+export async function getNextPlannedMeetingPoint(
+  activityId: string,
+): Promise<MeetingPointRow | null> {
   const rows = await prisma.$queryRaw<MeetingPointRow[]>`
     SELECT ${MEETING_POINT_COLUMNS} FROM meeting_points
-    WHERE activity_id = ${activityId}
-    ORDER BY created_at DESC LIMIT 1
+    WHERE activity_id = ${activityId} AND arrived_at IS NULL
+    ORDER BY created_at ASC LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+export async function deleteMeetingPoint(id: string): Promise<void> {
+  await prisma.$executeRaw`DELETE FROM meeting_points WHERE id = ${id}`;
+}
+
+/** Stamps a stop as reached. Callers pair this with moving Activity.currentMeetingPointId. */
+export async function markMeetingPointArrived(id: string): Promise<MeetingPointRow | null> {
+  const rows = await prisma.$queryRaw<MeetingPointRow[]>`
+    UPDATE meeting_points SET arrived_at = now() WHERE id = ${id}
+    RETURNING ${MEETING_POINT_COLUMNS}
   `;
   return rows[0] ?? null;
 }
@@ -85,7 +129,13 @@ export async function getMeetingPointById(id: string): Promise<MeetingPointRow |
 
 export async function updateMeetingPoint(
   id: string,
-  input: { label?: string; googleMapsUrl?: string; location?: GeoPoint; time?: Date },
+  input: {
+    label?: string;
+    googleMapsUrl?: string;
+    location?: GeoPoint;
+    time?: Date;
+    arrivedAt?: Date;
+  },
 ): Promise<MeetingPointRow | null> {
   const sets: Prisma.Sql[] = [];
   if (input.label !== undefined) sets.push(Prisma.sql`label = ${input.label}`);
@@ -99,6 +149,9 @@ export async function updateMeetingPoint(
   }
   if (input.time !== undefined) {
     sets.push(Prisma.sql`time = ${input.time}`);
+  }
+  if (input.arrivedAt !== undefined) {
+    sets.push(Prisma.sql`arrived_at = ${input.arrivedAt}`);
   }
 
   if (sets.length === 0) {

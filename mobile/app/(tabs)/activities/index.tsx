@@ -48,10 +48,15 @@ function needsReply(activity: ActivityWithGroup): boolean {
   return new Date(activity.endAt).getTime() >= Date.now();
 }
 
+/** How far ahead "Next up" reaches, and the fewest events it will show regardless. */
+const NEAR_TERM_DAYS = 7;
+const MIN_NEXT_UP = 3;
+
 export default function ActivitiesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [startingId, setStartingId] = useState<string | null>(null);
+  const [showLater, setShowLater] = useState(false);
 
   const { data, isFetching } = useQuery({
     queryKey: ['activities', 'mine'],
@@ -67,10 +72,27 @@ export default function ActivitiesScreen() {
   const activities = data?.activities ?? [];
   const now = Date.now();
   const live = activities.filter((a) => a.status === 'in_progress');
+  // Still to come means the clock agrees, not just the status. A published event nobody ever
+  // started or ended keeps that status forever, and without the date check it would sit at the
+  // top of "Next up" months after it happened.
+  const hasEnded = (a: ActivityWithGroup) => new Date(a.endAt).getTime() < now;
   const upcoming = activities.filter(
-    (a) => a.status === 'published' || (a.status === 'draft' && new Date(a.endAt).getTime() >= now),
+    (a) => (a.status === 'published' || a.status === 'draft') && !hasEnded(a),
   );
-  const finished = activities.filter((a) => a.status === 'completed');
+  const past = activities.filter((a) => a.status === 'completed' || hasEnded(a));
+
+  /**
+   * This screen answers "what's happening", so it can't be everything the leader has ever
+   * scheduled — a twice-weekly yoga term is ten identical cards, and a tour guide with two
+   * departures booked is looking at November from August. Near-term leads; the rest folds away
+   * but stays reachable, because hiding a scheduled event outright would be worse than a long
+   * list. The floor of three keeps the section useful for a leader whose next event is a month
+   * out, which is exactly the monthly photo walk.
+   */
+  const nearTermCutoff = now + NEAR_TERM_DAYS * 24 * 60 * 60 * 1000;
+  const withinWindow = upcoming.filter((a) => new Date(a.startAt).getTime() <= nearTermCutoff);
+  const nextUp = withinWindow.length >= MIN_NEXT_UP ? withinWindow : upcoming.slice(0, MIN_NEXT_UP);
+  const later = upcoming.slice(nextUp.length);
 
   function open(activity: ActivityWithGroup) {
     router.push(`/(tabs)/groups/${activity.groupId}/activities/${activity.id}`);
@@ -156,15 +178,37 @@ export default function ActivitiesScreen() {
       )}
 
       <Text style={styles.sectionTitle}>Next up</Text>
-      {upcoming.map((a) => (
+      {nextUp.map((a) => (
         <Card key={a.id} activity={a} />
       ))}
-      {upcoming.length === 0 && <Text style={styles.muted}>Nothing scheduled.</Text>}
+      {nextUp.length === 0 && <Text style={styles.muted}>Nothing scheduled.</Text>}
 
-      {finished.length > 0 && (
+      {later.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>Recently finished</Text>
-          {finished.map((a) => (
+          <TouchableOpacity onPress={() => setShowLater((v) => !v)}>
+            <Text style={styles.sectionTitle}>
+              Later ({later.length}) {showLater ? '▾' : '▸'}
+            </Text>
+          </TouchableOpacity>
+          {showLater &&
+            later.map((a) => (
+              <TouchableOpacity key={a.id} style={styles.laterRow} onPress={() => open(a)}>
+                <Text style={styles.laterTitle} numberOfLines={1}>
+                  {a.title}
+                </Text>
+                <Text style={styles.muted}>
+                  {formatActivityWhen(a.startAt, a.endAt, a.allDay)}
+                  {a.status === 'draft' ? '  ·  draft' : ''}
+                </Text>
+              </TouchableOpacity>
+            ))}
+        </>
+      )}
+
+      {past.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Earlier</Text>
+          {past.map((a) => (
             <Card key={a.id} activity={a} />
           ))}
         </>
@@ -186,6 +230,8 @@ const styles = StyleSheet.create({
   liveTag: { color: '#2563eb', fontWeight: '700', fontSize: 12 },
   when: { marginTop: 6, color: '#334155' },
   muted: { color: '#888', marginTop: 2 },
+  laterRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  laterTitle: { fontSize: 15 },
   draftTag: { marginTop: 8, color: '#b45309', fontSize: 12 },
   replyTag: { marginTop: 8, color: '#b45309', fontWeight: '600', fontSize: 12 },
   startButton: { backgroundColor: '#2563eb', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },

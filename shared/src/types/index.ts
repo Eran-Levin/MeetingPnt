@@ -104,6 +104,11 @@ export interface Activity {
   transportMode: TransportMode;
   requiresRsvp: boolean;
   status: ActivityStatus;
+  /**
+   * Where the group is right now. Null before the event starts, and while it runs it lags the
+   * end of the itinerary — the leader may have planned five stops but only walked to two.
+   */
+  currentMeetingPointId: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -199,6 +204,8 @@ export interface MeetingPoint {
   googleMapsUrl: string;
   location: GeoPoint;
   time: string;
+  /** When the group actually reached this stop. Null means it's still a planned stop. */
+  arrivedAt: string | null;
   createdBy: string;
   createdAt: string;
 }

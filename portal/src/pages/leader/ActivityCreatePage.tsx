@@ -191,13 +191,15 @@ export function ActivityCreatePage() {
               onChange={(e) => setRequiresRsvp(e.target.checked)}
               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            Require members to confirm attendance (RSVP)
+            Approve attendance
           </label>
-          {!requiresRsvp && (
-            <p className="-mt-2 text-xs text-slate-500">
-              Members will be marked as attending automatically when published; they can still decline.
-            </p>
-          )}
+          {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
+              morning — but they can still decline the one day they're sitting out. */}
+          <p className="-mt-2 text-xs text-slate-500">
+            {requiresRsvp
+              ? 'Members are asked to confirm they’re coming.'
+              : 'Members count as coming as soon as this is published — they can still decline.'}
+          </p>
 
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
             <input

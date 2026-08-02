@@ -8,7 +8,12 @@ import type {
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
-import { insertMeetingPoint, shiftMeetingPointTimes } from '../../db/geo.js';
+import {
+  getNextPlannedMeetingPoint,
+  insertMeetingPoint,
+  markMeetingPointArrived,
+  shiftMeetingPointTimes,
+} from '../../db/geo.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { buildIcsEvent } from '../../lib/ics.js';
@@ -28,6 +33,7 @@ function toSharedActivity(activity: Activity): SharedActivity {
     transportMode: activity.transportMode,
     requiresRsvp: activity.requiresRsvp,
     status: activity.status,
+    currentMeetingPointId: activity.currentMeetingPointId,
     createdBy: activity.createdBy,
     createdAt: activity.createdAt.toISOString(),
     updatedAt: activity.updatedAt.toISOString(),
@@ -226,7 +232,39 @@ export async function updateActivity(activityId: string, requesterId: string, dt
 
   await shiftMeetingPointTimes(activityId, nextStartAt.getTime() - activity.startAt.getTime());
 
+  if (dto.requiresRsvp !== undefined && dto.requiresRsvp !== activity.requiresRsvp) {
+    await reconcileRsvpsToApprovalSetting(activityId, dto.requiresRsvp);
+  }
+
   return toSharedActivity(updated);
+}
+
+/**
+ * Brings existing replies into line when a leader flips "Approve attendance" on an activity that
+ * has already been published. Without this the setting would only ever apply at publish time, so
+ * changing it later would look like it worked and change nothing.
+ *
+ * `respondedAt` is what separates a real answer from a seeded one: it's null on rows created by
+ * publishing and set the moment anybody — member or leader on their behalf — actually replies.
+ * So a genuine "I'm coming" or "I can't make it" always survives the switch; only the rows nobody
+ * ever touched get moved.
+ */
+async function reconcileRsvpsToApprovalSetting(activityId: string, requiresRsvp: boolean) {
+  if (requiresRsvp) {
+    // Now asking people to confirm: anyone auto-approved at publish hasn't actually said yes.
+    await prisma.rsvp.updateMany({
+      where: { activityId, status: 'approved', respondedAt: null },
+      data: { status: 'pending' },
+    });
+    return;
+  }
+
+  // No longer asking: anyone who never replied counts as coming. Declines stand — someone who
+  // said they can't make it doesn't get signed back up by a settings change.
+  await prisma.rsvp.updateMany({
+    where: { activityId, status: 'pending', respondedAt: null },
+    data: { status: 'approved' },
+  });
 }
 
 export async function publishActivity(activityId: string, requesterId: string) {
@@ -283,20 +321,47 @@ export async function startActivity(activityId: string, requesterId: string) {
     throw new HttpError(409, 'Only a published activity can be started');
   }
 
-  // A leader can't be in two places at once, so only one of their events runs at a time.
-  const alreadyRunning = await prisma.activity.findFirst({
+  // Within a group, starting is a handover: day 3 of a trek takes over from day 2, which is what
+  // keeps a multi-day trip continuous. The old event runs right up to the moment the new one
+  // begins, so location sharing never lapses overnight — the gap between an evening's end and the
+  // next morning's start is exactly when a guide is most likely to need to find someone.
+  const runningInGroup = await prisma.activity.findFirst({
+    where: { status: 'in_progress', groupId: activity.groupId },
+  });
+  if (runningInGroup) {
+    await prisma.activity.update({
+      where: { id: runningInGroup.id },
+      data: { status: 'completed' },
+    });
+  }
+
+  // Across groups it stays a refusal. A leader can't be in two places at once, and silently
+  // ending someone else's running event would close location sharing on a group still out there
+  // — the one case where doing it quietly is worse than saying no.
+  const runningElsewhere = await prisma.activity.findFirst({
     where: { status: 'in_progress', group: { leaderId: requesterId } },
   });
-  if (alreadyRunning) {
+  if (runningElsewhere) {
     throw new HttpError(
       409,
-      `You're already running "${alreadyRunning.title}". End it before starting another.`,
+      `You're already running "${runningElsewhere.title}" in another group. End it before starting this one.`,
     );
+  }
+
+  // Starting the event puts the group at the first stop on the plan — that's what "we're meeting
+  // at the clock tower at nine" means. Without this the event would run with nowhere marked as
+  // current, so nobody would have a destination and ETAs would have nothing to measure to.
+  const firstPoint = await getNextPlannedMeetingPoint(activityId);
+  if (firstPoint) {
+    await markMeetingPointArrived(firstPoint.id);
   }
 
   const updated = await prisma.activity.update({
     where: { id: activityId },
-    data: { status: 'in_progress' },
+    data: {
+      status: 'in_progress',
+      ...(firstPoint ? { currentMeetingPointId: firstPoint.id } : {}),
+    },
   });
   return toSharedActivity(updated);
 }

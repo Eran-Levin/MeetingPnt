@@ -10,6 +10,13 @@ import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { assertActivityParticipant } from '../activities/service.js';
 
+/** How the RSVP dashboard reads top to bottom, rather than alphabetically or by reply time. */
+const RSVP_DISPLAY_ORDER: Record<Rsvp['status'], number> = {
+  approved: 0,
+  pending: 1,
+  declined: 2,
+};
+
 function toSharedRsvp(rsvp: Rsvp): SharedRsvp {
   return {
     id: rsvp.id,
@@ -149,8 +156,13 @@ export async function listRsvps(activityId: string, requesterId: string): Promis
       isVisitor: true,
     }));
 
-  // Members first, visitors after them, as they're the exception rather than the roster.
+  // Members first, visitors after them, as they're the exception rather than the roster. Within
+  // each block: who's coming, then who still owes an answer, then who isn't — the leader's
+  // attention runs down that list. Name breaks ties so rows don't reshuffle as replies land.
   return [...fromRsvps, ...awaitingGuests].sort(
-    (a, b) => Number(a.isVisitor) - Number(b.isVisitor),
+    (a, b) =>
+      Number(a.isVisitor) - Number(b.isVisitor) ||
+      RSVP_DISPLAY_ORDER[a.status] - RSVP_DISPLAY_ORDER[b.status] ||
+      a.user.name.localeCompare(b.user.name),
   );
 }

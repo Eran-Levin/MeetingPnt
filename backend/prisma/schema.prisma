@@ -215,6 +215,12 @@ model Activity {
   transportMode TransportMode  @default(driving) @map("transport_mode")
   requiresRsvp  Boolean        @default(true) @map("requires_rsvp")
   status        ActivityStatus @default(draft)
+  // Where the group is right now — the stop the apps show and the ETA is measured to. Deliberately
+  // a stored pointer rather than "the newest meeting point": once the leader plans the whole
+  // itinerary up front, the newest point is the *last* stop, not the current one. Left as a plain
+  // column rather than a Prisma relation to avoid a cascade cycle with MeetingPoint.activityId;
+  // the FK and its ON DELETE SET NULL live in the migration.
+  currentMeetingPointId String?  @map("current_meeting_point_id")
   createdBy     String         @map("created_by")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -309,6 +315,11 @@ model MeetingPoint {
   googleMapsUrl String                               @map("google_maps_url")
   location      Unsupported("geography(Point,4326)")
   time          DateTime
+  // Null until the group actually gets here. The leader plans the itinerary up front, so the
+  // list of points and the group's progress through it are two different things: creation order
+  // is the planned route, arrivedAt is the trail of stops actually visited. Where the group is
+  // *now* is Activity.currentMeetingPointId, not the newest of these.
+  arrivedAt     DateTime?                            @map("arrived_at")
   createdBy     String                               @map("created_by")
   createdAt     DateTime                             @default(now()) @map("created_at")
 

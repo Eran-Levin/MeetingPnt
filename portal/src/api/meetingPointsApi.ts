@@ -18,4 +18,6 @@ export const meetingPointsApi = {
       method: 'PATCH',
       body: dto,
     }),
+  remove: (meetingPointId: string) =>
+    apiFetch<void>(`/api/meeting-points/${meetingPointId}`, { method: 'DELETE' }),
 };

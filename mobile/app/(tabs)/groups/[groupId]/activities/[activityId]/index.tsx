@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi';
+import { ApiError } from '../../../../../../src/api/client';
 import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi';
 import { attendanceApi } from '../../../../../../src/api/attendanceApi';
 import { locationsApi } from '../../../../../../src/api/locationsApi';
@@ -37,7 +38,7 @@ export default function ActivityDetailScreen() {
   const [omwSubmitting, setOmwSubmitting] = useState(false);
 
   // Meeting point editor — doubles as "change the current one" and "move the group on".
-  const [mpMode, setMpMode] = useState<null | 'edit' | 'add'>(null);
+  const [mpMode, setMpMode] = useState<null | 'edit' | 'next'>(null);
   const [mpLabel, setMpLabel] = useState('');
   const [mpUrl, setMpUrl] = useState('');
   const [mpTime, setMpTime] = useState<Date | null>(null);
@@ -68,9 +69,16 @@ export default function ActivityDetailScreen() {
     queryFn: () => meetingPointsApi.list(activityId),
   });
   const meetingPoints = meetingPointsQuery.data?.meetingPoints ?? [];
-  // The group moves forward through its meeting points, so the newest one is where they are now.
-  const currentPoint: MeetingPoint | undefined = meetingPoints[meetingPoints.length - 1];
-  const earlierPoints = meetingPoints.slice(0, -1);
+  // Where the group is, straight from the activity. Not "the newest point" — the leader may have
+  // planned the whole route on the Web, in which case the newest point is the last stop of the day.
+  const currentPoint: MeetingPoint | undefined = meetingPoints.find(
+    (mp) => mp.id === activity?.currentMeetingPointId,
+  );
+  const earlierPoints = meetingPoints.filter(
+    (mp) => mp.arrivedAt !== null && mp.id !== currentPoint?.id,
+  );
+  // The stop "Next meeting point" will pre-fill from, if the leader planned one.
+  const nextPlanned: MeetingPoint | undefined = meetingPoints.find((mp) => mp.arrivedAt === null);
 
   const rollCallQuery = useQuery({
     queryKey: ['meeting-points', currentPoint?.id, 'roll-call'],
@@ -134,11 +142,18 @@ export default function ActivityDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
   }
 
-  function openEditor(mode: 'edit' | 'add') {
-    if (mode === 'edit' && currentPoint) {
-      setMpLabel(currentPoint.label ?? '');
-      setMpUrl(currentPoint.googleMapsUrl);
-      setMpTime(new Date(currentPoint.time));
+  /**
+   * 'edit' changes the stop the group is standing at. 'next' moves them on: pre-filled from the
+   * planned stop when the leader mapped the route out in advance, blank when they're improvising
+   * past the end of the plan. Either way the leader can change anything before confirming —
+   * the plan said the market at 11, they actually got there at 11:40 by the other entrance.
+   */
+  function openEditor(mode: 'edit' | 'next') {
+    const source = mode === 'edit' ? currentPoint : nextPlanned;
+    if (source) {
+      setMpLabel(source.label ?? '');
+      setMpUrl(source.googleMapsUrl);
+      setMpTime(mode === 'edit' ? new Date(source.time) : null); // arriving now
     } else {
       setMpLabel('');
       setMpUrl('');
@@ -189,13 +204,20 @@ export default function ActivityDetailScreen() {
         googleMapsUrl: mpUrl,
         time: mpTime ? mpTime.toISOString() : undefined,
       };
+      // Advancing is a single call: the server applies these edits to the planned stop (or
+      // creates one if the plan has run out) and moves the group's position in the same step.
       if (mpMode === 'edit' && currentPoint) await meetingPointsApi.update(currentPoint.id, dto);
-      else await meetingPointsApi.create(activityId, dto);
+      else await meetingPointsApi.advance(activityId, dto);
 
       setMpMode(null);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
-    } catch {
-      setMpError("Couldn't read that Maps link — try a full (non-shortened) URL.");
+      queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
+    } catch (err) {
+      setMpError(
+        err instanceof ApiError
+          ? err.message
+          : "Couldn't read that Maps link — try a full (non-shortened) URL.",
+      );
     } finally {
       setMpSubmitting(false);
     }
@@ -271,7 +293,30 @@ export default function ActivityDetailScreen() {
               <Text style={styles.buttonText}>Start event</Text>
             </TouchableOpacity>
           )}
-          {isLeader && (activity.status === 'published' || activity.status === 'in_progress') && (
+
+          {/* Running an event is these two decisions: move the group on, or finish. They sit
+              together at the top so a leader holding a phone one-handed can reach both. */}
+          {isLeader && activity.status === 'in_progress' && mpMode === null && (
+            <View style={styles.eventControls}>
+              <TouchableOpacity
+                style={[styles.button, styles.eventControlButton]}
+                onPress={() => openEditor('next')}
+              >
+                <Text style={styles.buttonText}>Next meeting point</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, styles.eventControlButton]}
+                onPress={handleEnd}
+              >
+                <Text style={styles.secondaryButtonText}>End event</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {isLeader && activity.status === 'in_progress' && mpMode === null && nextPlanned && (
+            <Text style={styles.muted}>Next on the plan: {nextPlanned.label || 'a stop'}</Text>
+          )}
+
+          {isLeader && activity.status === 'published' && (
             <TouchableOpacity style={styles.secondaryButton} onPress={handleEnd}>
               <Text style={styles.secondaryButtonText}>End event</Text>
             </TouchableOpacity>
@@ -280,8 +325,11 @@ export default function ActivityDetailScreen() {
             <Text style={styles.muted}>This event has ended — location sharing is closed.</Text>
           )}
 
-          {/* ---- where the group is right now ---- */}
-          <Text style={styles.sectionTitle}>Meeting point</Text>
+          {/* Where to go leads, so nobody has to work out which pin is theirs. The rest of the
+              route sits underneath for context — what time we set off, when we'll be back. */}
+          <Text style={styles.sectionTitle}>
+            {currentPoint ? 'Where to go now' : 'Meeting point'}
+          </Text>
           {currentPoint ? (
             <View style={styles.currentPoint}>
               <Text style={styles.currentPointLabel}>{currentPoint.label || 'Meeting point'}</Text>
@@ -298,20 +346,29 @@ export default function ActivityDetailScreen() {
               </View>
             </View>
           ) : (
-            <Text style={styles.muted}>No meeting point set yet.</Text>
-          )}
-
-          {isLeader && mpMode === null && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => openEditor('add')}>
-              <Text style={styles.secondaryButtonText}>+ Add meeting point (move the group on)</Text>
-            </TouchableOpacity>
+            <Text style={styles.muted}>
+              {meetingPoints.length > 0
+                ? "The event hasn't started — the route is below."
+                : 'No meeting point set yet.'}
+            </Text>
           )}
 
           {isLeader && mpMode !== null && (
             <View style={styles.editor}>
               <Text style={styles.editorTitle}>
-                {mpMode === 'edit' ? 'Edit meeting point' : 'New meeting point'}
+                {mpMode === 'edit'
+                  ? 'Edit meeting point'
+                  : nextPlanned
+                    ? 'Next stop on the plan'
+                    : 'Next meeting point'}
               </Text>
+              {mpMode === 'next' && (
+                <Text style={styles.muted}>
+                  {nextPlanned
+                    ? 'Change anything that turned out differently, then confirm to move the group.'
+                    : "You're past the last planned stop — add where the group is going now."}
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
                 placeholder="Label (optional)"
@@ -356,7 +413,9 @@ export default function ActivityDetailScreen() {
                   onPress={handleSaveMeetingPoint}
                   disabled={mpSubmitting}
                 >
-                  <Text style={styles.buttonText}>{mpSubmitting ? 'Saving…' : 'Save'}</Text>
+                  <Text style={styles.buttonText}>
+                    {mpSubmitting ? 'Saving…' : mpMode === 'edit' ? 'Save' : "We're here"}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMpMode(null)}>
                   <Text style={styles.link}>Cancel</Text>
@@ -487,7 +546,14 @@ export default function ActivityDetailScreen() {
         </>
       )}
 
-      {isLeader && (
+      {/* Inviting someone is planning, and planning is over once the group is out walking — by
+          then the leader is marking a roll call, not signing people up. Also hidden when
+          attendance isn't approved: on a trip day the roster is the manifest, not a list you
+          top up, and the Web hides it on the same rule. */}
+      {isLeader &&
+        activity?.requiresRsvp &&
+        activity.status !== 'in_progress' &&
+        activity.status !== 'completed' && (
         <View style={styles.rsvpBox}>
           <Text style={styles.sectionTitle}>Add a visitor</Text>
           <TextInput
@@ -531,22 +597,39 @@ export default function ActivityDetailScreen() {
         </View>
       )}
 
-      {isLeader && earlierPoints.length > 0 && (
+      {/* The whole route, for anyone on the activity. Three states so a glance answers "where am
+          I going" without reading: stops already behind us fade back, the current one is picked
+          out, and what's still ahead reads as plan. */}
+      {meetingPoints.length > 1 && (
         <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>Earlier stops</Text>
-          {earlierPoints.map((mp) => (
-            <TouchableOpacity
-              key={mp.id}
-              style={styles.dashboardRow}
-              onPress={() => Linking.openURL(mp.googleMapsUrl)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text>{mp.label || 'Meeting point'}</Text>
-                <Text style={styles.muted}>{new Date(mp.time).toLocaleString()}</Text>
-              </View>
-              <Text style={styles.link}>Directions</Text>
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.sectionTitle}>The route</Text>
+          {meetingPoints.map((mp, index) => {
+            const isCurrent = mp.id === currentPoint?.id;
+            const visited = mp.arrivedAt !== null && !isCurrent;
+            return (
+              <TouchableOpacity
+                key={mp.id}
+                style={[styles.routeRow, isCurrent && styles.routeRowCurrent]}
+                onPress={() => Linking.openURL(mp.googleMapsUrl)}
+              >
+                <View style={[styles.routeIndex, isCurrent && styles.routeIndexCurrent]}>
+                  <Text style={[styles.routeIndexText, isCurrent && styles.routeIndexTextCurrent]}>
+                    {index + 1}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[visited && styles.routeTextVisited, isCurrent && styles.routeTextCurrent]}>
+                    {mp.label || 'Meeting point'}
+                  </Text>
+                  <Text style={[styles.muted, visited && styles.routeTextVisited]}>
+                    {new Date(mp.time).toLocaleString()}
+                    {isCurrent ? '  ·  you are heading here' : visited ? '  ·  done' : ''}
+                  </Text>
+                </View>
+                <Text style={styles.link}>Directions</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </ScrollView>
@@ -570,6 +653,24 @@ const styles = StyleSheet.create({
   currentPoint: { borderWidth: 2, borderColor: '#2563eb', backgroundColor: '#eff6ff', borderRadius: 10, padding: 14 },
   currentPointLabel: { fontSize: 16, fontWeight: '600' },
   pointActions: { flexDirection: 'row', gap: 20, marginTop: 10 },
+  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  routeRowCurrent: { backgroundColor: '#eff6ff', borderRadius: 8, paddingHorizontal: 8 },
+  routeIndex: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  routeIndexCurrent: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+  routeIndexText: { fontSize: 12, color: '#6b7280' },
+  routeIndexTextCurrent: { color: 'white', fontWeight: '600' },
+  routeTextCurrent: { fontWeight: '600' },
+  routeTextVisited: { color: '#9ca3af' },
+  eventControls: { flexDirection: 'row', gap: 8 },
+  eventControlButton: { flex: 1 },
   editor: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 12, marginTop: 12 },
   editorTitle: { fontWeight: '600', marginBottom: 8 },
   editorActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },

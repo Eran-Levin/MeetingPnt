@@ -4,7 +4,7 @@ Things consciously left undone, with the reasoning. This is not a wishlist: each
 was either explicitly deprioritised in conversation, or is a known gap in something
 already shipped. Delete an entry when it lands.
 
-Last reviewed: 2026-08-01
+Last reviewed: 2026-08-02
 
 ## Scheduled
 
@@ -50,6 +50,20 @@ directory. That means no RSVP/activity reminder pushes, no invitation expiry swe
 location points get deleted, and today they accumulate forever. There is also no rate
 limiting on any endpoint, including login.
 
+**Nothing closes an event that's simply been forgotten.** Starting an event now ends whichever one
+was already running in that group, which is what makes a multi-day trip continuous and stops a
+leader accumulating live events. But it only tidies up when there *is* a next start: a leader who
+runs one event and never starts another leaves it `in_progress` indefinitely, and with it the
+location-sharing channel. For a design whose whole premise is discrete, consented location
+snapshots, "open forever because nobody pressed End" is the wrong resting state. The fix is a
+time-based sweep closing anything still running well past its `endAt`, which belongs with the
+BullMQ jobs below — the two should land together.
+
+**Copying a roster between trips.** A trip is a group, so a guide running the same route in
+September and November creates two groups and re-invites the same people by hand. Deliberately
+deferred until someone has actually run a second trip and felt it; the shortcut is obvious
+("start from the roster of…") but the right shape isn't obvious until then.
+
 **Audit log only records role changes.** `auditLog.create` is called in exactly one
 place (`admin/service.ts`). Group deletion, activity cancellation, and attendance edits
 — the actions a leader would most plausibly need to account for — leave no trace.
@@ -65,18 +79,6 @@ and one Wi-Fi network — it will silently serve broken image links for anyone e
 in any deployment. Needs to come from proper per-environment config.
 
 ## Known gaps in shipped features
-
-**Multi-day trips may need their itinerary planned up front.** The Web permits exactly one
-initial meeting point, on the reasoning that later stops get sent from the leader's phone as the
-event unfolds. That fits a photo walk; it likely does not fit a 7-day trek, where "Day 3, 7 AM at
-the trailhead" is known months ahead and printed in the brochure. The seed was trimmed to match
-the current UI (tours keep only their Day 1 point), which means the tour-guide persona no longer
-reflects how a guide would really plan. Open question, not a bug — revisit when testing reaches
-that persona.
-
-**Members can't review where the group went.** By design they see only the current meeting point —
-their view is navigational ("where am I heading now"). A retrospective view of the whole event,
-listing the stops in order, was explicitly deferred: useful afterwards, noise during.
 
 **Members aren't told when the leader moves the group.** Adding a meeting point mid-event updates
 the app silently — a member only sees the new point when they next open or refresh the screen. The
@@ -109,6 +111,17 @@ the data is already there, it just needs a screen.
 **Recurring series can only be bulk-published, not bulk-edited.** Occurrences are
 independent rows, so changing the time of a whole series means editing each one by hand.
 Fine at 3 occurrences, painful at 20 — the yoga instructor's twice-weekly term is 8+.
+Now sharper than it was: a trip's days are separate events, so a departure slipping by a day
+means re-dating every day of the trek one at a time. A "shift the whole thing by N days" action
+would cover both cases.
+
+**"Approve attendance" has no per-leader default.** The checkbox is set per event and starts on
+every time, which is right for a photo club and wrong for a tour guide — they turn it off for
+every day of every trip and only want it on for the pre-trip gathering. The default should come
+from the leader's own preference (or be inferred from what they last chose), so the common case
+stops needing a click. Deliberately not guessed at now: one leader-level setting, a per-group
+default, and "remember the last choice" are all plausible, and which is right depends on whether
+a leader's habits are consistent across their groups — which nobody knows yet.
 
 **`chatMode` is portal-only.** Mobile correctly honours it (members see a read-only
 composer in `announcements` mode) but leaders can't change the setting from their phone.

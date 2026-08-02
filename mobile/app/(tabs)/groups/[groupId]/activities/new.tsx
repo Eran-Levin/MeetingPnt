@@ -141,10 +141,17 @@ export default function NewActivityScreen() {
         />
       )}
 
+      {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
+          morning — but they can still decline the one day they're sitting out. */}
       <View style={styles.repeatRow}>
-        <Text style={styles.label}>Require RSVP confirmation</Text>
+        <Text style={styles.label}>Approve attendance</Text>
         <Switch value={requiresRsvp} onValueChange={setRequiresRsvp} />
       </View>
+      <Text style={styles.hint}>
+        {requiresRsvp
+          ? 'Members are asked to confirm they’re coming.'
+          : 'Members count as coming as soon as this is published — they can still decline.'}
+      </Text>
 
       <Text style={styles.label}>Mode of transport</Text>
       <View style={styles.modeRow}>
@@ -218,6 +225,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, gap: 12 },
   title: { fontSize: 22, fontWeight: '600' },
   label: { fontWeight: '600', marginTop: 4 },
+  hint: { fontSize: 12, color: '#6b7280', marginTop: -4 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
   modeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   modeChip: { borderWidth: 1, borderColor: '#ccc', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12 },

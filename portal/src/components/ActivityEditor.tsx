@@ -24,16 +24,18 @@ function toTimeInput(iso: string): string {
 }
 
 /**
- * Rescheduling one occurrence. Series occurrences are independent rows, so this moves only the
- * one being edited — which is exactly what a leader wants when a single session shifts.
+ * Editing one occurrence. Series occurrences are independent rows, so this changes only the one
+ * being edited — which is exactly what a leader wants when a single session shifts, or when the
+ * pre-trip gathering needs confirmations but the trek days don't.
  */
-export function ActivityScheduleEditor({ activity, onDone }: Props) {
+export function ActivityEditor({ activity, onDone }: Props) {
   const queryClient = useQueryClient();
   const [allDay, setAllDay] = useState(activity.allDay);
   const [date, setDate] = useState(toDateInput(activity.startAt));
   const [endDate, setEndDate] = useState(toDateInput(activity.endAt));
   const [startTime, setStartTime] = useState(toTimeInput(activity.startAt));
   const [endTime, setEndTime] = useState(toTimeInput(activity.endAt));
+  const [requiresRsvp, setRequiresRsvp] = useState(activity.requiresRsvp);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -66,12 +68,14 @@ export function ActivityScheduleEditor({ activity, onDone }: Props) {
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
+        requiresRsvp,
       });
       queryClient.invalidateQueries({ queryKey: ['activities', activity.id] });
+      queryClient.invalidateQueries({ queryKey: ['activities', activity.id, 'rsvps'] });
       queryClient.invalidateQueries({ queryKey: ['groups', activity.groupId, 'activities'] });
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to update the schedule');
+      setError(err instanceof ApiError ? err.message : 'Failed to save the event');
     } finally {
       setSaving(false);
     }
@@ -104,11 +108,37 @@ export function ActivityScheduleEditor({ activity, onDone }: Props) {
 
       <p className="text-xs text-slate-500">Meeting point times shift with the event.</p>
 
+      <label className="flex items-center gap-2 border-t border-slate-200 pt-3 text-sm font-medium text-slate-700">
+        <input
+          type="checkbox"
+          checked={requiresRsvp}
+          onChange={(e) => setRequiresRsvp(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+        />
+        Approve attendance
+      </label>
+      <p className="-mt-2 text-xs text-slate-500">
+        {requiresRsvp
+          ? 'Members are asked to confirm they’re coming.'
+          : 'Members count as coming without replying — they can still decline.'}
+        {activity.status !== 'draft' && requiresRsvp !== activity.requiresRsvp && (
+          <>
+            {' '}
+            <span className="text-amber-700">
+              {requiresRsvp
+                ? 'Anyone who never actually replied will go back to awaiting a reply.'
+                : 'Anyone who never replied will be counted as coming.'}{' '}
+              Replies already given are kept either way.
+            </span>
+          </>
+        )}
+      </p>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={saving}>
-          {saving ? 'Saving…' : 'Save schedule'}
+          {saving ? 'Saving…' : 'Save changes'}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
           Cancel

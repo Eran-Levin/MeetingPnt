@@ -6,7 +6,11 @@ import type {
   UpdateAttendanceDto,
 } from '@meetingpnt/shared';
 import type { Attendance, User } from '@prisma/client';
-import { getMeetingPointById, listMeetingPoints } from '../../db/geo.js';
+import {
+  getMeetingPointById,
+  listArrivedMeetingPoints,
+  listMeetingPoints,
+} from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
 import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -115,6 +119,11 @@ export async function listActivityAttendance(
  * declined — members and visitors alike. At every later point it's only the people who were
  * actually present at the previous one, so a leader who has moved on isn't still chasing
  * someone who went home.
+ *
+ * "Previous" means the stop before this one *among those the group actually reached*, not the one
+ * before it in the itinerary. Now that a leader can plan stops in advance and then skip one, the
+ * preceding planned stop may never have been visited and would have no attendance at all —
+ * carrying forward from it would empty the roster and hide everyone who is standing right there.
  */
 export async function getRollCall(
   meetingPointId: string,
@@ -123,7 +132,7 @@ export async function getRollCall(
   const meetingPoint = await assertMeetingPointLeader(meetingPointId, requesterId);
   const activityId = meetingPoint.activityId!;
 
-  const points = await listMeetingPoints(activityId);
+  const points = await listArrivedMeetingPoints(activityId);
   const index = points.findIndex((p) => p.id === meetingPointId);
   const previous = index > 0 ? points[index - 1] : undefined;
 
