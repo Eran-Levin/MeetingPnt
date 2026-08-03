@@ -1,0 +1,17 @@
+# EAS uploads the repo root because mobile depends on the shared workspace through npm workspaces.
+# Keep the other workspaces' package.json files — npm needs them to resolve the workspace set —
+# and drop only what the app build never reads.
+node_modules
+**/node_modules
+.git
+.claude
+backend/src
+backend/prisma
+backend/uploads
+backend/dist
+backend/Dockerfile
+portal/src
+portal/dist
+portal/public
+docker-compose.yml
+*.log

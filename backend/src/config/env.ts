@@ -10,7 +10,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(1),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  REDIS_URL: z.string().min(1),
+  // Optional: only fans Socket.IO events out across instances. A single instance needs no Redis.
+  REDIS_URL: z.string().optional(),
   GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
   RESEND_API_KEY: z.string().optional().default(''),
   RESEND_FROM_EMAIL: z.string().optional().default('onboarding@resend.dev'),

@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -21,7 +22,16 @@ export async function registerForPushNotifications(): Promise<void> {
     });
   }
 
-  const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+  // A standalone build has no dev-server URL to infer the project from, so the EAS project id has
+  // to be passed explicitly. It lands in app.json when `eas init` links the project; without it,
+  // push is simply unavailable rather than a startup crash.
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+  if (!projectId) {
+    console.warn('[push] no EAS projectId in app config — skipping push registration');
+    return;
+  }
+
+  const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({ projectId });
   await apiFetch<void>('/api/users/push-token', {
     method: 'POST',
     body: { expoPushToken, platform: Platform.OS },

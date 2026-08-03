@@ -30,6 +30,10 @@ import { usersRouter } from './modules/users/routes.js';
 export function createApp() {
   const app = express();
 
+  // Behind a hosting proxy (Render/Cloudflare), the TLS terminates upstream. Without this Express
+  // sees a plain-http request and silently drops the `secure` refresh cookie.
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(express.json());

@@ -1,0 +1,20 @@
+node_modules
+**/node_modules
+dist
+**/dist
+build
+.git
+.expo
+mobile
+portal
+coverage
+*.tsbuildinfo
+*.log
+# Anchored patterns only match the root, and a stray backend/.env would both leak dev secrets into
+# the image and silently override the host's configuration.
+**/.env
+**/.env.*
+!**/.env.example
+backend/uploads
+.claude
+.vscode

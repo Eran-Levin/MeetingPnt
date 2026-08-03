@@ -20,9 +20,14 @@ export function createRealtimeServer(httpServer: HttpServer): SocketIOServer {
     cors: { origin: corsOrigins, credentials: true },
   });
 
-  const pubClient = new Redis(env.REDIS_URL);
-  const subClient = pubClient.duplicate();
-  io.adapter(createAdapter(pubClient, subClient));
+  // The Redis adapter only matters when more than one backend instance is serving sockets. On a
+  // single instance the in-memory adapter is equivalent, so a deployment can omit REDIS_URL
+  // entirely rather than pay for a Redis it never uses.
+  if (env.REDIS_URL) {
+    const pubClient = new Redis(env.REDIS_URL);
+    const subClient = pubClient.duplicate();
+    io.adapter(createAdapter(pubClient, subClient));
+  }
 
   io.use((socket, next) => {
     try {

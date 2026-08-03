@@ -9,6 +9,7 @@
     "shared"
   ],
   "scripts": {
+    "postinstall": "npm run build:shared",
     "db:up": "docker compose up -d postgres redis",
     "db:down": "docker compose down",
     "db:migrate": "npm run prisma:migrate -w backend",
