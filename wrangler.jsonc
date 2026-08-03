@@ -1,0 +1,13 @@
+{
+  // Cloudflare's unified Workers Builds UI replaced the Pages dashboard fields (framework preset,
+  // output directory, root directory) with this file. The portal is a static bundle — there is no
+  // Worker script, just assets.
+  "name": "meetingpnt-portal",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./portal/dist",
+    // React Router owns the routing, so any unmatched path has to serve index.html rather than
+    // 404 — invitation links being the case that matters.
+    "not_found_handling": "single-page-application"
+  }
+}
