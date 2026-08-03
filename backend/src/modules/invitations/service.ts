@@ -31,6 +31,22 @@ function hashToken(raw: string): string {
 }
 
 /**
+ * An invitation link has to work for someone who doesn't have the app — that's most of the
+ * people who receive one. It used to be a bare `meetingpnt://` custom scheme, which does nothing
+ * at all on a phone without MeetingPnt installed and nothing on a desktop: no error, no prompt,
+ * no app store. So the link is an ordinary https page that explains the invitation and hands off
+ * to the app when it's there.
+ */
+function buildAcceptUrl(rawToken: string): string {
+  return `${env.PORTAL_URL}/invite?token=${rawToken}`;
+}
+
+/** The custom scheme the web page hands off to once someone has the app installed. */
+export function buildAppDeepLink(rawToken: string): string {
+  return `${env.MOBILE_DEEP_LINK_SCHEME}://accept-invite?token=${rawToken}`;
+}
+
+/**
  * Someone who already has an account owns their own name — the leader's guess at it doesn't
  * overwrite it. A phone number is different: if we don't have one, the one the leader typed is
  * better than nothing, and it's exactly what they need to reach this person mid-event.
@@ -97,7 +113,7 @@ export async function inviteMember(groupId: string, requesterId: string, dto: In
     },
   });
 
-  const acceptUrl = `${env.MOBILE_DEEP_LINK_SCHEME}://accept-invite?token=${rawToken}`;
+  const acceptUrl = buildAcceptUrl(rawToken);
   await sendInvitationEmail({
     to: dto.email,
     groupName: group.name,
@@ -156,7 +172,7 @@ export async function inviteActivityGuest(
     },
   });
 
-  const acceptUrl = `${env.MOBILE_DEEP_LINK_SCHEME}://accept-invite?token=${rawToken}`;
+  const acceptUrl = buildAcceptUrl(rawToken);
   await sendInvitationEmail({
     to: dto.email,
     groupName: `${group.name} — ${activity.title}`,
@@ -231,12 +247,14 @@ export async function previewInvitation(rawToken: string): Promise<InvitationPre
   }
 
   // The details the leader typed come back so the sign-up form arrives pre-filled — the invitee
-  // confirms rather than retypes.
+  // confirms rather than retypes. appLink is what the web landing page hands off to; the scheme
+  // is environment config, so the server builds it rather than the client guessing.
   return {
     email: invitation.email,
     firstName: invitation.firstName,
     lastName: invitation.lastName,
     phone: invitation.phone,
+    appLink: buildAppDeepLink(rawToken),
     group: { id: invitation.group.id, name: invitation.group.name },
   };
 }

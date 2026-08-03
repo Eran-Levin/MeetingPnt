@@ -88,6 +88,8 @@ export interface InvitationPreview {
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
+  /** Deep link into the app for this invitation, for someone who already has it installed. */
+  appLink: string;
   group: Pick<Group, 'id' | 'name'>;
 }
 

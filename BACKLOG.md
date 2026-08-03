@@ -91,6 +91,67 @@ receive path has never actually been exercised — only the send path. Testing n
 development build (`npx expo run:android`). Deprioritised deliberately, but it means
 "leader pings a member" is only half-proven.
 
+**Let the leader send an invitation over WhatsApp themselves.** An invitation is a personal act —
+"come join my photo walk" — and it lands better from someone you know than from an email or a
+business number. A `wa.me/<phone>?text=<invite link>` link opens WhatsApp with the message
+composed on the leader's own device; they press send. No API, no business account, no templates,
+no per-message cost, and none of the opt-in machinery below, because Meta's consent rules govern
+*business* messaging, not one person messaging their own contact. The phone number is already
+collected at invite time, so the data is there. The same trick gives `sms:` as a fallback.
+
+Two things to get right. `wa.me` wants E.164 digits only and phones are stored loosely
+(`+972 54-964-5964` → `972549645964`), so they need normalising. And the invite endpoint would
+have to return the accept link to the leader, which softens the current posture of the raw token
+existing only inside the email — defensible, since the leader created the invitation and is
+authenticated, but it's a decision rather than something to drift into.
+
+Only covers invitations. Anything recurring or automated still needs push or the business API.
+
+**Invitation links don't yet open the app directly.** The link is now an ordinary https page
+(fixed 2 Aug 2026 — it used to be a bare `meetingpnt://` scheme that did nothing for anyone
+without the app, which is most people receiving an invitation). The page explains the invitation
+and offers a button into the app, but that button is still a custom scheme: it works if the app
+is installed and silently does nothing if not, and the page can't tell which. Proper Universal
+Links (iOS) and App Links (Android) would make the https URL open the app directly, and need
+`apple-app-site-association` / `assetlinks.json` served from the real domain plus the app's
+bundle identifiers — so this waits on both the deployment and app distribution. The page also
+says "install MeetingPnt" without linking anywhere, because there's no store listing yet; that
+becomes a real button when there is one.
+
+**WhatsApp as a notification channel — open question, nothing decided.** Raised on 2 Aug 2026.
+Worth keeping distinct from the original plan's rejection of WhatsApp, which was about *chat*:
+the Business API genuinely cannot create or manage group chats, and that hasn't changed. Sending
+1:1 templated notifications is a different capability and is available.
+
+It suits some of what we send and not others. The four things that notify today are activity
+published, series published, new chat message, and the leader's location ping. The first two are
+a good fit — low volume, high value, and a plain utility template. Chat is a bad fit: per-message
+cost, high volume, and a reply goes nowhere because the member can't answer into the group. The
+ping degrades — today's push carries a data payload so the member answers with their location
+from the notification itself, and WhatsApp can only offer a link back into the app. (Inbound
+WhatsApp *can* carry a location share, which would in principle let someone take part without
+installing the app at all. Intriguing, unproven, a lot of machinery.)
+
+The prerequisite is consent, and we don't have it. Meta requires demonstrable opt-in before you
+message anyone, and phone numbers arrive here typed in by the *leader* at invite time — which is
+not the member agreeing to be messaged by us. A real opt-in, captured at sign-up or first login
+and stored with a timestamp, has to come first. Easy to skip, expensive to discover late.
+
+Also needed: a verified Meta Business account (unverified ones are capped at a low number of
+unique recipients per day), a dedicated number not already on regular WhatsApp, and per-template
+Meta review of every message's wording. Pricing is per conversation/message and varies by country
+and template category; Meta has been changing it, so check current docs rather than any figure
+quoted from memory. Webhooks need a public HTTPS endpoint, so this can't sensibly be built
+against localhost — it comes after the deployment above.
+
+On sequencing: prove push first (the entry above — its receive path has still never run).
+Standing up a second channel while the first is unverified means debugging two unproven paths at
+once. If it still looks worthwhile after that, the shape worth trying is WhatsApp for the
+scheduling notifications only and push for anything tied to a live event. Either way the first
+code change is the same: the four call sites each invoke `sendPushNotifications` directly, and a
+thin `notify(userId, event)` layer that fans out per channel and per user preference belongs in
+between before any second channel is threaded through them.
+
 **Chat history has no pagination UI.** The backend serves 50 messages a page and accepts
 a `before` cursor, but neither client passes it. Groups will silently cap at the most
 recent 50 messages with no way to scroll back.

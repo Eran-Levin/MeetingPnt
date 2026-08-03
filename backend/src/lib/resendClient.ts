@@ -12,9 +12,11 @@ interface SendInvitationEmailParams {
 
 export async function sendInvitationEmail(params: SendInvitationEmailParams) {
   const subject = `${params.inviterName} invited you to join "${params.groupName}" on MeetingPnt`;
+  // Opening this on a phone is the happy path — MeetingPnt is a phone app — but the link is an
+  // ordinary web page, so it still explains itself on a laptop instead of silently doing nothing.
   const html = `
     <p>${params.inviterName} invited you to join <strong>${params.groupName}</strong> on MeetingPnt.</p>
-    <p><a href="${params.acceptUrl}">Accept the invitation</a> to create your account and join the group.</p>
+    <p><a href="${params.acceptUrl}">Open your invitation</a> — best on your phone, where the app runs.</p>
     <p>This link expires in 7 days.</p>
   `;
 

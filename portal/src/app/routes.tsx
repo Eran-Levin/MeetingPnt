@@ -7,11 +7,14 @@ import { ActivityDetailPage } from '../pages/leader/ActivityDetailPage.js';
 import { GroupDetailPage } from '../pages/leader/GroupDetailPage.js';
 import { GroupsPage } from '../pages/leader/GroupsPage.js';
 import { HomeRedirect } from '../pages/HomeRedirect.js';
+import { InvitePage } from '../pages/InvitePage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 
 export const router = createBrowserRouter([
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
+  // Public: an invitation link is opened by someone who has no account yet.
+  { path: '/invite', element: <InvitePage /> },
   {
     element: <AuthenticatedLayout />,
     children: [
