@@ -1,3 +1,0 @@
-# React Router owns the routes client-side. Without this, a hard refresh or a shared link on any
-# path other than / is a 404 from the static host — invitation links being the case that matters.
-/*    /index.html   200
