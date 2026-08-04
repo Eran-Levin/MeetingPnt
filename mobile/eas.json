@@ -16,13 +16,13 @@
       "distribution": "internal",
       "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.example.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.meetingpnt.com"
       }
     },
     "production": {
       "android": { "buildType": "app-bundle" },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.example.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.meetingpnt.com"
       }
     }
   },
