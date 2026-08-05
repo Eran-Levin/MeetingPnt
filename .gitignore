@@ -12,3 +12,9 @@ coverage/
 backend/uploads/
 .vscode/*
 !.vscode/extensions.json
+
+# The FCM service account key can send push to every user — it belongs in EAS credentials, never
+# in the repo. google-services.json is deliberately not listed: it ships inside the APK anyway and
+# EAS needs it committed to build.
+google-service-account*.json
+*-firebase-adminsdk-*.json

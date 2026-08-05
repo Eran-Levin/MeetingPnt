@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.meetingpnt.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2563eb"

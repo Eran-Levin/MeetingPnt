@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "917406473444",
+    "project_id": "meetingpnt-d0bd7",
+    "storage_bucket": "meetingpnt-d0bd7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:917406473444:android:b3df7106dfa316cbb860f1",
+        "android_client_info": {
+          "package_name": "com.meetingpnt.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXzoKIjltnn5kO88xh4vcMmIcGM50cCm0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
