@@ -4,36 +4,39 @@ Things consciously left undone, with the reasoning. This is not a wishlist: each
 was either explicitly deprioritised in conversation, or is a known gap in something
 already shipped. Delete an entry when it lands.
 
-Last reviewed: 2026-08-02
+Last reviewed: 2026-08-05
 
-## Scheduled
+## Deployed — and what it left open
 
-**First deployment — targeted for the week of Mon 3 August 2026.** Everything still runs on one
-laptop; testing on a phone needs the same Wi-Fi. Getting it hosted is the next piece of work,
-ahead of any new features.
+**Live since Wed 5 August 2026**, all on free tiers: portal `app.meetingpnt.com` (Cloudflare
+Workers static assets), API `api.meetingpnt.com` (Render, Docker), Neon Postgres with PostGIS,
+Android via EAS internal distribution. `DEPLOYMENT.md` is the cookbook for redeploying.
 
-Four code changes are needed first, and none of them depend on which host is chosen:
+This is a **test deployment, not a launch.** Security was consciously postponed, so the four
+pre-deployment items resolved like this:
 
-1. **The refresh cookie is `sameSite: 'strict'`** (`backend/src/modules/auth/routes.ts`). Harmless
-   while the portal and API share `localhost`. Once they're on different domains the browser stops
-   sending it, so every session dies at the 15-minute access-token expiry with no way to refresh.
-   Needs `sameSite: 'none'` + `secure: true` under `NODE_ENV=production` — or serve the portal from
-   the API's own domain, which sidesteps this and the CORS config together.
-2. **Move chat images off local disk** — see the storage entry below. Ephemeral filesystems are the
-   norm on managed hosts, so images would disappear on every deploy.
-3. **Rate limiting on auth**, at minimum on login. Listed below; it stops being theoretical the
-   moment there's a public URL.
-4. **Production secrets.** `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` need real values, and the
-   seed must never run against a deployed database — it creates an admin with a known password and
-   fifteen users on `password123`.
+1. **The `sameSite: 'strict'` refresh cookie turned out not to need changing.** The prediction was
+   that it would break across domains; it doesn't, because `app.meetingpnt.com` and
+   `api.meetingpnt.com` share a registrable domain and the browser treats them as same-site.
+   Still only verified as far as login — **the refresh at the 15-minute access-token expiry has
+   never been exercised against the deployment.** If portal sessions die after ~15 minutes, this
+   is the entry to reopen.
+2. **Chat images are still on local disk** — see the storage entry below. Render's filesystem is
+   ephemeral, so uploaded images now disappear on every deploy. This is the one deferred item that
+   loses data rather than merely risking it.
+3. **No rate limiting.** Login, invitation-token acceptance, and registration are all reachable
+   from the public internet and brute-forceable.
+4. **Secrets are half done.** `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` hold real generated values
+   in Render. But **the seed was run against the deployed database**, against this file's own
+   advice — so `password123` accounts and a known-password admin are live on a public URL. Wiping
+   them is the first thing to do before anyone real touches this.
 
-**PostGIS is the constraint when choosing a host.** Meeting points and location snapshots are
-`geography(Point,4326)` columns; a managed Postgres without the extension simply won't run the
-migrations. Verify it before committing to a provider rather than after.
+Also live and unaddressed: no CSP tuned for the app, no upload MIME validation, `/uploads` served
+with CORP relaxed and protected only by unguessable filenames, and real location data sitting in a
+free-tier database with no backups configured.
 
-Leaning towards a managed platform for the backend with the portal served from the same domain,
-and EAS Build with internal distribution for mobile — which would also be the first real test of
-push notifications, still unverified (below).
+**Push notifications are wired but unverified.** FCM V1 credentials are attached to the EAS project
+and the APK is built from them; nobody has yet confirmed a ping actually reaches a device.
 
 ## Blocking a production launch
 
@@ -69,14 +72,14 @@ place (`admin/service.ts`). Group deletion, activity cancellation, and attendanc
 — the actions a leader would most plausibly need to account for — leave no trace.
 
 **Chat image storage is local disk.** `saveImage` writes to `backend/uploads/` behind a
-deliberate seam in `lib/storage.ts`. Fine for a single dev box; it breaks the moment the
-backend runs more than one instance or a container restarts. Swapping to S3-compatible
-storage should only touch that one file.
+deliberate seam in `lib/storage.ts`. This is no longer hypothetical: Render's filesystem is
+ephemeral, so every deploy and every wake from idle now discards the images uploaded before it.
+Cloudflare R2's free tier is 10 GB and S3-compatible; swapping to it should only touch that
+one file.
 
-**`BACKEND_PUBLIC_URL` is a hardcoded LAN IP in local `.env`.** Set to `192.168.7.101`
-so chat image URLs resolve on a physical phone. That address is specific to one machine
-and one Wi-Fi network — it will silently serve broken image links for anyone else, and
-in any deployment. Needs to come from proper per-environment config.
+**`BACKEND_PUBLIC_URL` was a hardcoded LAN IP in local `.env`.** Resolved for the deployment —
+Render sets it to `https://api.meetingpnt.com`. The local `.env` still holds a machine-specific
+LAN address for phone testing, which is correct there and wrong everywhere else.
 
 ## Known gaps in shipped features
 
@@ -86,10 +89,11 @@ push plumbing already exists (`sendPushNotifications`), so this is a small addit
 explicitly deferred as "not now". Until it lands, moving the group depends on the leader also
 saying so in chat.
 
-**Push notifications are unverified.** Expo Go dropped remote push in SDK 53, so the
-receive path has never actually been exercised — only the send path. Testing needs a
-development build (`npx expo run:android`). Deprioritised deliberately, but it means
-"leader pings a member" is only half-proven.
+**Push notifications are unverified.** The receive path has never actually been exercised — only
+the send path. The blocker used to be Expo Go dropping remote push in SDK 53; that's now gone,
+since an internal-distribution APK with FCM V1 credentials exists (see the deployment section).
+What remains is simply doing it: install on a real device, grant the notification permission, and
+have a leader ping a member. Until then "leader pings a member" is only half-proven.
 
 **Let the leader send an invitation over WhatsApp themselves.** An invitation is a personal act —
 "come join my photo walk" — and it lands better from someone you know than from an email or a
