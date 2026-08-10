@@ -124,8 +124,14 @@ async function main() {
   const admin = await ensureUser(env.SEED_ADMIN_EMAIL, env.SEED_ADMIN_NAME, 'admin');
   console.log(`[seed] admin ready: ${admin.email}`);
 
-  // ---- shared member pool (~15 people reused across the leaders below) ----
+  // ---- member pool, partitioned one leader per person ----
+  // 30 people split three ways. A member belongs to exactly one leader; they may appear in
+  // several of *that* leader's groups, never in another's. Sharing the pool across leaders was
+  // convenient to seed and unlike anything real — a photo-walk regular is not also on a stranger's
+  // Andes manifest — and it made every members-facing screen ambiguous to test, because the same
+  // login saw a timeline stitched from three unrelated leaders.
   const memberNames = [
+    // photoinstructor@ — members 1–10
     'Ana Torres',
     'Ben Cohen',
     'Chloe Kim',
@@ -136,16 +142,36 @@ async function main() {
     'Hassan Ali',
     'Ivy Chen',
     'Jonas Weber',
+    // yogainstructor@ — members 11–20
     'Katya Novak',
     "Liam O'Brien",
     'Mira Patel',
     'Noah Schmidt',
     'Olga Ivanova',
+    'Priya Nair',
+    'Quentin Roy',
+    'Rina Tanaka',
+    'Samir Khoury',
+    'Tessa Lindgren',
+    // tourguide@ — members 21–30
+    'Umar Farooq',
+    'Vera Sokolova',
+    'Wesley Adjei',
+    'Ximena Ortiz',
+    'Yannis Papadakis',
+    'Zoe Marchetti',
+    'Adam Berger',
+    'Bianca Rossi',
+    'Caleb Mwangi',
+    'Dalia Haddad',
   ];
   const members = await Promise.all(
     memberNames.map((name, i) => ensureUser(`member${i + 1}@example.com`, name, 'user')),
   );
-  console.log(`[seed] ${members.length} member users ready`);
+  const photoPool = members.slice(0, 10);
+  const yogaPool = members.slice(10, 20);
+  const tourPool = members.slice(20, 30);
+  console.log(`[seed] ${members.length} member users ready (10 per leader)`);
 
   // ===================== Photo instructor =====================
   // Sunday-every-4-weeks series with mid-session meeting-point changes and a cross-group visitor.
@@ -157,7 +183,7 @@ async function main() {
     'Monthly street photography sessions around downtown — bring your own camera.',
   );
   if (photoGroupA.created) {
-    const roster = members.slice(0, 10);
+    const roster = photoPool.slice(0, 9);
     for (const member of roster) await ensureMembership(photoGroupA.id, member.id);
 
     const dto: CreateActivityDto = {
@@ -196,8 +222,8 @@ async function main() {
     const roster5 = roster.slice(0, 5);
     for (const member of roster5) await recordRsvp(past.id, member.id, 'approved');
 
-    // Cross-group visitor: someone outside her regular roster, invited to just this occurrence.
-    const visitor = members[10]!;
+    // Visitor: one of her people, but not on this group's roster — invited to just this occurrence.
+    const visitor = photoPool[9]!;
     await ensureGuest(past.id, visitor.id, photoLeader.id);
     await recordRsvp(past.id, visitor.id, 'approved');
 
@@ -249,7 +275,8 @@ async function main() {
     'Small-group portrait sessions at sunset.',
   );
   if (photoGroupB.created) {
-    const roster = members.slice(0, 8);
+    // Her portrait sessions are deliberately smaller — a subset of the walkers, same leader.
+    const roster = photoPool.slice(0, 6);
     for (const member of roster) await ensureMembership(photoGroupB.id, member.id);
 
     const dto: CreateActivityDto = {
@@ -283,7 +310,7 @@ async function main() {
     'Twice-weekly vinyasa flow — all levels welcome.',
   );
   if (yogaGroupA.created) {
-    const roster = members.slice(0, 8);
+    const roster = yogaPool.slice(0, 8);
     for (const member of roster) await ensureMembership(yogaGroupA.id, member.id);
 
     const dto: CreateActivityDto = {
@@ -334,7 +361,9 @@ async function main() {
     'Twice-weekly restorative yoga to unwind.',
   );
   if (yogaGroupB.created) {
-    const roster = members.slice(4, 12);
+    // Overlaps her morning class by four people — the same students taking both, which is the
+    // kind of overlap that is real. All still hers.
+    const roster = yogaPool.slice(4, 10);
     for (const member of roster) await ensureMembership(yogaGroupB.id, member.id);
 
     const dto: CreateActivityDto = {
@@ -359,8 +388,8 @@ async function main() {
     const seriesId = occurrences[0]!.seriesId!;
     await activitiesService.publishSeries(seriesId, yogaLeader.id);
 
-    // A member from her other group joins one session as a visitor.
-    const visitor = members[0]!;
+    // A member from her morning class joins one evening session as a visitor.
+    const visitor = yogaPool[0]!;
     await ensureGuest(occurrences[0]!.id, visitor.id, yogaLeader.id);
   }
 
@@ -415,7 +444,7 @@ async function main() {
     'Six days trekking the Andes, two nights under canvas. Small group, all meals included.',
   );
   if (peru.created) {
-    const roster = members.slice(5, 13);
+    const roster = tourPool.slice(0, 8);
     for (const member of roster) await ensureMembership(peru.id, member.id);
 
     // Before the trip: a standalone evening, and the one thing people do RSVP to.
@@ -487,8 +516,9 @@ async function main() {
     'A guided loop of the ring road. Bookings still open.',
   );
   if (iceland.created) {
-    // A different set of people, as a later departure would be.
-    for (const member of members.slice(11, 15)) await ensureMembership(iceland.id, member.id);
+    // Mostly a different cohort, as a later departure would be — but two of the Andes group
+    // booked again, which is what repeat customers look like when the group *is* the trip.
+    for (const member of tourPool.slice(6, 10)) await ensureMembership(iceland.id, member.id);
 
     await createTripDay(iceland.id, ICELAND_DAY_ONE, 'Day 1 — Arrivals and Reykjavík', [
       { label: 'Airport arrivals hall', lat: 63.985, lng: -22.6056, hour: 8 },

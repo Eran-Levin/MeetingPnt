@@ -124,7 +124,20 @@ cd backend && npm run seed
 ```
 
 Seeded logins are `photoinstructor@`, `yogainstructor@`, `tourguide@example.com` and
-`member1..15@example.com`, all `password123`; admin is `admin@meetingpnt.dev` / `changeme123`.
+`member1..30@example.com`, all `password123`; admin is `admin@meetingpnt.dev` / `changeme123`.
+
+**Each seeded member belongs to exactly one leader** — `member1..10` to the photo instructor,
+`member11..20` to the yoga instructor, `member21..30` to the tour guide. Members overlap freely
+between groups of the *same* leader (the yoga classes share four students; two Andes trekkers
+rebook for Iceland), never across leaders. The pool used to be shared, which is unlike anything
+real and made every member-facing screen ambiguous to test: one login's timeline was stitched
+together from three unrelated leaders. `member10` is deliberately on no roster — a visitor-only
+user, so the `ActivityGuest` path has a subject.
+
+The seed is idempotent by *skipping*: `ensureGroup` returns early when a group of that name
+already exists, so changing a roster in `seed.ts` has no effect on a database that already has it.
+Re-partitioning means `npx prisma migrate reset --force --skip-seed` first — check
+`npx prisma migrate status` names `localhost`, never `neon.tech`.
 
 **Verify against the user's actual scenario, not a convenient one.** A bug shipped because
 meeting-point ordering was tested on an activity whose times happened to match creation order,
