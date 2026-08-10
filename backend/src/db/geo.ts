@@ -226,6 +226,20 @@ export async function insertLocationSnapshot(input: {
   return rows[0]!;
 }
 
+/** The most recent position one person reported during an activity. Covered by the
+ * (activity_id, user_id, created_at DESC) index, so this stays a single index seek. */
+export async function getLatestSnapshotForUser(
+  activityId: string,
+  userId: string,
+): Promise<LocationSnapshotRow | null> {
+  const rows = await prisma.$queryRaw<LocationSnapshotRow[]>`
+    SELECT ${LOCATION_SNAPSHOT_COLUMNS} FROM location_snapshots
+    WHERE activity_id = ${activityId} AND user_id = ${userId}
+    ORDER BY created_at DESC LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
 export async function getLatestSnapshotsForActivity(activityId: string): Promise<LocationSnapshotRow[]> {
   return prisma.$queryRaw<LocationSnapshotRow[]>`
     SELECT DISTINCT ON (user_id) ${LOCATION_SNAPSHOT_COLUMNS}

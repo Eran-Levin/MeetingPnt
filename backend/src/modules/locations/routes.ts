@@ -47,6 +47,16 @@ locationsRouter.post(
   },
 );
 
+// The pair: /latest is the leader's view of everyone, /leader is everyone's view of the leader.
+locationsRouter.get('/:id/location/leader', async (req, res, next) => {
+  try {
+    const location = await locationsService.getLeaderLocation(req.params.id as string, req.user!.id);
+    res.json({ location });
+  } catch (err) {
+    next(err);
+  }
+});
+
 locationsRouter.get('/:id/location/latest', async (req, res, next) => {
   try {
     const locations = await locationsService.getLatestLocations(req.params.id as string, req.user!.id);

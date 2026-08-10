@@ -8,6 +8,16 @@ import { verifyAccessToken } from '../lib/jwt.js';
 
 let io: SocketIOServer | null = null;
 
+/** Everyone approved for the activity — the room for anything the whole group may see. */
+export function activityRoom(activityId: string): string {
+  return `activity:${activityId}`;
+}
+
+/** The leader alone. Member location snapshots go here and nowhere else. */
+export function activityLeaderRoom(activityId: string): string {
+  return `activity:${activityId}:leader`;
+}
+
 export function getIO(): SocketIOServer {
   if (!io) {
     throw new Error('Socket.IO server not initialized');
@@ -72,7 +82,14 @@ export function createRealtimeServer(httpServer: HttpServer): SocketIOServer {
           isLeader ||
           !!(await prisma.rsvp.findFirst({ where: { activityId, userId, status: 'approved' } }));
         if (!isApproved) return ack?.(false);
-        socket.join(`activity:${activityId}`);
+        socket.join(activityRoom(activityId));
+        // Two rooms, because two audiences. Everyone in the activity may see where the *leader*
+        // is; only the leader may see where the members are. Splitting the rooms makes that
+        // structural — the leader-only room is the one member snapshots are broadcast to, so a
+        // member's socket is never sent another member's coordinates in the first place. It used
+        // to be one room carrying every snapshot, which left the REST read leader-only while the
+        // socket handed the same data to anyone with an approved RSVP.
+        if (isLeader) socket.join(activityLeaderRoom(activityId));
         ack?.(true);
       } catch {
         ack?.(false);

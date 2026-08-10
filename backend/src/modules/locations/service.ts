@@ -6,6 +6,7 @@ import type {
 } from '@meetingpnt/shared';
 import { LocationSource, SocketEvents } from '@meetingpnt/shared';
 import {
+  getLatestSnapshotForUser,
   getLatestSnapshotsForActivity,
   getCurrentMeetingPoint,
   insertLocationSnapshot,
@@ -16,7 +17,7 @@ import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { getEta } from '../../lib/googleMapsClient.js';
-import { getIO } from '../../realtime/index.js';
+import { activityLeaderRoom, activityRoom, getIO } from '../../realtime/index.js';
 
 function toSharedSnapshot(row: LocationSnapshotRow): SharedLocationSnapshot {
   return {
@@ -40,6 +41,30 @@ async function assertApprovedRsvp(activityId: string, userId: string) {
   }
 }
 
+/**
+ * A leader is always entitled to take part in their own event's location features, whatever their
+ * RSVP row says. Publishing creates an RSVP for every group member including the leader, and it is
+ * `pending` whenever the activity requires an RSVP — so gating on the RSVP alone locks the leader
+ * out of exactly the events they run. Trips and yoga classes hide this (`requiresRsvp: false`
+ * approves everyone up front); a photo walk exposes it.
+ */
+async function assertLeaderOrApproved(activityId: string, userId: string, leaderId: string) {
+  if (userId === leaderId) return;
+  await assertApprovedRsvp(activityId, userId);
+}
+
+async function getActivityWithLeader(activityId: string) {
+  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
+  if (!activity) {
+    throw new HttpError(404, 'Activity not found');
+  }
+  const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
+  if (!group) {
+    throw new HttpError(404, 'Activity not found');
+  }
+  return { activity, group };
+}
+
 /** Once an event is over there's no legitimate reason to keep locating people, so ending an
  * activity closes the location features off. */
 function assertActivityLive(activity: { status: string }) {
@@ -54,12 +79,9 @@ async function recordSnapshot(
   location: { lat: number; lng: number },
   source: (typeof LocationSource)[keyof typeof LocationSource],
 ) {
-  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
-  if (!activity) {
-    throw new HttpError(404, 'Activity not found');
-  }
+  const { activity, group } = await getActivityWithLeader(activityId);
   assertActivityLive(activity);
-  await assertApprovedRsvp(activityId, userId);
+  await assertLeaderOrApproved(activityId, userId, group.leaderId);
 
   const meetingPoint = await getCurrentMeetingPoint(activityId);
   if (!meetingPoint) {
@@ -84,7 +106,11 @@ async function recordSnapshot(
   });
 
   const snapshot = toSharedSnapshot(row);
-  getIO().to(`activity:${activityId}`).emit(SocketEvents.LocationUpdated, { snapshot });
+  // Where this goes depends on whose position it is. The leader's is for the whole group; a
+  // member's is for the leader alone. See the room split in realtime/index.ts.
+  const room =
+    userId === group.leaderId ? activityRoom(activityId) : activityLeaderRoom(activityId);
+  getIO().to(room).emit(SocketEvents.LocationUpdated, { snapshot });
   return snapshot;
 }
 
@@ -101,12 +127,8 @@ export async function submitPingResponse(
 }
 
 export async function requestPing(activityId: string, requesterId: string, dto: PingRequestDto) {
-  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
-  if (!activity) {
-    throw new HttpError(404, 'Activity not found');
-  }
-  const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
-  if (!group || group.leaderId !== requesterId) {
+  const { activity, group } = await getActivityWithLeader(activityId);
+  if (group.leaderId !== requesterId) {
     throw new HttpError(403, 'Only the group leader can request a location');
   }
   assertActivityLive(activity);
@@ -127,12 +149,8 @@ export async function requestPing(activityId: string, requesterId: string, dto: 
 }
 
 export async function getLatestLocations(activityId: string, requesterId: string) {
-  const activity = await prisma.activity.findUnique({ where: { id: activityId } });
-  if (!activity) {
-    throw new HttpError(404, 'Activity not found');
-  }
-  const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
-  if (!group || group.leaderId !== requesterId) {
+  const { group } = await getActivityWithLeader(activityId);
+  if (group.leaderId !== requesterId) {
     throw new HttpError(403, 'Only the group leader can view live locations');
   }
 
@@ -150,4 +168,28 @@ export async function getLatestLocations(activityId: string, requesterId: string
         }
       : null,
   }));
+}
+
+/**
+ * Where the leader is, for anyone attending. The counterpart to `getLatestLocations`, and
+ * deliberately not a relaxation of it: this returns one person's position — the leader's — so
+ * members still never see each other. Null when the leader hasn't reported a position, which is
+ * the normal state until they answer a request or start broadcasting.
+ *
+ * Not gated on the activity still being live. A completed event stops *producing* positions
+ * (`assertActivityLive` on the write path, and the socket room refuses joins), but the last known
+ * position of the leader is ordinary history by then, and readable like the rest of it.
+ */
+export async function getLeaderLocation(activityId: string, requesterId: string) {
+  const { group } = await getActivityWithLeader(activityId);
+  await assertLeaderOrApproved(activityId, requesterId, group.leaderId);
+
+  const row = await getLatestSnapshotForUser(activityId, group.leaderId);
+  if (!row) return null;
+
+  const leader = await prisma.user.findUnique({ where: { id: group.leaderId } });
+  return {
+    ...toSharedSnapshot(row),
+    user: leader ? { id: leader.id, name: displayName(leader), email: leader.email } : null,
+  };
 }
