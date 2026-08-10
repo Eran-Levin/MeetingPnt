@@ -111,6 +111,12 @@ export interface Activity {
    * end of the itinerary — the leader may have planned five stops but only walked to two.
    */
   currentMeetingPointId: string | null;
+  /**
+   * "Follow me": until when the leader is sharing a live position. Null means they aren't, and a
+   * time already past means the lease lapsed — so clients must compare against now rather than
+   * treat non-null as on. Use `isLeaderBroadcasting`.
+   */
+  leaderBroadcastUntil: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

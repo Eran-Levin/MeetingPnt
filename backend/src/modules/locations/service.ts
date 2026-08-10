@@ -5,7 +5,7 @@ import type {
   PingRequestDto,
   PingResponseDto,
 } from '@meetingpnt/shared';
-import { LocationSource, SocketEvents } from '@meetingpnt/shared';
+import { LocationSource, SocketEvents, isLeaderBroadcasting } from '@meetingpnt/shared';
 import {
   getLatestSnapshotForUser,
   getLatestSnapshotsForActivity,
@@ -89,11 +89,17 @@ async function recordSnapshot(
     throw new HttpError(409, 'No meeting point has been set for this activity yet');
   }
 
-  const eta = await getEta(
-    location,
-    { lat: meetingPoint.lat, lng: meetingPoint.lng },
-    activity.transportMode,
-  );
+  // A broadcast fix gets no ETA. The leader isn't travelling to the meeting point — they're what
+  // the group is heading towards — so the number would be meaningless, and at a fix every 30
+  // seconds it would also be a billed Directions call every 30 seconds for the length of the event.
+  const eta =
+    source === LocationSource.LeaderBroadcast
+      ? null
+      : await getEta(
+          location,
+          { lat: meetingPoint.lat, lng: meetingPoint.lng },
+          activity.transportMode,
+        );
 
   const row = await insertLocationSnapshot({
     activityId,
@@ -117,6 +123,127 @@ async function recordSnapshot(
 
 export async function submitOmw(activityId: string, userId: string, dto: OmwLocationDto) {
   return recordSnapshot(activityId, userId, dto.location, LocationSource.Omw);
+}
+
+/**
+ * How long a broadcast runs before it lapses on its own. Short enough that a phone going into a
+ * bag, dying, or losing signal stops the sharing without anyone deciding to; long enough that a
+ * leader isn't re-arming it constantly. The mobile client renews while it's still posting fixes,
+ * so in practice this is the timeout, not the duration.
+ */
+const BROADCAST_LEASE_MS = 15 * 60 * 1000;
+
+/** Server-side floor on how often a broadcast fix is stored. */
+const BROADCAST_MIN_INTERVAL_MS = 30 * 1000;
+
+/** …unless the leader has moved this far, which is worth recording immediately. */
+const BROADCAST_MIN_MOVE_METRES = 50;
+
+function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6_371_000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+async function assertIsLeader(activityId: string, requesterId: string) {
+  const { activity, group } = await getActivityWithLeader(activityId);
+  if (group.leaderId !== requesterId) {
+    throw new HttpError(403, 'Only the group leader can share a live position');
+  }
+  return { activity, group };
+}
+
+function emitBroadcastChanged(activityId: string, until: Date | null) {
+  getIO()
+    .to(activityRoom(activityId))
+    .emit(SocketEvents.LeaderBroadcastChanged, {
+      activityId,
+      until: until?.toISOString() ?? null,
+    });
+}
+
+/**
+ * Start (or renew) "follow me".
+ *
+ * Deliberately not capped at the activity's scheduled end. That was the first shape, and it is
+ * wrong: events overrun, and a trek day still going half an hour past its planned finish is
+ * precisely when a guide needs the flag up. What keeps a broadcast from outliving its event is the
+ * lease — it lapses within the quarter hour once the phone stops posting fixes — and ending the
+ * event, which clears it outright. An event nobody ever ends is a separate problem, tracked in
+ * BACKLOG.
+ */
+export async function startLeaderBroadcast(activityId: string, requesterId: string) {
+  const { activity } = await assertIsLeader(activityId, requesterId);
+  assertActivityLive(activity);
+  if (activity.status !== 'in_progress') {
+    throw new HttpError(409, 'Start the event before sharing a live position');
+  }
+
+  const until = new Date(Date.now() + BROADCAST_LEASE_MS);
+
+  const updated = await prisma.activity.update({
+    where: { id: activityId },
+    data: { leaderBroadcastUntil: until },
+  });
+  emitBroadcastChanged(activityId, until);
+  return { until: updated.leaderBroadcastUntil!.toISOString() };
+}
+
+export async function stopLeaderBroadcast(activityId: string, requesterId: string) {
+  await assertIsLeader(activityId, requesterId);
+  await prisma.activity.update({
+    where: { id: activityId },
+    data: { leaderBroadcastUntil: null },
+  });
+  emitBroadcastChanged(activityId, null);
+  return { until: null };
+}
+
+/**
+ * One fix from a running broadcast.
+ *
+ * Throttled server-side rather than trusting the client's cadence: a fix is stored only if the
+ * last one is old enough or the leader has moved far enough. Without this a six-hour trek day at a
+ * fix every fifteen seconds is well over a thousand rows for one leader, and `location_snapshots`
+ * has no retention purge yet (see BACKLOG) — so the volume would simply accumulate. A leader
+ * standing still costs almost nothing; one walking is recorded as often as it takes to follow them.
+ */
+export async function recordBroadcastFix(
+  activityId: string,
+  requesterId: string,
+  dto: OmwLocationDto,
+) {
+  const { activity } = await assertIsLeader(activityId, requesterId);
+  assertActivityLive(activity);
+  if (!isLeaderBroadcasting(activity.leaderBroadcastUntil)) {
+    throw new HttpError(409, 'Live position sharing is not running for this activity');
+  }
+
+  const previous = await getLatestSnapshotForUser(activityId, requesterId);
+  if (previous && previous.source === LocationSource.LeaderBroadcast) {
+    const sinceLast = Date.now() - previous.createdAt.getTime();
+    const moved = metresBetween(
+      { lat: previous.lat, lng: previous.lng },
+      { lat: dto.location.lat, lng: dto.location.lng },
+    );
+    if (sinceLast < BROADCAST_MIN_INTERVAL_MS && moved < BROADCAST_MIN_MOVE_METRES) {
+      return toSharedSnapshot(previous);
+    }
+  }
+
+  // Renew the lease off the leader's own fixes: while their phone is reporting, the broadcast is
+  // demonstrably alive, and when it stops reporting the lease is what ends it.
+  await prisma.activity.update({
+    where: { id: activityId },
+    data: { leaderBroadcastUntil: new Date(Date.now() + BROADCAST_LEASE_MS) },
+  });
+
+  return recordSnapshot(activityId, requesterId, dto.location, LocationSource.LeaderBroadcast);
 }
 
 export async function submitPingResponse(

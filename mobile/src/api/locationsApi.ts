@@ -32,4 +32,20 @@ export const locationsApi = {
     apiFetch<{ location: LocationSnapshotWithUser | null }>(
       `/api/activities/${activityId}/location/leader`,
     ),
+
+  // "Follow me". The lease returned by start/stop is when sharing lapses on its own; sending fixes
+  // renews it, so the leader's phone going quiet is what ends the broadcast.
+  startBroadcast: (activityId: string) =>
+    apiFetch<{ until: string }>(`/api/activities/${activityId}/location/broadcast/start`, {
+      method: 'POST',
+    }),
+  stopBroadcast: (activityId: string) =>
+    apiFetch<{ until: null }>(`/api/activities/${activityId}/location/broadcast/stop`, {
+      method: 'POST',
+    }),
+  sendBroadcastFix: (activityId: string, location: GeoPoint) =>
+    apiFetch<{ snapshot: LocationSnapshot }>(`/api/activities/${activityId}/location/broadcast`, {
+      method: 'POST',
+      body: { location },
+    }),
 };

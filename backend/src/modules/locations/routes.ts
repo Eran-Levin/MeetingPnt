@@ -47,6 +47,41 @@ locationsRouter.post(
   },
 );
 
+// "Follow me" — the leader holding up a flag. Start/stop manage the lease; fixes come in through
+// /broadcast while it's running.
+locationsRouter.post('/:id/location/broadcast/start', async (req, res, next) => {
+  try {
+    res.json(await locationsService.startLeaderBroadcast(req.params.id as string, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+locationsRouter.post('/:id/location/broadcast/stop', async (req, res, next) => {
+  try {
+    res.json(await locationsService.stopLeaderBroadcast(req.params.id as string, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+locationsRouter.post(
+  '/:id/location/broadcast',
+  validate(omwLocationSchema),
+  async (req, res, next) => {
+    try {
+      const snapshot = await locationsService.recordBroadcastFix(
+        req.params.id as string,
+        req.user!.id,
+        req.body,
+      );
+      res.json({ snapshot });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // The mirror of /location/ping: that one is the leader asking a member, this is a member asking
 // the leader. No body — who is asking comes from the token, and who they're asking is the
 // activity's leader.

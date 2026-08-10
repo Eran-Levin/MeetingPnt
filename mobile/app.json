@@ -43,7 +43,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "MeetingPnt uses your location only when you tap \"On My Way\" or respond to a leader's location request — never in the background."
+          "locationWhenInUsePermission": "MeetingPnt uses your location when you tap \"On My Way\", respond to a location request, or share your live position as a leader — only while the app is open, never in the background."
         }
       ]
     ],

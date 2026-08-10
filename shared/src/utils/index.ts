@@ -2,6 +2,21 @@ export function isBeforeStartTime(startAt: string, now: Date = new Date()): bool
   return now.getTime() < new Date(startAt).getTime();
 }
 
+/**
+ * Whether the leader is sharing a live position right now.
+ *
+ * `leaderBroadcastUntil` is a lease, so a non-null value is not the same as "broadcasting" — it
+ * expires on its own and nothing rewrites it at that moment. Both clients and the server decide
+ * through this one function so they can't disagree about when a broadcast has lapsed.
+ */
+export function isLeaderBroadcasting(
+  leaderBroadcastUntil: string | Date | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!leaderBroadcastUntil) return false;
+  return new Date(leaderBroadcastUntil).getTime() > now.getTime();
+}
+
 function isSameCalendarDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

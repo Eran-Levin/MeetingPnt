@@ -1,5 +1,5 @@
 import type { LocationSnapshotWithUser, MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, isLeaderBroadcasting } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
@@ -23,7 +23,7 @@ import { locationsApi } from '../../../../../../src/api/locationsApi';
 import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi';
 import { groupsApi } from '../../../../../../src/api/groupsApi';
-import { getCurrentLocationSnapshot } from '../../../../../../src/services/location';
+import { getCurrentLocationSnapshot, watchPosition } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
 
 /** How long ago a position was captured, in the words you'd use out loud. */
@@ -56,6 +56,11 @@ export default function ActivityDetailScreen() {
   const [askMessage, setAskMessage] = useState<string | null>(null);
   const [askSubmitting, setAskSubmitting] = useState(false);
 
+  // "Follow me" — the leader's side.
+  const [broadcastUntil, setBroadcastUntil] = useState<string | null>(null);
+  const [broadcastError, setBroadcastError] = useState<string | null>(null);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+
   // Meeting point editor — doubles as "change the current one" and "move the group on".
   const [mpMode, setMpMode] = useState<null | 'edit' | 'next'>(null);
   const [mpLabel, setMpLabel] = useState('');
@@ -75,6 +80,10 @@ export default function ActivityDetailScreen() {
   const activityQuery = useQuery({
     queryKey: ['activities', activityId],
     queryFn: () => activitiesApi.get(activityId),
+    // While an event is running, poll — otherwise a member sitting on this screen would never
+    // learn the leader had started sharing their position, since nothing else refetches it.
+    refetchInterval: (query) =>
+      query.state.data?.activity.status === 'in_progress' ? 30_000 : false,
   });
   const groupQuery = useQuery({
     queryKey: ['groups', groupId],
@@ -105,6 +114,21 @@ export default function ActivityDetailScreen() {
     enabled: isLeader && !!currentPoint,
   });
   const rollCall = rollCallQuery.data?.entries ?? [];
+
+  // The server's view of whether sharing is on, which survives closing the screen. Locally held
+  // state only tracks it between renders.
+  const broadcasting = isLeaderBroadcasting(broadcastUntil ?? activity?.leaderBroadcastUntil);
+
+  // Members follow a live broadcast by polling. The server stores a fix at most every 30 seconds,
+  // so there is nothing to gain from a socket here — and mobile has no socket client, which is a
+  // dependency and a reconnect lifecycle not worth adding to read one moving pin.
+  const leaderLocationQuery = useQuery({
+    queryKey: ['activities', activityId, 'leader-location'],
+    queryFn: () => locationsApi.getLeaderLocation(activityId),
+    enabled: !isLeader && broadcasting,
+    refetchInterval: 20_000,
+  });
+  const liveLeaderLocation = leaderLocationQuery.data?.location ?? null;
 
   const myRsvpQuery = useQuery({
     queryKey: ['activities', activityId, 'rsvp', 'me'],
@@ -268,6 +292,56 @@ export default function ActivityDetailScreen() {
     await locationsApi.requestPing(activityId, userId);
   }
 
+  // While the leader is broadcasting, feed the server fixes. Tied to `broadcasting` so it starts
+  // and stops with the lease, and torn down on unmount — leaving the screen stops the watch, and
+  // the lease then lapses on the server rather than sharing on invisibly.
+  useEffect(() => {
+    if (!isLeader || !broadcasting) return;
+    let subscription: Awaited<ReturnType<typeof watchPosition>> = null;
+    let cancelled = false;
+
+    (async () => {
+      subscription = await watchPosition((point) => {
+        locationsApi.sendBroadcastFix(activityId, point).catch(() => {
+          // A dropped fix is not worth interrupting the leader over: the next one is seconds away,
+          // and if they stop for good the lease is what ends the broadcast.
+        });
+      });
+      if (cancelled) {
+        subscription?.remove();
+        subscription = null;
+      } else if (!subscription) {
+        setBroadcastError('Location permission is required to share your position.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, [isLeader, broadcasting, activityId]);
+
+  async function handleToggleBroadcast() {
+    setBroadcastError(null);
+    setBroadcastBusy(true);
+    try {
+      if (broadcasting) {
+        await locationsApi.stopBroadcast(activityId);
+        setBroadcastUntil(null);
+      } else {
+        const { until } = await locationsApi.startBroadcast(activityId);
+        setBroadcastUntil(until);
+      }
+      queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
+    } catch (err) {
+      setBroadcastError(
+        err instanceof ApiError ? err.message : "Couldn't change live sharing just now.",
+      );
+    } finally {
+      setBroadcastBusy(false);
+    }
+  }
+
   async function handleAskLeader() {
     setAskMessage(null);
     setAskSubmitting(true);
@@ -356,6 +430,32 @@ export default function ActivityDetailScreen() {
           )}
           {isLeader && activity.status === 'in_progress' && mpMode === null && nextPlanned && (
             <Text style={styles.muted}>Next on the plan: {nextPlanned.label || 'a stop'}</Text>
+          )}
+
+          {/* "Follow me" — the flag a guide holds up. Separate from moving the group on: this
+              says where I am right now, not where everyone should end up. */}
+          {isLeader && activity.status === 'in_progress' && mpMode === null && (
+            <View style={{ marginTop: 12 }}>
+              <TouchableOpacity
+                style={broadcasting ? styles.button : styles.secondaryButton}
+                onPress={handleToggleBroadcast}
+                disabled={broadcastBusy}
+              >
+                <Text style={broadcasting ? styles.buttonText : styles.secondaryButtonText}>
+                  {broadcastBusy
+                    ? 'One moment…'
+                    : broadcasting
+                      ? 'Stop sharing my position'
+                      : 'Share my live position'}
+                </Text>
+              </TouchableOpacity>
+              {broadcasting && (
+                <Text style={styles.muted}>
+                  Your group can see where you are. Sharing stops if you leave this screen.
+                </Text>
+              )}
+              {broadcastError && <Text style={styles.muted}>{broadcastError}</Text>}
+            </View>
           )}
 
           {isLeader && activity.status === 'published' && (
@@ -567,24 +667,53 @@ export default function ActivityDetailScreen() {
                       meaning before it starts, and the server closes it once it ends. */}
                   {activity.status === 'in_progress' && (
                     <View style={{ marginTop: 12 }}>
-                      <TouchableOpacity
-                        style={styles.secondaryButton}
-                        onPress={handleAskLeader}
-                        disabled={askSubmitting}
-                      >
-                        <Text style={styles.secondaryButtonText}>
-                          {askSubmitting ? 'Asking…' : "Where's the leader?"}
-                        </Text>
-                      </TouchableOpacity>
-                      {askMessage && <Text style={styles.muted}>{askMessage}</Text>}
-                      {leaderLocation && (
-                        <TouchableOpacity
-                          onPress={() => Linking.openURL(mapsLinkFor(leaderLocation.location))}
-                        >
-                          <Text style={styles.link}>
-                            Open {leaderLocation.user?.name ?? 'the leader'}'s position in Maps
+                      {/* A live broadcast answers the question before it's asked, so it replaces
+                          the button rather than sitting next to it. */}
+                      {broadcasting ? (
+                        <View>
+                          <Text style={styles.sectionTitle}>
+                            {liveLeaderLocation?.user?.name ?? 'Your leader'} is sharing their
+                            position
                           </Text>
-                        </TouchableOpacity>
+                          {liveLeaderLocation ? (
+                            <>
+                              <Text style={styles.muted}>
+                                Updated {describeAge(liveLeaderLocation.capturedAt)}.
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() =>
+                                  Linking.openURL(mapsLinkFor(liveLeaderLocation.location))
+                                }
+                              >
+                                <Text style={styles.link}>Follow them in Maps</Text>
+                              </TouchableOpacity>
+                            </>
+                          ) : (
+                            <Text style={styles.muted}>Waiting for their first position…</Text>
+                          )}
+                        </View>
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={handleAskLeader}
+                            disabled={askSubmitting}
+                          >
+                            <Text style={styles.secondaryButtonText}>
+                              {askSubmitting ? 'Asking…' : "Where's the leader?"}
+                            </Text>
+                          </TouchableOpacity>
+                          {askMessage && <Text style={styles.muted}>{askMessage}</Text>}
+                          {leaderLocation && (
+                            <TouchableOpacity
+                              onPress={() => Linking.openURL(mapsLinkFor(leaderLocation.location))}
+                            >
+                              <Text style={styles.link}>
+                                Open {leaderLocation.user?.name ?? 'the leader'}'s position in Maps
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
                       )}
                     </View>
                   )}

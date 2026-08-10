@@ -59,6 +59,9 @@ export type RsvpStatus = (typeof RsvpStatus)[keyof typeof RsvpStatus];
 export const LocationSource = {
   Omw: 'omw',
   PingResponse: 'ping_response',
+  /** A fix from the leader's live "follow me" broadcast. Carries no ETA — the leader isn't
+   * travelling to the meeting point, they're what everyone else is heading towards. */
+  LeaderBroadcast: 'leader_broadcast',
 } as const;
 export type LocationSource = (typeof LocationSource)[keyof typeof LocationSource];
 

@@ -6,6 +6,7 @@ export const SocketEvents = {
   ChatMessage: 'chat:message',
   RsvpUpdated: 'rsvp:updated',
   LocationUpdated: 'location:updated',
+  LeaderBroadcastChanged: 'leaderBroadcast:changed',
   MeetingPointCreated: 'meetingPoint:created',
   ActivityPublished: 'activity:published',
 } as const;
@@ -21,6 +22,12 @@ export interface RsvpUpdatedPayload {
 
 export interface LocationUpdatedPayload {
   snapshot: LocationSnapshot;
+}
+
+/** The leader started or stopped sharing a live position. `until` is null when they stopped. */
+export interface LeaderBroadcastChangedPayload {
+  activityId: string;
+  until: string | null;
 }
 
 export interface MeetingPointCreatedPayload {

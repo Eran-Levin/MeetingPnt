@@ -57,6 +57,9 @@ enum RsvpStatus {
 enum LocationSource {
   omw
   ping_response
+  /// A fix from the leader's live "follow me" broadcast. Carries no ETA — the leader isn't
+  /// travelling to the meeting point, they're the thing everyone else is heading towards.
+  leader_broadcast
 }
 
 enum AttendanceStatus {
@@ -221,6 +224,10 @@ model Activity {
   // column rather than a Prisma relation to avoid a cascade cycle with MeetingPoint.activityId;
   // the FK and its ON DELETE SET NULL live in the migration.
   currentMeetingPointId String?  @map("current_meeting_point_id")
+  // "Follow me" — until when the leader is sharing a live position. A lease rather than a flag, so
+  // a force-quit app or a dead battery can't leave the channel open indefinitely; null means not
+  // broadcasting, and a time in the past means the lease lapsed. Capped at the activity's end.
+  leaderBroadcastUntil  DateTime? @map("leader_broadcast_until")
   createdBy     String         @map("created_by")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")

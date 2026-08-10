@@ -34,6 +34,7 @@ function toSharedActivity(activity: Activity): SharedActivity {
     requiresRsvp: activity.requiresRsvp,
     status: activity.status,
     currentMeetingPointId: activity.currentMeetingPointId,
+    leaderBroadcastUntil: activity.leaderBroadcastUntil?.toISOString() ?? null,
     createdBy: activity.createdBy,
     createdAt: activity.createdAt.toISOString(),
     updatedAt: activity.updatedAt.toISOString(),
@@ -331,7 +332,7 @@ export async function startActivity(activityId: string, requesterId: string) {
   if (runningInGroup) {
     await prisma.activity.update({
       where: { id: runningInGroup.id },
-      data: { status: 'completed' },
+      data: { status: 'completed', leaderBroadcastUntil: null },
     });
   }
 
@@ -376,9 +377,11 @@ export async function endActivity(activityId: string, requesterId: string) {
     throw new HttpError(409, 'Only a published or in-progress activity can be ended');
   }
 
+  // Ending closes location sharing, and a live broadcast is the loudest form of it. The lease
+  // would lapse on its own within the quarter hour, but "the event is over" should stop it now.
   const updated = await prisma.activity.update({
     where: { id: activityId },
-    data: { status: 'completed' },
+    data: { status: 'completed', leaderBroadcastUntil: null },
   });
   return toSharedActivity(updated);
 }
