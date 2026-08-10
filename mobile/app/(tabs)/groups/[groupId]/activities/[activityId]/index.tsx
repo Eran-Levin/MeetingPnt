@@ -1,4 +1,4 @@
-import type { MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
+import type { LocationSnapshotWithUser, MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
 import { formatActivityWhen } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,20 @@ import { groupsApi } from '../../../../../../src/api/groupsApi';
 import { getCurrentLocationSnapshot } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
 
+/** How long ago a position was captured, in the words you'd use out loud. */
+function describeAge(capturedAt: string): string {
+  const minutes = Math.round((Date.now() - new Date(capturedAt).getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes === 1) return 'a minute ago';
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.round(minutes / 60);
+  return hours === 1 ? 'an hour ago' : `${hours} hours ago`;
+}
+
+function mapsLinkFor(location: { lat: number; lng: number }): string {
+  return `https://www.google.com/maps/search/?api=1&query=${location.lat},${location.lng}`;
+}
+
 export default function ActivityDetailScreen() {
   const { groupId, activityId } = useLocalSearchParams<{ groupId: string; activityId: string }>();
   const user = useAuthStore((s) => s.user);
@@ -36,6 +50,11 @@ export default function ActivityDetailScreen() {
   const [rsvpMessage, setRsvpMessage] = useState<string | null>(null);
   const [omwMessage, setOmwMessage] = useState<string | null>(null);
   const [omwSubmitting, setOmwSubmitting] = useState(false);
+
+  // "Where are you?" — the member's side of it.
+  const [leaderLocation, setLeaderLocation] = useState<LocationSnapshotWithUser | null>(null);
+  const [askMessage, setAskMessage] = useState<string | null>(null);
+  const [askSubmitting, setAskSubmitting] = useState(false);
 
   // Meeting point editor — doubles as "change the current one" and "move the group on".
   const [mpMode, setMpMode] = useState<null | 'edit' | 'next'>(null);
@@ -247,6 +266,29 @@ export default function ActivityDetailScreen() {
 
   async function handleRequestLocation(userId: string) {
     await locationsApi.requestPing(activityId, userId);
+  }
+
+  async function handleAskLeader() {
+    setAskMessage(null);
+    setAskSubmitting(true);
+    try {
+      const result = await locationsApi.askLeader(activityId);
+      setLeaderLocation(result.location);
+      if (!result.location) {
+        setAskMessage("Asked — you'll see their position here once they share it.");
+      } else if (result.notified) {
+        // A position exists but it's old enough that we disturbed the leader for a fresh one.
+        setAskMessage(`Asked. Last known position was ${describeAge(result.location.capturedAt)}.`);
+      } else {
+        setAskMessage(`Shared ${describeAge(result.location.capturedAt)}.`);
+      }
+    } catch (err) {
+      setAskMessage(
+        err instanceof ApiError ? err.message : "Couldn't ask right now — try again in a moment.",
+      );
+    } finally {
+      setAskSubmitting(false);
+    }
   }
 
   async function handleInviteVisitor() {
@@ -520,6 +562,32 @@ export default function ActivityDetailScreen() {
                     <Text style={styles.buttonText}>{omwSubmitting ? 'Sharing…' : "I'm On My Way"}</Text>
                   </TouchableOpacity>
                   {omwMessage && <Text style={styles.muted}>{omwMessage}</Text>}
+
+                  {/* Only while the event is actually running — asking where the leader is has no
+                      meaning before it starts, and the server closes it once it ends. */}
+                  {activity.status === 'in_progress' && (
+                    <View style={{ marginTop: 12 }}>
+                      <TouchableOpacity
+                        style={styles.secondaryButton}
+                        onPress={handleAskLeader}
+                        disabled={askSubmitting}
+                      >
+                        <Text style={styles.secondaryButtonText}>
+                          {askSubmitting ? 'Asking…' : "Where's the leader?"}
+                        </Text>
+                      </TouchableOpacity>
+                      {askMessage && <Text style={styles.muted}>{askMessage}</Text>}
+                      {leaderLocation && (
+                        <TouchableOpacity
+                          onPress={() => Linking.openURL(mapsLinkFor(leaderLocation.location))}
+                        >
+                          <Text style={styles.link}>
+                            Open {leaderLocation.user?.name ?? 'the leader'}'s position in Maps
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               )}
             </View>

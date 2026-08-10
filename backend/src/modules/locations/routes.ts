@@ -47,6 +47,21 @@ locationsRouter.post(
   },
 );
 
+// The mirror of /location/ping: that one is the leader asking a member, this is a member asking
+// the leader. No body — who is asking comes from the token, and who they're asking is the
+// activity's leader.
+locationsRouter.post('/:id/location/ask-leader', async (req, res, next) => {
+  try {
+    const result = await locationsService.requestLeaderLocation(
+      req.params.id as string,
+      req.user!.id,
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // The pair: /latest is the leader's view of everyone, /leader is everyone's view of the leader.
 locationsRouter.get('/:id/location/leader', async (req, res, next) => {
   try {

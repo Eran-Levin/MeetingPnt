@@ -1,4 +1,5 @@
 import type {
+  LeaderLocationRequestResult,
   LocationSnapshot as SharedLocationSnapshot,
   OmwLocationDto,
   PingRequestDto,
@@ -146,6 +147,91 @@ export async function requestPing(activityId: string, requesterId: string, dto: 
       categoryId: 'location_ping',
     })),
   );
+}
+
+/**
+ * How fresh the leader's position has to be for a member's question to be already answered. Below
+ * this, asking costs the leader nothing — they get the position that's already on file.
+ */
+const LEADER_POSITION_FRESH_MS = 2 * 60 * 1000;
+
+/** At most one notification per activity per window, however many people ask inside it. */
+const ASK_COALESCE_WINDOW_MS = 60 * 1000;
+
+/**
+ * When the leader was last notified that someone is asking, per activity. Eight trekkers each
+ * tapping "where are you" is eight pushes to one guide, which is how a useful feature becomes one
+ * the guide switches off.
+ *
+ * The notification fires on the *first* ask and later ones inside the window are absorbed, rather
+ * than waiting out the window to collect names. "Where are you" is urgent, and delaying every
+ * single-asker case by a minute to occasionally say "and 2 others" is a bad trade — so the
+ * notification names one person and the others ride along silently. They lose nothing: the answer
+ * is a leader position, which reaches every attendee.
+ *
+ * Deliberately in-process. It holds seconds of state that is worthless if lost, and the codebase
+ * already treats Redis as optional (see the adapter note in realtime/index.ts), so requiring it
+ * here would make a second instance mandatory for correctness rather than for scale. Running more
+ * than one instance degrades this to one notification per instance per window — noisier, never
+ * wrong. If the backend is ever scaled, move this to Redis rather than dropping it.
+ */
+const lastAskNotifiedAt = new Map<string, number>();
+
+function pruneAsks(now: number) {
+  for (const [activityId, notifiedAt] of lastAskNotifiedAt) {
+    if (now - notifiedAt > ASK_COALESCE_WINDOW_MS) lastAskNotifiedAt.delete(activityId);
+  }
+}
+
+/**
+ * A member asking the leader where they are — the counterpart to `requestPing`, which is the
+ * leader asking a member. The leader answers through the existing ping-response endpoint, so the
+ * position they share reaches every attendee the same way any leader position does.
+ */
+export async function requestLeaderLocation(
+  activityId: string,
+  requesterId: string,
+): Promise<LeaderLocationRequestResult> {
+  const { activity, group } = await getActivityWithLeader(activityId);
+  assertActivityLive(activity);
+  await assertLeaderOrApproved(activityId, requesterId, group.leaderId);
+
+  const location = await getLeaderLocation(activityId, requesterId);
+
+  // Already answered: the leader reported a position moments ago, so don't disturb them for it.
+  // Once leader broadcasting exists this is the path that makes a live broadcast silence the
+  // question entirely, because every fix refreshes this timestamp.
+  const now = Date.now();
+  if (location && now - new Date(location.capturedAt).getTime() < LEADER_POSITION_FRESH_MS) {
+    return { location, notified: false };
+  }
+
+  // A leader asking after their own position is answered, never notified.
+  if (requesterId === group.leaderId) {
+    return { location, notified: false };
+  }
+
+  pruneAsks(now);
+  const notifiedAt = lastAskNotifiedAt.get(activityId);
+  if (notifiedAt !== undefined && now - notifiedAt < ASK_COALESCE_WINDOW_MS) {
+    return { location, notified: false };
+  }
+  lastAskNotifiedAt.set(activityId, now);
+
+  const requester = await prisma.user.findUnique({ where: { id: requesterId } });
+  const pushTokens = await prisma.pushToken.findMany({ where: { userId: group.leaderId } });
+  await sendPushNotifications(
+    pushTokens.map((token) => ({
+      to: token.expoPushToken,
+      title: 'Where are you?',
+      body: `${displayName(requester!)} asked where you are in ${activity.title}.`,
+      data: { type: 'leader_location_request', activityId },
+      priority: 'high',
+      categoryId: 'leader_location_request',
+    })),
+  );
+
+  return { location, notified: true };
 }
 
 export async function getLatestLocations(activityId: string, requesterId: string) {

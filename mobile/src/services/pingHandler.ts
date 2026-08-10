@@ -4,21 +4,39 @@ import { locationsApi } from '../api/locationsApi';
 import { getCurrentLocationSnapshot } from './location';
 
 const LOCATION_PING_CATEGORY = 'location_ping';
+/** The mirror of the above: a member asking the leader. Same action, same response — the only
+ * difference is who is being asked, so both categories share one handler. */
+const LEADER_LOCATION_REQUEST_CATEGORY = 'leader_location_request';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
+const SHARE_LOCATION_ACTION = [
+  {
+    identifier: 'share_location',
+    buttonTitle: 'Share Location',
+    options: { opensAppToForeground: true },
+  },
+];
+
 export async function setupNotificationCategories() {
-  await Notifications.setNotificationCategoryAsync(LOCATION_PING_CATEGORY, [
-    {
-      identifier: 'share_location',
-      buttonTitle: 'Share Location',
-      options: { opensAppToForeground: true },
-    },
-  ]);
+  await Notifications.setNotificationCategoryAsync(LOCATION_PING_CATEGORY, SHARE_LOCATION_ACTION);
+  await Notifications.setNotificationCategoryAsync(
+    LEADER_LOCATION_REQUEST_CATEGORY,
+    SHARE_LOCATION_ACTION,
+  );
 }
 
 interface PingNotificationData {
   type?: string;
   activityId?: string;
+}
+
+/** Both notification types mean the same thing to whoever receives one: report where you are. */
+function isLocationRequest(data: PingNotificationData | undefined): data is PingNotificationData &
+  { activityId: string } {
+  return (
+    !!data?.activityId &&
+    (data.type === 'location_ping' || data.type === 'leader_location_request')
+  );
 }
 
 async function respondToPing(activityId: string) {
@@ -31,7 +49,7 @@ async function respondToPing(activityId: string) {
 export function registerNotificationResponseHandler() {
   return Notifications.addNotificationResponseReceivedListener(async (response) => {
     const data = response.notification.request.content.data as PingNotificationData;
-    if (data?.type === 'location_ping' && data.activityId) {
+    if (isLocationRequest(data)) {
       await respondToPing(data.activityId);
     }
   });
@@ -46,7 +64,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
   if (error) return;
   const payload = (data as { notification?: { request?: { content?: { data?: PingNotificationData } } } })
     ?.notification?.request?.content?.data;
-  if (payload?.type === 'location_ping' && payload.activityId) {
+  if (isLocationRequest(payload)) {
     await respondToPing(payload.activityId);
   }
 });

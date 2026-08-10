@@ -228,3 +228,12 @@ export interface LocationSnapshot {
 export interface LocationSnapshotWithUser extends LocationSnapshot {
   user: Pick<User, 'id' | 'name' | 'email'> | null;
 }
+
+/** The answer to a member asking the leader where they are. */
+export interface LeaderLocationRequestResult {
+  /** The leader's last known position — null if they've never reported one, and possibly stale. */
+  location: LocationSnapshotWithUser | null;
+  /** False when nobody was disturbed: the position was already fresh, or another member had
+   * just asked and the leader has been notified once for all of them. */
+  notified: boolean;
+}

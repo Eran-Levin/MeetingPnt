@@ -1,4 +1,9 @@
-import type { GeoPoint, LocationSnapshot } from '@meetingpnt/shared';
+import type {
+  GeoPoint,
+  LeaderLocationRequestResult,
+  LocationSnapshot,
+  LocationSnapshotWithUser,
+} from '@meetingpnt/shared';
 import { apiFetch } from './client';
 
 export const locationsApi = {
@@ -17,4 +22,14 @@ export const locationsApi = {
       method: 'POST',
       body: { userId },
     }),
+  /** A member asking the leader where they are. Answers immediately from the last known position
+   * when it's recent enough, in which case the leader is never disturbed. */
+  askLeader: (activityId: string) =>
+    apiFetch<LeaderLocationRequestResult>(`/api/activities/${activityId}/location/ask-leader`, {
+      method: 'POST',
+    }),
+  getLeaderLocation: (activityId: string) =>
+    apiFetch<{ location: LocationSnapshotWithUser | null }>(
+      `/api/activities/${activityId}/location/leader`,
+    ),
 };
