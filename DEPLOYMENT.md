@@ -60,6 +60,32 @@ verification).
 | 5 | Open the APK link on the phone, install over the existing app | Me |
 | 6 | Grant notification permission if prompted | Me |
 
+## Testing on a phone against the local backend
+
+The `preview` APK cannot do this. It is a release build: the JavaScript is compiled in and
+`https://api.meetingpnt.com` is baked into it, so it always runs its own code against production.
+Pointing it at a local machine is not a configuration problem, it is impossible. A client asked for
+a bundle it cannot fetch reports **"Failed to download remote update"**.
+
+Use a **development build** instead — built once from the `development` profile, it loads its
+JavaScript from Metro on your machine and supports push, which Expo Go does not (Android remote
+push was dropped there in SDK 53).
+
+| # | Action | Who |
+|---|---|---|
+| 1 | `cd mobile && npx eas-cli@latest build -p android --profile development --non-interactive --no-wait` | Claude |
+| 2 | Install the APK — a one-off, not repeated per code change | Me |
+| 3 | Set `EXPO_PUBLIC_API_BASE_URL` / `EXPO_PUBLIC_SOCKET_URL` in `mobile/.env` and `BACKEND_PUBLIC_URL` in `backend/.env` to the machine's current LAN IP | Me |
+| 4 | `npm run dev:backend`, then `cd mobile && npx expo start -c` | Claude |
+| 5 | Open the dev build on the phone; it connects to Metro over the LAN | Me |
+
+Rebuild only when native dependencies change. Ordinary JS edits reload from Metro.
+
+The `development` profile deliberately sets **no** `EXPO_PUBLIC_API_BASE_URL`. `EXPO_PUBLIC_*` is
+inlined by whichever bundler produces the JavaScript, and for a development build that is local
+Metro reading `mobile/.env` — so a value here would never reach the app while looking like it
+governs the thing. It previously held a LAN address that had long since gone stale.
+
 ## Env var change — Render
 
 | # | Action | Who |
