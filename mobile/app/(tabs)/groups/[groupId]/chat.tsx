@@ -4,22 +4,35 @@ import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 import {
   Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatApi } from '../../../../src/api/chatApi';
 import { groupsApi } from '../../../../src/api/groupsApi';
 import { useAuthStore } from '../../../../src/store/authStore';
+import {
+  Button,
+  Empty,
+  color,
+  fontSize,
+  minTouchTarget,
+  radius,
+  space,
+  text,
+  toneTint,
+} from '../../../../src/ui';
 
 export default function GroupChatScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [body, setBody] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -76,11 +89,13 @@ export default function GroupChatScreen() {
     }
   }
 
+  const messages = messagesQuery.data?.messages ?? [];
+
   return (
     <View style={styles.container}>
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16 }}
+        style={styles.scroll}
+        contentContainerStyle={{ padding: space.lg }}
         refreshControl={
           <RefreshControl
             refreshing={messagesQuery.isFetching}
@@ -90,70 +105,113 @@ export default function GroupChatScreen() {
           />
         }
       >
-        <Text style={styles.hint}>
+        <Text style={[text.secondary, styles.mode]}>
           {chatMode === 'announcements'
             ? 'Announcements only — members can read but not reply.'
             : 'Two-way chat — anyone in the group can post.'}
         </Text>
-        {messagesQuery.data?.messages.map((message) => (
-          <View
-            key={message.id}
-            style={[styles.messageRow, message.authorId === user?.id && styles.messageRowMine]}
-          >
-            <Text style={styles.author}>{message.author.name}</Text>
-            {message.body && <Text style={styles.body}>{message.body}</Text>}
-            {message.imageUrl && (
-              <Image source={{ uri: message.imageUrl }} style={styles.image} resizeMode="cover" />
-            )}
-          </View>
-        ))}
-        {messagesQuery.data?.messages.length === 0 && (
-          <Text style={styles.muted}>No messages yet.</Text>
+
+        {messages.map((message) => {
+          const mine = message.authorId === user?.id;
+          return (
+            <View key={message.id} style={[styles.message, mine && styles.messageMine]}>
+              {!mine && <Text style={text.caption}>{message.author.name}</Text>}
+              {message.body && (
+                <View style={[styles.bubble, mine && styles.bubbleMine]}>
+                  <Text style={mine ? styles.bodyMine : text.body}>{message.body}</Text>
+                </View>
+              )}
+              {message.imageUrl && (
+                <Image source={{ uri: message.imageUrl }} style={styles.image} resizeMode="cover" />
+              )}
+            </View>
+          );
+        })}
+
+        {messages.length === 0 && (
+          <Empty
+            headline="No messages yet"
+            body={canPost ? 'Say where you are, or what to bring.' : undefined}
+          />
         )}
       </ScrollView>
 
       {canPost ? (
-        <View style={styles.composer}>
-          {imageUri && <Image source={{ uri: imageUri }} style={styles.previewImage} />}
+        <View style={[styles.composer, { paddingBottom: space.md + insets.bottom }]}>
+          {imageUri && <Image source={{ uri: imageUri }} style={styles.preview} />}
           <View style={styles.composerRow}>
             <TextInput
               style={styles.input}
               placeholder="Write a message…"
+              placeholderTextColor={color.textMuted}
               value={body}
               onChangeText={setBody}
             />
-            <TouchableOpacity onPress={handlePickImage} style={styles.imageButton}>
-              <Text>📷</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={sending}>
-              <Text style={styles.sendButtonText}>{sending ? '…' : 'Send'}</Text>
-            </TouchableOpacity>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Attach a photo"
+              onPress={handlePickImage}
+              style={styles.attach}
+            >
+              <Text style={styles.attachIcon}>+</Text>
+            </Pressable>
+            <Button label={sending ? '…' : 'Send'} onPress={handleSend} busy={sending} />
           </View>
           {error && <Text style={styles.error}>{error}</Text>}
         </View>
       ) : (
-        <Text style={styles.readOnlyNotice}>Only the leader can post in this group.</Text>
+        <Text style={[text.secondary, styles.readOnly, { paddingBottom: space.md + insets.bottom }]}>
+          Only the leader can post in this group.
+        </Text>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  hint: { color: '#888', marginBottom: 12 },
-  muted: { color: '#888', textAlign: 'center', marginTop: 24 },
-  messageRow: { marginBottom: 12, alignSelf: 'flex-start', maxWidth: '85%' },
-  messageRowMine: { alignSelf: 'flex-end' },
-  author: { fontSize: 12, color: '#888' },
-  body: { backgroundColor: '#f1f5f9', borderRadius: 8, padding: 10, marginTop: 2 },
-  image: { width: 200, height: 200, borderRadius: 8, marginTop: 4 },
-  composer: { borderTopWidth: 1, borderTopColor: '#eee', padding: 12 },
-  composerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10 },
-  imageButton: { padding: 8 },
-  sendButton: { backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  sendButtonText: { color: 'white', fontWeight: '600' },
-  previewImage: { width: 60, height: 60, borderRadius: 8, marginBottom: 8 },
-  error: { color: 'crimson', marginTop: 4 },
-  readOnlyNotice: { textAlign: 'center', color: '#888', padding: 12, borderTopWidth: 1, borderTopColor: '#eee' },
+  container: { flex: 1, backgroundColor: color.surfaceSunken },
+  scroll: { flex: 1 },
+  mode: { marginBottom: space.lg },
+  message: { marginBottom: space.md, alignSelf: 'flex-start', maxWidth: '85%' },
+  messageMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+  bubble: {
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.lg,
+    padding: space.md,
+    marginTop: space.xs,
+  },
+  bubbleMine: { backgroundColor: color.accent, borderColor: color.accent },
+  bodyMine: { fontSize: fontSize.body, color: color.textInverse },
+  image: { width: 220, height: 220, borderRadius: radius.lg, marginTop: space.xs },
+  composer: {
+    borderTopWidth: 1,
+    borderTopColor: color.border,
+    backgroundColor: color.surface,
+    padding: space.md,
+  },
+  composerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  input: {
+    flex: 1,
+    minHeight: minTouchTarget,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    fontSize: fontSize.body,
+    color: color.text,
+  },
+  attach: {
+    width: minTouchTarget,
+    height: minTouchTarget,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: color.surfaceRaised,
+  },
+  attachIcon: { fontSize: 24, color: color.textSecondary },
+  preview: { width: 64, height: 64, borderRadius: radius.md, marginBottom: space.sm },
+  error: { color: toneTint.danger.fg, marginTop: space.xs },
+  readOnly: { textAlign: 'center', padding: space.md, borderTopWidth: 1, borderTopColor: color.border },
 });

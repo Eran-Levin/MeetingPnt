@@ -1,10 +1,24 @@
 import type { TransportMode } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../src/api/activitiesApi';
 import { ApiError } from '../../../../../src/api/client';
+import {
+  Button,
+  Chip,
+  ChipRow,
+  Screen,
+  Section,
+  TextField,
+  color,
+  minTouchTarget,
+  radius,
+  space,
+  text,
+  toneTint,
+} from '../../../../../src/ui';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -29,7 +43,9 @@ export default function NewActivityScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   function toggleDay(day: number) {
-    setDaysOfWeek((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
+    setDaysOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
+    );
   }
 
   async function handleSubmit() {
@@ -49,7 +65,11 @@ export default function NewActivityScreen() {
     }
 
     if (end <= start) {
-      setError(allDay ? 'The end date must not be before the start date.' : 'The end time must be after the start time.');
+      setError(
+        allDay
+          ? 'The end date must not be before the start date.'
+          : 'The end time must be after the start time.',
+      );
       return;
     }
 
@@ -87,153 +107,222 @@ export default function NewActivityScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>New activity</Text>
-      <TextInput style={styles.input} placeholder="Title" value={title} onChangeText={setTitle} />
-      <TextInput
-        style={styles.input}
-        placeholder="Description (optional)"
+    <Screen title="New event" bottomInset={80}>
+      <TextField
+        label="Title"
+        placeholder="Sunrise walk — Old Town"
+        value={title}
+        onChangeText={setTitle}
+      />
+      <TextField
+        label="Description (optional)"
         value={description}
         onChangeText={setDescription}
       />
 
-      <View style={styles.repeatRow}>
-        <Text style={styles.label}>Spans whole days (multi-day trip)</Text>
-        <Switch value={allDay} onValueChange={setAllDay} />
-      </View>
-
-      <TouchableOpacity style={styles.input} onPress={() => setPicker('date')}>
-        <Text>
-          {allDay ? 'Start date: ' : 'Date: '}
-          {startAt.toLocaleDateString()}
-        </Text>
-      </TouchableOpacity>
-
-      {allDay ? (
-        <TouchableOpacity style={styles.input} onPress={() => setPicker('endDate')}>
-          <Text>End date: {endAt.toLocaleDateString()}</Text>
-        </TouchableOpacity>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.input} onPress={() => setPicker('startTime')}>
-            <Text>
-              Start time: {startAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.input} onPress={() => setPicker('endTime')}>
-            <Text>
-              End time: {endAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {picker && (
-        <DateTimePicker
-          value={picker === 'endDate' || picker === 'endTime' ? endAt : startAt}
-          mode={picker === 'startTime' || picker === 'endTime' ? 'time' : 'date'}
-          onChange={(_event, selected) => {
-            setPicker(Platform.OS === 'ios' ? picker : null);
-            if (!selected) return;
-            if (picker === 'endDate' || picker === 'endTime') setEndAt(selected);
-            else setStartAt(selected);
-          }}
+      <Section label="When" first>
+        <Toggle
+          label="Spans whole days"
+          hint="A multi-day trip. Each day is its own event."
+          value={allDay}
+          onValueChange={setAllDay}
         />
-      )}
 
-      {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
-          morning — but they can still decline the one day they're sitting out. */}
-      <View style={styles.repeatRow}>
-        <Text style={styles.label}>Approve attendance</Text>
-        <Switch value={requiresRsvp} onValueChange={setRequiresRsvp} />
-      </View>
-      <Text style={styles.hint}>
-        {requiresRsvp
-          ? 'Members are asked to confirm they’re coming.'
-          : 'Members count as coming as soon as this is published — they can still decline.'}
-      </Text>
+        <PickerField
+          label={allDay ? 'Start date' : 'Date'}
+          value={startAt.toLocaleDateString()}
+          onPress={() => setPicker('date')}
+        />
 
-      <Text style={styles.label}>Mode of transport</Text>
-      <View style={styles.modeRow}>
-        {TRANSPORT_MODES.map((mode) => (
-          <TouchableOpacity
-            key={mode}
-            style={[styles.modeChip, transportMode === mode && styles.modeChipSelected]}
-            onPress={() => setTransportMode(mode)}
-          >
-            <Text style={transportMode === mode ? styles.modeTextSelected : styles.modeText}>
-              {mode}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.repeatRow}>
-        <Text style={styles.label}>Repeat weekly</Text>
-        <Switch value={repeats} onValueChange={setRepeats} />
-      </View>
-
-      {repeats && (
-        <View style={{ gap: 8 }}>
-          <View style={styles.repeatRow}>
-            <Text>Every</Text>
-            <TextInput
-              style={[styles.input, { width: 50 }]}
-              keyboardType="number-pad"
-              value={intervalWeeks}
-              onChangeText={setIntervalWeeks}
+        {allDay ? (
+          <PickerField
+            label="End date"
+            value={endAt.toLocaleDateString()}
+            onPress={() => setPicker('endDate')}
+          />
+        ) : (
+          <>
+            <PickerField
+              label="Start time"
+              value={startAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              onPress={() => setPicker('startTime')}
             />
-            <Text>week(s)</Text>
-          </View>
-          <View style={styles.modeRow}>
-            {WEEKDAY_LABELS.map((label, day) => (
-              <TouchableOpacity
-                key={day}
-                style={[styles.modeChip, daysOfWeek.includes(day) && styles.modeChipSelected]}
-                onPress={() => toggleDay(day)}
-              >
-                <Text style={daysOfWeek.includes(day) ? styles.modeTextSelected : styles.modeText}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.repeatRow}>
-            <Text>For</Text>
-            <TextInput
-              style={[styles.input, { width: 60 }]}
-              keyboardType="number-pad"
-              value={count}
-              onChangeText={setCount}
+            <PickerField
+              label="End time"
+              value={endAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              onPress={() => setPicker('endTime')}
             />
-            <Text>occurrences</Text>
+          </>
+        )}
+
+        {picker && (
+          <DateTimePicker
+            value={picker === 'endDate' || picker === 'endTime' ? endAt : startAt}
+            mode={picker === 'startTime' || picker === 'endTime' ? 'time' : 'date'}
+            onChange={(_event, selected) => {
+              setPicker(Platform.OS === 'ios' ? picker : null);
+              if (!selected) return;
+              if (picker === 'endDate' || picker === 'endTime') setEndAt(selected);
+              else setStartAt(selected);
+            }}
+          />
+        )}
+      </Section>
+
+      <Section label="Attendance">
+        {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
+            morning — but they can still decline the one day they're sitting out. */}
+        <Toggle
+          label="Approve attendance"
+          hint={
+            requiresRsvp
+              ? 'Members are asked to confirm they’re coming.'
+              : 'Members count as coming as soon as this is published — they can still decline.'
+          }
+          value={requiresRsvp}
+          onValueChange={setRequiresRsvp}
+        />
+      </Section>
+
+      <Section label="Mode of transport">
+        <ChipRow>
+          {TRANSPORT_MODES.map((mode) => (
+            <Chip
+              key={mode}
+              label={mode}
+              selected={transportMode === mode}
+              onPress={() => setTransportMode(mode)}
+            />
+          ))}
+        </ChipRow>
+      </Section>
+
+      <Section label="Repeat">
+        <Toggle label="Repeat weekly" value={repeats} onValueChange={setRepeats} />
+
+        {repeats && (
+          <View style={styles.repeat}>
+            <View style={styles.inlineRow}>
+              <Text style={text.body}>Every</Text>
+              <TextField
+                keyboardType="number-pad"
+                value={intervalWeeks}
+                onChangeText={setIntervalWeeks}
+                containerStyle={styles.number}
+              />
+              <Text style={text.body}>week(s)</Text>
+            </View>
+
+            <ChipRow>
+              {WEEKDAY_LABELS.map((label, day) => (
+                <Chip
+                  key={day}
+                  label={label}
+                  selected={daysOfWeek.includes(day)}
+                  onPress={() => toggleDay(day)}
+                />
+              ))}
+            </ChipRow>
+
+            <View style={styles.inlineRow}>
+              <Text style={text.body}>For</Text>
+              <TextField
+                keyboardType="number-pad"
+                value={count}
+                onChangeText={setCount}
+                containerStyle={styles.number}
+              />
+              <Text style={text.body}>occurrences</Text>
+            </View>
           </View>
+        )}
+      </Section>
+
+      {error && (
+        <View style={styles.error}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {error && <Text style={styles.error}>{error}</Text>}
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={submitting}>
-        <Text style={styles.buttonText}>
-          {submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
-        </Text>
-      </TouchableOpacity>
+      <Button
+        label={submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
+        onPress={handleSubmit}
+        busy={submitting}
+        style={styles.submit}
+      />
+    </Screen>
+  );
+}
+
+function Toggle({
+  label,
+  hint,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  hint?: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.toggle}>
+      <View style={styles.toggleText}>
+        <Text style={text.body}>{label}</Text>
+        {hint && <Text style={text.secondary}>{hint}</Text>}
+      </View>
+      <Switch value={value} onValueChange={onValueChange} />
     </View>
   );
 }
 
+function PickerField({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.pickerField} onPress={onPress}>
+      <Text style={text.secondary}>{label}</Text>
+      <Text style={text.body}>{value}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, gap: 12 },
-  title: { fontSize: 22, fontWeight: '600' },
-  label: { fontWeight: '600', marginTop: 4 },
-  hint: { fontSize: 12, color: '#6b7280', marginTop: -4 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
-  modeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  modeChip: { borderWidth: 1, borderColor: '#ccc', borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12 },
-  modeChipSelected: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  modeText: { color: '#333' },
-  modeTextSelected: { color: 'white', fontWeight: '600' },
-  repeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: 'white', fontWeight: '600' },
-  error: { color: 'crimson' },
+  toggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    minHeight: minTouchTarget,
+    marginBottom: space.md,
+  },
+  toggleText: { flex: 1 },
+  pickerField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: minTouchTarget,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+    paddingHorizontal: space.md,
+    marginBottom: space.sm,
+  },
+  repeat: { gap: space.md, marginTop: space.sm },
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  number: { width: 72, marginBottom: 0 },
+  error: {
+    backgroundColor: toneTint.danger.bg,
+    borderRadius: radius.md,
+    padding: space.md,
+    marginTop: space.lg,
+  },
+  errorText: { color: toneTint.danger.fg },
+  submit: { marginTop: space.lg },
 });

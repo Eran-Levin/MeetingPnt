@@ -32,11 +32,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-sunken px-4">
       <Card className="w-full max-w-sm">
         <AppLogo size={48} className="mb-1" />
-        <h1 className="text-2xl font-semibold text-slate-900">MeetingPnt</h1>
-        <p className="mt-1 text-sm text-slate-500">Leader &amp; Admin console</p>
+        <h1 className="text-2xl font-semibold text-ink">MeetingPnt</h1>
+        <p className="mt-1 text-sm text-ink-secondary">Leader &amp; Admin console</p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           <TextField
@@ -53,7 +53,7 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-tone-danger-fg">{error}</p>}
           <Button type="submit" disabled={submitting} className="mt-1 w-full">
             {submitting ? 'Signing in…' : 'Sign in'}
           </Button>

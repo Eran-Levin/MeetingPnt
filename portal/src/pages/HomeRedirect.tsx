@@ -19,10 +19,10 @@ export function HomeRedirect() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface-sunken px-4">
       <Card className="w-full max-w-sm text-center">
-        <h1 className="text-xl font-semibold text-slate-900">MeetingPnt</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-ink">MeetingPnt</h1>
+        <p className="mt-2 text-sm text-ink-secondary">
           This account doesn&rsquo;t have Leader or Admin access. Group members use the MeetingPnt
           mobile app instead.
         </p>

@@ -1,30 +1,38 @@
 import type { LocationSnapshotWithUser, MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
 import { formatActivityWhen, isLeaderBroadcasting } from '@meetingpnt/shared';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi';
-import { ApiError } from '../../../../../../src/api/client';
 import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi';
 import { attendanceApi } from '../../../../../../src/api/attendanceApi';
+import { ApiError } from '../../../../../../src/api/client';
+import { groupsApi } from '../../../../../../src/api/groupsApi';
 import { locationsApi } from '../../../../../../src/api/locationsApi';
 import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi';
-import { groupsApi } from '../../../../../../src/api/groupsApi';
+import { CurrentPointCard } from '../../../../../../src/features/activity/CurrentPointCard';
+import { MeetingPointEditor } from '../../../../../../src/features/activity/MeetingPointEditor';
+import { MemberPanel } from '../../../../../../src/features/activity/MemberPanel';
+import { RollCallList } from '../../../../../../src/features/activity/RollCallList';
+import { RouteList } from '../../../../../../src/features/activity/RouteList';
+import { VisitorInvite } from '../../../../../../src/features/activity/VisitorInvite';
 import { getCurrentLocationSnapshot, watchPosition } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
+import {
+  Badge,
+  Button,
+  ButtonRow,
+  Card,
+  Pill,
+  Screen,
+  Section,
+  color,
+  space,
+  text,
+} from '../../../../../../src/ui';
 
 /** How long ago a position was captured, in the words you'd use out loud. */
 function describeAge(capturedAt: string): string {
@@ -42,6 +50,7 @@ function mapsLinkFor(location: { lat: number; lng: number }): string {
 
 export default function ActivityDetailScreen() {
   const { groupId, activityId } = useLocalSearchParams<{ groupId: string; activityId: string }>();
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
@@ -91,6 +100,7 @@ export default function ActivityDetailScreen() {
   });
   const isLeader = groupQuery.data?.group.leaderId === user?.id;
   const activity = activityQuery.data?.activity;
+  const running = activity?.status === 'in_progress';
 
   const meetingPointsQuery = useQuery({
     queryKey: ['activities', activityId, 'meeting-points'],
@@ -228,13 +238,13 @@ export default function ActivityDetailScreen() {
   }
 
   async function pasteLink() {
-    const text = (await Clipboard.getStringAsync())?.trim();
-    if (!text) {
+    const copied = (await Clipboard.getStringAsync())?.trim();
+    if (!copied) {
       setMpError('Nothing on the clipboard to paste.');
       return;
     }
     setMpError(null);
-    setMpUrl(text);
+    setMpUrl(copied);
   }
 
   async function handleSaveMeetingPoint() {
@@ -390,501 +400,203 @@ export default function ActivityDetailScreen() {
     }
   }
 
-  const markedCount = rollCall.filter((e) => e.attendance !== null).length;
-  const presentCount = rollCall.filter((e) => e.attendance === 'present').length;
+  if (!activity) return <Screen title="…">{null}</Screen>;
+
+  const attendees = attendeesQuery.data?.attendees ?? [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      <Text style={styles.title}>{activity?.title ?? '…'}</Text>
-      {activity && (
-        <>
-          <Text style={styles.muted}>
-            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)} ·{' '}
-            {activity.status}
-          </Text>
-          {activity.description && <Text style={styles.desc}>{activity.description}</Text>}
+    <Screen
+      title={activity.title}
+      subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+      bottomInset={80}
+    >
+      <View style={styles.status}>
+        <Badge status={activity.status} />
+        {/* Chat lives on the event now: for a member a conversation is nearly always about a
+            specific one — where are you, I'm running late — and this is the screen they're on. */}
+        <Pressable
+          style={styles.chat}
+          onPress={() => router.push(`/(tabs)/groups/${groupId}/chat`)}
+        >
+          <Text style={[text.body, { color: color.accentText }]}>Group chat</Text>
+        </Pressable>
+      </View>
 
-          {isLeader && activity.status === 'published' && (
-            <TouchableOpacity style={styles.button} onPress={handleStart}>
-              <Text style={styles.buttonText}>Start event</Text>
-            </TouchableOpacity>
-          )}
+      {activity.description && <Text style={[text.body, styles.desc]}>{activity.description}</Text>}
 
-          {/* Running an event is these two decisions: move the group on, or finish. They sit
-              together at the top so a leader holding a phone one-handed can reach both. */}
-          {isLeader && activity.status === 'in_progress' && mpMode === null && (
-            <View style={styles.eventControls}>
-              <TouchableOpacity
-                style={[styles.button, styles.eventControlButton]}
-                onPress={() => openEditor('next')}
-              >
-                <Text style={styles.buttonText}>Next meeting point</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.secondaryButton, styles.eventControlButton]}
-                onPress={handleEnd}
-              >
-                <Text style={styles.secondaryButtonText}>End event</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Running an event is these two decisions: move the group on, or finish. They sit at the
+          top so a leader holding a phone one-handed can reach both. */}
+      {isLeader && mpMode === null && (
+        <View style={styles.controls}>
+          {activity.status === 'published' && (
+            <ButtonRow>
+              <Button label="Start event" onPress={handleStart} grow />
+              <Button label="End event" onPress={handleEnd} variant="secondary" grow />
+            </ButtonRow>
           )}
-          {isLeader && activity.status === 'in_progress' && mpMode === null && nextPlanned && (
-            <Text style={styles.muted}>Next on the plan: {nextPlanned.label || 'a stop'}</Text>
-          )}
+          {running && (
+            <>
+              <ButtonRow>
+                <Button label="Next meeting point" onPress={() => openEditor('next')} grow />
+                <Button label="End event" onPress={handleEnd} variant="secondary" grow />
+              </ButtonRow>
+              {nextPlanned && (
+                <Text style={[text.secondary, styles.planned]}>
+                  Next on the plan: {nextPlanned.label || 'a stop'}
+                </Text>
+              )}
 
-          {/* "Follow me" — the flag a guide holds up. Separate from moving the group on: this
-              says where I am right now, not where everyone should end up. */}
-          {isLeader && activity.status === 'in_progress' && mpMode === null && (
-            <View style={{ marginTop: 12 }}>
-              <TouchableOpacity
-                style={broadcasting ? styles.button : styles.secondaryButton}
-                onPress={handleToggleBroadcast}
-                disabled={broadcastBusy}
-              >
-                <Text style={broadcasting ? styles.buttonText : styles.secondaryButtonText}>
-                  {broadcastBusy
+              {/* "Follow me" — the flag a guide holds up. Separate from moving the group on: this
+                  says where I am right now, not where everyone should end up. */}
+              <Button
+                label={
+                  broadcastBusy
                     ? 'One moment…'
                     : broadcasting
                       ? 'Stop sharing my position'
-                      : 'Share my live position'}
-                </Text>
-              </TouchableOpacity>
+                      : 'Share my live position'
+                }
+                onPress={handleToggleBroadcast}
+                busy={broadcastBusy}
+                variant={broadcasting ? 'primary' : 'secondary'}
+                style={styles.broadcast}
+              />
               {broadcasting && (
-                <Text style={styles.muted}>
+                <Text style={[text.secondary, styles.planned]}>
                   Your group can see where you are. Sharing stops if you leave this screen.
                 </Text>
               )}
-              {broadcastError && <Text style={styles.muted}>{broadcastError}</Text>}
-            </View>
-          )}
-
-          {isLeader && activity.status === 'published' && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleEnd}>
-              <Text style={styles.secondaryButtonText}>End event</Text>
-            </TouchableOpacity>
-          )}
-          {activity.status === 'completed' && (
-            <Text style={styles.muted}>This event has ended — location sharing is closed.</Text>
-          )}
-
-          {/* Where to go leads, so nobody has to work out which pin is theirs. The rest of the
-              route sits underneath for context — what time we set off, when we'll be back. */}
-          <Text style={styles.sectionTitle}>
-            {currentPoint ? 'Where to go now' : 'Meeting point'}
-          </Text>
-          {currentPoint ? (
-            <View style={styles.currentPoint}>
-              <Text style={styles.currentPointLabel}>{currentPoint.label || 'Meeting point'}</Text>
-              <Text style={styles.muted}>{new Date(currentPoint.time).toLocaleString()}</Text>
-              <View style={styles.pointActions}>
-                <TouchableOpacity onPress={() => Linking.openURL(currentPoint.googleMapsUrl)}>
-                  <Text style={styles.link}>Directions</Text>
-                </TouchableOpacity>
-                {isLeader && (
-                  <TouchableOpacity onPress={() => openEditor('edit')}>
-                    <Text style={styles.link}>Edit</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.muted}>
-              {meetingPoints.length > 0
-                ? "The event hasn't started — the route is below."
-                : 'No meeting point set yet.'}
-            </Text>
-          )}
-
-          {isLeader && mpMode !== null && (
-            <View style={styles.editor}>
-              <Text style={styles.editorTitle}>
-                {mpMode === 'edit'
-                  ? 'Edit meeting point'
-                  : nextPlanned
-                    ? 'Next stop on the plan'
-                    : 'Next meeting point'}
-              </Text>
-              {mpMode === 'next' && (
-                <Text style={styles.muted}>
-                  {nextPlanned
-                    ? 'Change anything that turned out differently, then confirm to move the group.'
-                    : "You're past the last planned stop — add where the group is going now."}
-                </Text>
-              )}
-              <TextInput
-                style={styles.input}
-                placeholder="Label (optional)"
-                value={mpLabel}
-                onChangeText={setMpLabel}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Google Maps URL"
-                autoCapitalize="none"
-                autoCorrect={false}
-                value={mpUrl}
-                onChangeText={setMpUrl}
-              />
-              <View style={styles.pickerRow}>
-                <TouchableOpacity onPress={useCurrentLocation}>
-                  <Text style={styles.tap}>Use my location</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={openGoogleMaps}>
-                  <Text style={styles.tap}>Open Google Maps</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={pasteLink}>
-                  <Text style={styles.tap}>Paste link</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={styles.input} onPress={() => setShowMpPicker(true)}>
-                <Text>{mpTime ? mpTime.toLocaleString() : 'Time (optional — defaults to now)'}</Text>
-              </TouchableOpacity>
-              {showMpPicker && (
-                <DateTimePicker
-                  value={mpTime ?? new Date()}
-                  mode="datetime"
-                  onChange={(_event, selected) => {
-                    setShowMpPicker(Platform.OS === 'ios');
-                    if (selected) setMpTime(selected);
-                  }}
-                />
-              )}
-              <View style={styles.editorActions}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={handleSaveMeetingPoint}
-                  disabled={mpSubmitting}
-                >
-                  <Text style={styles.buttonText}>
-                    {mpSubmitting ? 'Saving…' : mpMode === 'edit' ? 'Save' : "We're here"}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setMpMode(null)}>
-                  <Text style={styles.link}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-              {mpError && <Text style={styles.error}>{mpError}</Text>}
-            </View>
-          )}
-
-          {/* ---- who's here: RSVP and attendance in one list ---- */}
-          {isLeader && currentPoint && (
-            <>
-              <Text style={styles.sectionTitle}>
-                Who&rsquo;s here{'  '}
-                <Text style={styles.muted}>
-                  {presentCount} present · {markedCount}/{rollCall.length} checked
-                </Text>
-              </Text>
-              {earlierPoints.length > 0 && (
-                <Text style={styles.hint}>
-                  Showing whoever made the previous stop. People who declined aren&rsquo;t listed.
-                </Text>
-              )}
-
-              {rollCall.map((entry) => (
-                <View key={entry.user.id} style={styles.personRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.personName}>
-                      {entry.user.name}
-                      {entry.isVisitor ? '  ·  visitor' : ''}
-                    </Text>
-                    <Text style={styles.muted}>
-                      {entry.rsvpStatus === 'approved' ? 'Coming' : 'No reply yet'}
-                      {entry.attendance ? ` · ${entry.attendance}` : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.personActions}>
-                    <TouchableOpacity onPress={() => handleMarkAttendance(entry.user.id, 'present')}>
-                      <Text
-                        style={[styles.tap, entry.attendance === 'present' && styles.tapActive]}
-                      >
-                        Here
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleMarkAttendance(entry.user.id, 'absent')}>
-                      <Text style={[styles.tap, entry.attendance === 'absent' && styles.tapDanger]}>
-                        Missing
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleRequestLocation(entry.user.id)}>
-                      <Text style={styles.tap}>Locate</Text>
-                    </TouchableOpacity>
-                    {/* Answer for them if they replied by phone rather than in the app. */}
-                    {entry.rsvpStatus !== 'approved' && (
-                      <TouchableOpacity
-                        onPress={() => handleRsvpForMember(entry.user.id, 'approved')}
-                      >
-                        <Text style={styles.tap}>Confirm</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity onPress={() => handleRsvpForMember(entry.user.id, 'declined')}>
-                      <Text style={styles.tapMuted}>Won&rsquo;t arrive</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-              {rollCall.length === 0 && (
-                <Text style={styles.muted}>Nobody expected at this meeting point.</Text>
+              {broadcastError && (
+                <Text style={[text.secondary, styles.planned]}>{broadcastError}</Text>
               )}
             </>
           )}
+        </View>
+      )}
 
-          {/* ---- member's own view ---- */}
-          {activity.status !== 'draft' && !isLeader && (
-            <View style={styles.rsvpBox}>
-              <Text style={styles.sectionTitle}>Your RSVP</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Optional note (e.g. running 15 mins late)"
-                value={note}
-                onChangeText={setNote}
-              />
-              <View style={styles.rsvpRow}>
-                <TouchableOpacity
-                  style={[styles.rsvpButton, myStatus === 'approved' && styles.rsvpApproved]}
-                  onPress={() => handleRsvp('approved')}
-                >
-                  <Text style={styles.rsvpButtonText}>Going</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rsvpButton, myStatus === 'declined' && styles.rsvpDeclined]}
-                  onPress={() => handleRsvp('declined')}
-                >
-                  <Text style={styles.rsvpButtonText}>Not going</Text>
-                </TouchableOpacity>
-              </View>
-              {rsvpMessage && <Text style={styles.muted}>{rsvpMessage}</Text>}
+      {activity.status === 'completed' && (
+        <Text style={[text.secondary, styles.planned]}>
+          This event has ended — location sharing is closed.
+        </Text>
+      )}
 
-              {myStatus === 'approved' && (
-                <View style={{ marginTop: 12 }}>
-                  <TouchableOpacity style={styles.button} onPress={handleOnMyWay} disabled={omwSubmitting}>
-                    <Text style={styles.buttonText}>{omwSubmitting ? 'Sharing…' : "I'm On My Way"}</Text>
-                  </TouchableOpacity>
-                  {omwMessage && <Text style={styles.muted}>{omwMessage}</Text>}
+      {/* `onOnMyWay` isn't gated on the event running: a member sets off for the 06:30 meetup
+          well before the leader taps start, and that's exactly when sharing an ETA matters. */}
+      <Section label={currentPoint ? 'Where to go now' : 'Meeting point'}>
+        <CurrentPointCard
+          point={currentPoint}
+          plannedCount={meetingPoints.length}
+          isLeader={!!isLeader}
+          onEdit={() => openEditor('edit')}
+          onOnMyWay={myStatus === 'approved' ? handleOnMyWay : undefined}
+          omwBusy={omwSubmitting}
+          message={omwMessage}
+        />
+      </Section>
 
-                  {/* Only while the event is actually running — asking where the leader is has no
-                      meaning before it starts, and the server closes it once it ends. */}
-                  {activity.status === 'in_progress' && (
-                    <View style={{ marginTop: 12 }}>
-                      {/* A live broadcast answers the question before it's asked, so it replaces
-                          the button rather than sitting next to it. */}
-                      {broadcasting ? (
-                        <View>
-                          <Text style={styles.sectionTitle}>
-                            {liveLeaderLocation?.user?.name ?? 'Your leader'} is sharing their
-                            position
-                          </Text>
-                          {liveLeaderLocation ? (
-                            <>
-                              <Text style={styles.muted}>
-                                Updated {describeAge(liveLeaderLocation.capturedAt)}.
-                              </Text>
-                              <TouchableOpacity
-                                onPress={() =>
-                                  Linking.openURL(mapsLinkFor(liveLeaderLocation.location))
-                                }
-                              >
-                                <Text style={styles.link}>Follow them in Maps</Text>
-                              </TouchableOpacity>
-                            </>
-                          ) : (
-                            <Text style={styles.muted}>Waiting for their first position…</Text>
-                          )}
-                        </View>
-                      ) : (
-                        <>
-                          <TouchableOpacity
-                            style={styles.secondaryButton}
-                            onPress={handleAskLeader}
-                            disabled={askSubmitting}
-                          >
-                            <Text style={styles.secondaryButtonText}>
-                              {askSubmitting ? 'Asking…' : "Where's the leader?"}
-                            </Text>
-                          </TouchableOpacity>
-                          {askMessage && <Text style={styles.muted}>{askMessage}</Text>}
-                          {leaderLocation && (
-                            <TouchableOpacity
-                              onPress={() => Linking.openURL(mapsLinkFor(leaderLocation.location))}
-                            >
-                              <Text style={styles.link}>
-                                Open {leaderLocation.user?.name ?? 'the leader'}'s position in Maps
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                        </>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          )}
+      {isLeader && mpMode !== null && (
+        <MeetingPointEditor
+          mode={mpMode}
+          nextPlanned={nextPlanned}
+          label={mpLabel}
+          onLabelChange={setMpLabel}
+          url={mpUrl}
+          onUrlChange={setMpUrl}
+          time={mpTime}
+          onTimeChange={setMpTime}
+          showPicker={showMpPicker}
+          onShowPicker={setShowMpPicker}
+          onUseCurrentLocation={useCurrentLocation}
+          onOpenMaps={openGoogleMaps}
+          onPasteLink={pasteLink}
+          onSave={handleSaveMeetingPoint}
+          onCancel={() => setMpMode(null)}
+          submitting={mpSubmitting}
+          error={mpError}
+        />
+      )}
 
-          {/* Who else is coming. Names only — attendance is the leader's view. */}
-          {!isLeader && activity.status !== 'draft' && (
-            <View style={styles.rsvpBox}>
-              <Text style={styles.sectionTitle}>
-                Coming{' '}
-                <Text style={styles.muted}>({attendeesQuery.data?.attendees.length ?? 0})</Text>
-              </Text>
-              {attendeesQuery.data?.attendees.map((attendee) => (
-                <Text key={attendee.user.id} style={styles.attendeeName}>
-                  {attendee.user.name}
-                  {attendee.isVisitor ? '  ·  visitor' : ''}
-                </Text>
+      {isLeader && currentPoint && (
+        <RollCallList
+          entries={rollCall}
+          narrowed={earlierPoints.length > 0}
+          onMark={handleMarkAttendance}
+          onLocate={handleRequestLocation}
+          onRsvpFor={handleRsvpForMember}
+        />
+      )}
+
+      {!isLeader && activity.status !== 'draft' && (
+        <MemberPanel
+          status={myStatus}
+          note={note}
+          onNoteChange={setNote}
+          onRsvp={handleRsvp}
+          message={rsvpMessage}
+          running={running}
+          broadcasting={broadcasting}
+          liveLeaderLocation={liveLeaderLocation}
+          askedLeaderLocation={leaderLocation}
+          onAskLeader={handleAskLeader}
+          askBusy={askSubmitting}
+          askMessage={askMessage}
+          describeAge={describeAge}
+          mapsLinkFor={mapsLinkFor}
+        />
+      )}
+
+      {/* Who else is coming. Names only — attendance is the leader's view. */}
+      {!isLeader && activity.status !== 'draft' && (
+        <Section label={`Coming · ${attendees.length}`}>
+          {attendees.length > 0 ? (
+            <View style={styles.attendees}>
+              {attendees.map((attendee) => (
+                <Pill
+                  key={attendee.user.id}
+                  tone={attendee.isVisitor ? 'accent' : 'neutral'}
+                  label={attendee.isVisitor ? `${attendee.user.name} · visitor` : attendee.user.name}
+                />
               ))}
-              {(attendeesQuery.data?.attendees.length ?? 0) === 0 && (
-                <Text style={styles.muted}>Nobody has confirmed yet.</Text>
-              )}
             </View>
+          ) : (
+            <Card>
+              <Text style={text.secondary}>Nobody has confirmed yet.</Text>
+            </Card>
           )}
-        </>
+        </Section>
       )}
 
       {/* Inviting someone is planning, and planning is over once the group is out walking — by
           then the leader is marking a roll call, not signing people up. Also hidden when
           attendance isn't approved: on a trip day the roster is the manifest, not a list you
           top up, and the Web hides it on the same rule. */}
-      {isLeader &&
-        activity?.requiresRsvp &&
-        activity.status !== 'in_progress' &&
-        activity.status !== 'completed' && (
-        <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>Add a visitor</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="First name"
-            value={visitorFirstName}
-            onChangeText={setVisitorFirstName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Last name"
-            value={visitorLastName}
-            onChangeText={setVisitorLastName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Phone (optional)"
-            keyboardType="phone-pad"
-            value={visitorPhone}
-            onChangeText={setVisitorPhone}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="visitor@example.com"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            value={visitorEmail}
-            onChangeText={setVisitorEmail}
-          />
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleInviteVisitor}
-            disabled={visitorSubmitting}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {visitorSubmitting ? 'Sending…' : 'Invite visitor'}
-            </Text>
-          </TouchableOpacity>
-          {visitorMessage && <Text style={styles.muted}>{visitorMessage}</Text>}
-        </View>
+      {isLeader && activity.requiresRsvp && !running && activity.status !== 'completed' && (
+        <VisitorInvite
+          firstName={visitorFirstName}
+          onFirstNameChange={setVisitorFirstName}
+          lastName={visitorLastName}
+          onLastNameChange={setVisitorLastName}
+          phone={visitorPhone}
+          onPhoneChange={setVisitorPhone}
+          email={visitorEmail}
+          onEmailChange={setVisitorEmail}
+          onInvite={handleInviteVisitor}
+          submitting={visitorSubmitting}
+          message={visitorMessage}
+        />
       )}
 
-      {/* The whole route, for anyone on the activity. Three states so a glance answers "where am
-          I going" without reading: stops already behind us fade back, the current one is picked
-          out, and what's still ahead reads as plan. */}
-      {meetingPoints.length > 1 && (
-        <View style={styles.rsvpBox}>
-          <Text style={styles.sectionTitle}>The route</Text>
-          {meetingPoints.map((mp, index) => {
-            const isCurrent = mp.id === currentPoint?.id;
-            const visited = mp.arrivedAt !== null && !isCurrent;
-            return (
-              <TouchableOpacity
-                key={mp.id}
-                style={[styles.routeRow, isCurrent && styles.routeRowCurrent]}
-                onPress={() => Linking.openURL(mp.googleMapsUrl)}
-              >
-                <View style={[styles.routeIndex, isCurrent && styles.routeIndexCurrent]}>
-                  <Text style={[styles.routeIndexText, isCurrent && styles.routeIndexTextCurrent]}>
-                    {index + 1}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[visited && styles.routeTextVisited, isCurrent && styles.routeTextCurrent]}>
-                    {mp.label || 'Meeting point'}
-                  </Text>
-                  <Text style={[styles.muted, visited && styles.routeTextVisited]}>
-                    {new Date(mp.time).toLocaleString()}
-                    {isCurrent ? '  ·  you are heading here' : visited ? '  ·  done' : ''}
-                  </Text>
-                </View>
-                <Text style={styles.link}>Directions</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </ScrollView>
+      <RouteList points={meetingPoints} currentPointId={activity.currentMeetingPointId} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  title: { fontSize: 22, fontWeight: '600' },
-  desc: { marginTop: 8 },
-  muted: { color: '#888', marginTop: 4 },
-  hint: { color: '#888', fontSize: 12, marginBottom: 8 },
-  error: { color: 'crimson', marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '600', marginTop: 24, marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, marginBottom: 8 },
-  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
-  buttonText: { color: 'white', fontWeight: '600' },
-  secondaryButton: { borderWidth: 1, borderColor: '#2563eb', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
-  secondaryButtonText: { color: '#2563eb', fontWeight: '600' },
-  link: { color: '#2563eb', fontWeight: '600' },
-  currentPoint: { borderWidth: 2, borderColor: '#2563eb', backgroundColor: '#eff6ff', borderRadius: 10, padding: 14 },
-  currentPointLabel: { fontSize: 16, fontWeight: '600' },
-  pointActions: { flexDirection: 'row', gap: 20, marginTop: 10 },
-  routeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  routeRowCurrent: { backgroundColor: '#eff6ff', borderRadius: 8, paddingHorizontal: 8 },
-  routeIndex: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  routeIndexCurrent: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  routeIndexText: { fontSize: 12, color: '#6b7280' },
-  routeIndexTextCurrent: { color: 'white', fontWeight: '600' },
-  routeTextCurrent: { fontWeight: '600' },
-  routeTextVisited: { color: '#9ca3af' },
-  eventControls: { flexDirection: 'row', gap: 8 },
-  eventControlButton: { flex: 1 },
-  editor: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 12, marginTop: 12 },
-  editorTitle: { fontWeight: '600', marginBottom: 8 },
-  editorActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 12 },
-  personRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  personName: { fontWeight: '600' },
-  attendeeName: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  personActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 },
-  tap: { color: '#2563eb', fontWeight: '600' },
-  tapActive: { color: '#16a34a' },
-  tapDanger: { color: '#dc2626' },
-  tapMuted: { color: '#94a3b8' },
-  rsvpBox: { marginTop: 20 },
-  rsvpRow: { flexDirection: 'row', gap: 8 },
-  rsvpButton: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12, alignItems: 'center' },
-  rsvpApproved: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
-  rsvpDeclined: { backgroundColor: '#dc2626', borderColor: '#dc2626' },
-  rsvpButtonText: { fontWeight: '600' },
-  dashboardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  status: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.md },
+  chat: { marginLeft: 'auto', paddingVertical: space.sm },
+  desc: { marginBottom: space.md },
+  controls: { marginTop: space.sm },
+  planned: { marginTop: space.sm },
+  broadcast: { marginTop: space.md },
+  attendees: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

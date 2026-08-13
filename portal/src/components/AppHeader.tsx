@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { useAuthStore } from '../store/authStore.js';
 import { AppLogo } from './AppLogo.js';
@@ -6,6 +6,7 @@ import { AppLogo } from './AppLogo.js';
 export function AppHeader() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const { pathname } = useLocation();
 
   async function handleLogout() {
     await authApi.logout();
@@ -13,32 +14,60 @@ export function AppHeader() {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
-        <Link to="/" className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+    <header className="border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
+        <Link to="/" className="flex items-center gap-2 font-semibold text-ink">
           <AppLogo size={28} />
           MeetingPnt
         </Link>
-        <nav className="flex items-center gap-5">
-          {user?.role === 'admin' && (
-            <Link to="/admin/users" className="text-sm text-slate-600 hover:text-slate-900">
-              Users
-            </Link>
-          )}
+
+        <nav className="flex items-center gap-1">
           {(user?.role === 'leader' || user?.role === 'admin') && (
-            <Link to="/groups" className="text-sm text-slate-600 hover:text-slate-900">
+            <NavLink to="/groups" active={pathname.startsWith('/groups')}>
               Groups
-            </Link>
+            </NavLink>
           )}
-          <span className="text-sm text-slate-500">{user?.name}</span>
+          {user?.role === 'admin' && (
+            <NavLink to="/admin/users" active={pathname.startsWith('/admin')}>
+              Users
+            </NavLink>
+          )}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-4">
+          <span className="text-sm text-ink-secondary">{user?.name}</span>
           <button
             onClick={handleLogout}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
+            className="text-sm font-medium text-ink-secondary hover:text-ink"
           >
             Log out
           </button>
-        </nav>
+        </div>
       </div>
     </header>
+  );
+}
+
+/** Which section you're in should be visible without reading the URL. */
+function NavLink({
+  to,
+  active,
+  children,
+}: {
+  to: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? 'bg-accent-surface text-accent-text'
+          : 'text-ink-secondary hover:bg-surface-sunken hover:text-ink'
+      }`}
+    >
+      {children}
+    </Link>
   );
 }

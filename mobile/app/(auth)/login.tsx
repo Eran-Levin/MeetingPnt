@@ -1,9 +1,11 @@
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { authApi } from '../../src/api/authApi';
 import { ApiError } from '../../src/api/client';
+import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { establishSession } from '../../src/services/session';
+import { Button, TextField, color, space, text } from '../../src/ui';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,42 +29,43 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>MeetingPnt</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
+    <AuthLayout
+      title="MeetingPnt"
+      subtitle="Sign in to see what's happening today."
+      error={error}
+      footer={
+        <Link href="/(auth)/register" style={[text.body, { color: color.accentText }]}>
+          Don&rsquo;t have an account? Register
+        </Link>
+      }
+    >
+      <TextField
+        label="Email"
+        placeholder="you@example.com"
         autoCapitalize="none"
+        autoCorrect={false}
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
+      <TextField
+        label="Password"
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         value={password}
         onChangeText={setPassword}
       />
-      {error && <Text style={styles.error}>{error}</Text>}
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={submitting}>
-        <Text style={styles.buttonText}>{submitting ? 'Signing in…' : 'Sign in'}</Text>
-      </TouchableOpacity>
-      <Link href="/(auth)/register" style={styles.link}>
-        Don&rsquo;t have an account? Register
-      </Link>
-    </View>
+      <Button
+        label={submitting ? 'Signing in…' : 'Sign in'}
+        onPress={handleSubmit}
+        busy={submitting}
+        style={styles.submit}
+      />
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 28, fontWeight: '600', marginBottom: 16, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
-  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: 'white', fontWeight: '600' },
-  error: { color: 'crimson' },
-  link: { textAlign: 'center', marginTop: 12, color: '#2563eb' },
+  submit: { marginTop: space.sm },
 });

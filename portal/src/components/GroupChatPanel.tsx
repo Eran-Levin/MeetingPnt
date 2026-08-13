@@ -71,8 +71,8 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
 
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-semibold text-slate-900">Chat</h2>
-      <p className="mt-1 text-sm text-slate-500">
+      <h2 className="text-lg font-semibold text-ink">Chat</h2>
+      <p className="mt-1 text-sm text-ink-secondary">
         {chatMode === 'announcements'
           ? 'Announcements only — members can read but not reply.'
           : 'Two-way chat — anyone in the group can post.'}
@@ -82,9 +82,9 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
         <div ref={listRef} className="flex max-h-96 flex-col gap-3 overflow-y-auto p-4">
           {messages.map((message) => (
             <div key={message.id} className={message.authorId === currentUser?.id ? 'self-end text-right' : ''}>
-              <p className="text-xs text-slate-400">{message.author.name}</p>
+              <p className="text-xs text-ink-muted">{message.author.name}</p>
               {message.body && (
-                <p className="mt-0.5 inline-block rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-800">
+                <p className="mt-0.5 inline-block rounded-lg bg-surface-raised px-3 py-2 text-sm text-ink">
                   {message.body}
                 </p>
               )}
@@ -92,40 +92,40 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
                 <img
                   src={message.imageUrl}
                   alt="Shared"
-                  className="mt-1 max-h-64 rounded-lg border border-slate-200"
+                  className="mt-1 max-h-64 rounded-lg border border-line"
                 />
               )}
             </div>
           ))}
           {messages.length === 0 && (
-            <p className="py-6 text-center text-sm text-slate-400">No messages yet.</p>
+            <p className="py-6 text-center text-sm text-ink-muted">No messages yet.</p>
           )}
         </div>
 
         {canPost ? (
-          <form onSubmit={handleSend} className="flex flex-wrap items-center gap-2 border-t border-slate-100 p-3">
+          <form onSubmit={handleSend} className="flex flex-wrap items-center gap-2 border-t border-line p-3">
             <input
               placeholder="Write a message…"
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              className="min-w-[160px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="min-w-[160px] flex-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setImage(e.target.files?.[0] ?? null)}
-              className="text-xs text-slate-500"
+              className="text-xs text-ink-secondary"
             />
             <Button type="submit" size="sm" disabled={sending}>
               {sending ? 'Sending…' : 'Send'}
             </Button>
           </form>
         ) : (
-          <p className="border-t border-slate-100 p-3 text-center text-sm text-slate-400">
+          <p className="border-t border-line p-3 text-center text-sm text-ink-muted">
             Only the leader can post in this group.
           </p>
         )}
-        {error && <p className="px-3 pb-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="px-3 pb-3 text-sm text-tone-danger-fg">{error}</p>}
       </Card>
     </section>
   );

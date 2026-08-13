@@ -1,9 +1,11 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { authApi } from '../../src/api/authApi';
 import { ApiError } from '../../src/api/client';
+import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { establishSession } from '../../src/services/session';
+import { Button, TextField, color, space, text } from '../../src/ui';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -51,61 +53,52 @@ export default function RegisterScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create account</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="First name"
-        value={firstName}
-        onChangeText={setFirstName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Last name"
-        value={lastName}
-        onChangeText={setLastName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone (optional)"
+    <AuthLayout
+      title="Create account"
+      subtitle={invitationToken ? 'Confirm your details and pick a password.' : undefined}
+      error={error}
+      footer={
+        <Link href="/(auth)/login" style={[text.body, { color: color.accentText }]}>
+          Already have an account? Sign in
+        </Link>
+      }
+    >
+      <TextField label="First name" value={firstName} onChangeText={setFirstName} />
+      <TextField label="Last name" value={lastName} onChangeText={setLastName} />
+      <TextField
+        label="Phone (optional)"
         keyboardType="phone-pad"
         value={phone}
         onChangeText={setPhone}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
+      <TextField
+        label="Email"
+        placeholder="you@example.com"
         autoCapitalize="none"
+        autoCorrect={false}
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password (min 8 characters)"
+      <TextField
+        label="Password"
+        placeholder="At least 8 characters"
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         value={password}
         onChangeText={setPassword}
       />
-      {error && <Text style={styles.error}>{error}</Text>}
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={submitting}>
-        <Text style={styles.buttonText}>{submitting ? 'Creating account…' : 'Register'}</Text>
-      </TouchableOpacity>
-      <Link href="/(auth)/login" style={styles.link}>
-        Already have an account? Sign in
-      </Link>
-    </View>
+      <Button
+        label={submitting ? 'Creating account…' : 'Register'}
+        onPress={handleSubmit}
+        busy={submitting}
+        style={styles.submit}
+      />
+    </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 24, fontWeight: '600', marginBottom: 16, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 12 },
-  button: { backgroundColor: '#2563eb', padding: 14, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: 'white', fontWeight: '600' },
-  error: { color: 'crimson' },
-  link: { textAlign: 'center', marginTop: 12, color: '#2563eb' },
+  submit: { marginTop: space.sm },
 });

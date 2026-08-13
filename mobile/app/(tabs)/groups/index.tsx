@@ -1,20 +1,25 @@
-import type { GroupWithRole } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { groupsApi } from '../../../src/api/groupsApi';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { authApi } from '../../../src/api/authApi';
+import { groupsApi } from '../../../src/api/groupsApi';
 import { secureStore } from '../../../src/services/secureStore';
 import { endSession } from '../../../src/services/session';
 import { useAuthStore } from '../../../src/store/authStore';
+import {
+  Badge,
+  Button,
+  Card,
+  Empty,
+  Row,
+  Screen,
+  Section,
+  TextField,
+  color,
+  space,
+  text,
+} from '../../../src/ui';
 
 export default function GroupsScreen() {
   const router = useRouter();
@@ -22,13 +27,20 @@ export default function GroupsScreen() {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [composing, setComposing] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ['groups'],
     queryFn: () => groupsApi.list(),
   });
 
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
+
+  // "Closed" is a finished group — for a guide, the end of the trip. Planned and in-progress are
+  // both still live concerns, so they sit together.
+  const groups = data?.groups ?? [];
+  const active = groups.filter((g) => g.status !== 'completed');
+  const closed = groups.filter((g) => g.status === 'completed');
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -36,6 +48,7 @@ export default function GroupsScreen() {
     try {
       await groupsApi.create({ name });
       setName('');
+      setComposing(false);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     } finally {
       setCreating(false);
@@ -49,63 +62,101 @@ export default function GroupsScreen() {
     if (refreshToken) authApi.logout(refreshToken).catch(() => undefined);
   }
 
-  function renderItem({ item }: { item: GroupWithRole }) {
-    return (
-      <Link href={`/(tabs)/groups/${item.id}`} asChild>
-        <TouchableOpacity style={styles.card}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          {item.description && <Text style={styles.cardDesc}>{item.description}</Text>}
-        </TouchableOpacity>
-      </Link>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Groups</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logout}>Log out</Text>
-        </TouchableOpacity>
-      </View>
+    <Screen
+      title="Groups"
+      onRefresh={() => queryClient.invalidateQueries({ queryKey: ['groups'] })}
+      refreshing={isFetching}
+      bottomInset={80}
+      headerRight={
+        <Pressable onPress={handleLogout} style={styles.logout}>
+          <Text style={[text.secondary, { color: color.accentText }]}>Log out</Text>
+        </Pressable>
+      }
+    >
+      {isLeaderOrAdmin &&
+        (composing ? (
+          <Card>
+            <TextField
+              label="Group name"
+              placeholder="Tuesday Flow"
+              value={name}
+              onChangeText={setName}
+              autoFocus
+            />
+            <View style={styles.createActions}>
+              <Button
+                label={creating ? 'Creating…' : 'Create group'}
+                onPress={handleCreate}
+                busy={creating}
+                grow
+              />
+              <Button
+                label="Cancel"
+                onPress={() => setComposing(false)}
+                variant="secondary"
+                grow
+              />
+            </View>
+          </Card>
+        ) : (
+          <Button label="New group" onPress={() => setComposing(true)} variant="secondary" />
+        ))}
 
-      {isLeaderOrAdmin && (
-        <View style={styles.createRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="New group name"
-            value={name}
-            onChangeText={setName}
-          />
-          <TouchableOpacity style={styles.createButton} onPress={handleCreate} disabled={creating}>
-            <Text style={styles.createButtonText}>{creating ? '…' : 'Create'}</Text>
-          </TouchableOpacity>
-        </View>
+      {active.length > 0 && (
+        <Section label={`Active · ${active.length}`}>
+          {active.map((group, index) => (
+            <Row
+              key={group.id}
+              title={group.name}
+              subtitle={
+                group.nextActivityAt
+                  ? `Next: ${new Date(group.nextActivityAt).toLocaleString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}`
+                  : 'Nothing scheduled'
+              }
+              trailing={<Badge status={group.status} />}
+              onPress={() => router.push(`/(tabs)/groups/${group.id}`)}
+              last={index === active.length - 1}
+            />
+          ))}
+        </Section>
       )}
 
-      {isLoading && <Text style={styles.muted}>Loading…</Text>}
-      <FlatList
-        data={data?.groups ?? []}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={!isLoading ? <Text style={styles.muted}>No groups yet.</Text> : null}
-        contentContainerStyle={{ gap: 8 }}
-      />
-    </View>
+      {closed.length > 0 && (
+        <Section label={`Closed · ${closed.length}`}>
+          {closed.map((group, index) => (
+            <Row
+              key={group.id}
+              title={group.name}
+              subtitle={group.description ?? undefined}
+              onPress={() => router.push(`/(tabs)/groups/${group.id}`)}
+              done
+              last={index === closed.length - 1}
+            />
+          ))}
+        </Section>
+      )}
+
+      {!isLoading && groups.length === 0 && (
+        <Empty
+          headline={isLeaderOrAdmin ? 'Start your first group' : 'No groups yet'}
+          body={
+            isLeaderOrAdmin
+              ? 'A group holds a roster and the events that run inside it.'
+              : "You'll see a group here once a leader adds you."
+          }
+        />
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '600' },
-  logout: { color: '#2563eb' },
-  createRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10 },
-  createButton: { backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
-  createButtonText: { color: 'white', fontWeight: '600' },
-  card: { borderWidth: 1, borderColor: '#eee', borderRadius: 8, padding: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '600' },
-  cardDesc: { color: '#666', marginTop: 2 },
-  muted: { color: '#888', textAlign: 'center', marginTop: 24 },
+  logout: { paddingVertical: space.sm, paddingLeft: space.sm },
+  createActions: { flexDirection: 'row', gap: space.sm },
 });

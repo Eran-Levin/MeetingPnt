@@ -4,15 +4,17 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { ApiError } from '../../api/client.js';
-import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { groupsApi } from '../../api/groupsApi.js';
+import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { ActivityEditor } from '../../components/ActivityEditor.js';
 import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
+import { AttendancePanel } from '../../components/AttendancePanel.js';
 import { MeetingPointsPanel } from '../../components/MeetingPointsPanel.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
+import { Skeleton } from '../../components/ui/Skeleton.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function ActivityDetailPage() {
@@ -87,164 +89,144 @@ export function ActivityDetailPage() {
   }
 
   const activity = activityQuery.data?.activity;
+  /**
+   * A trip day takes no replies, so the right-hand column has nothing in it — and an itinerary
+   * pinned to three fifths of the page with empty space beside it looks like something failed to
+   * load. One column when there's one thing.
+   */
+  const showAttendance = isLeader && activity?.requiresRsvp;
+
+  if (!activity) {
+    return (
+      <PageContainer wide>
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="mt-4 h-8 w-2/5" />
+        <Skeleton className="mt-3 h-4 w-1/3" />
+      </PageContainer>
+    );
+  }
 
   return (
-    <PageContainer className="max-w-4xl">
+    <PageContainer wide>
       {groupId && (
-        <Link to={`/groups/${groupId}`} className="text-sm text-blue-600 hover:underline">
+        <Link to={`/groups/${groupId}`} className="text-sm text-accent-text hover:underline">
           &larr; Back to group
         </Link>
       )}
-      <h1 className="mt-2 text-2xl font-semibold text-slate-900">{activity?.title ?? '…'}</h1>
 
-      {activity && (
-        <Card className="mt-4">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+      {/* Everything about the event itself, and every action that changes its state, in one band
+          at the top — the leader shouldn't have to hunt for "publish" among the planning tools. */}
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold text-ink">{activity.title}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
             <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}</span>
-            {isLeader && activity.status !== 'completed' && !editingSchedule && (
-              <button
-                onClick={() => setEditingSchedule(true)}
-                className="text-sm font-medium text-blue-600 hover:underline"
-              >
-                Edit event
-              </button>
-            )}
             <span>&middot;</span>
             <span className="capitalize">{activity.transportMode}</span>
             <Badge status={activity.status} />
             {!activity.requiresRsvp && (
-              <span className="inline-block whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+              <span className="inline-block whitespace-nowrap rounded-full bg-tone-warning-bg px-2.5 py-0.5 text-xs font-medium text-tone-warning-fg">
                 attendance not approved
               </span>
             )}
           </div>
-          {editingSchedule && (
-            <ActivityEditor activity={activity} onDone={() => setEditingSchedule(false)} />
-          )}
+        </div>
 
-          {activity.description && <p className="mt-3 text-sm text-slate-700">{activity.description}</p>}
-          <a
-            href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}
-            className="mt-3 inline-block text-sm text-blue-600 hover:underline"
-          >
-            Download .ics
-          </a>
+        {isLeader && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {activity.status !== 'completed' && !editingSchedule && (
+              <Button variant="secondary" size="sm" onClick={() => setEditingSchedule(true)}>
+                Edit event
+              </Button>
+            )}
+            {activity.status === 'draft' && (
+              <Button size="sm" onClick={handlePublish}>
+                Publish &amp; notify members
+              </Button>
+            )}
+            {activity.status === 'published' && (
+              <Button size="sm" onClick={handleStart}>
+                Start event
+              </Button>
+            )}
+            {(activity.status === 'published' || activity.status === 'in_progress') && (
+              <Button variant="secondary" size="sm" onClick={handleEnd}>
+                End event
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
-          {isLeader && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {activity.status === 'draft' && (
-                <Button onClick={handlePublish}>Publish &amp; notify members</Button>
-              )}
-              {activity.status === 'published' && (
-                <Button onClick={handleStart}>Start event</Button>
-              )}
-              {(activity.status === 'published' || activity.status === 'in_progress') && (
-                <Button variant="secondary" onClick={handleEnd}>
-                  End event
-                </Button>
-              )}
-              {activity.status === 'completed' && (
-                <p className="text-sm text-slate-500">
-                  This event has ended — location sharing is closed.
-                </p>
-              )}
-            </div>
-          )}
-          {lifecycleError && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {lifecycleError}
-            </p>
-          )}
+      {activity.status === 'completed' && (
+        <p className="mt-3 text-sm text-ink-secondary">
+          This event has ended — location sharing is closed.
+        </p>
+      )}
+      {lifecycleError && (
+        <p className="mt-3 rounded-md bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">
+          {lifecycleError}
+        </p>
+      )}
+
+      {editingSchedule && (
+        <Card className="mt-4">
+          <ActivityEditor activity={activity} onDone={() => setEditingSchedule(false)} />
         </Card>
       )}
 
-      {/* Nothing to chase when attendance isn't approved: everyone is already counted as coming,
-          so the dashboard would be a wall of identical rows. Inviting a visitor goes with it —
-          on a trip day the roster is the manifest, not something you top up. Marking someone as
-          not coming still works from the roll call on the leader's phone. */}
-      {isLeader && activity?.requiresRsvp && (
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-900">RSVP dashboard</h2>
-          {rsvpError && (
-            <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{rsvpError}</p>
-          )}
-          {activity?.status === 'draft' ? (
-            <p className="mt-2 text-sm text-slate-400">
-              Publish this activity to start collecting RSVPs.
-            </p>
-          ) : (
-            <Card className="mt-3 overflow-hidden p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-3">Member</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Note</th>
-                    <th className="px-4 py-3">Reply for them</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rsvpsQuery.data?.rsvps.map((rsvp) => (
-                    <tr key={rsvp.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3 text-slate-900">
-                        {rsvp.user.name} <span className="text-slate-400">({rsvp.user.email})</span>
-                        {rsvp.isVisitor && (
-                          <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-                            Visitor
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge status={rsvp.status} />
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">{rsvp.note ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {/* Members often reply by phone days ahead — the leader records it here. */}
-                        <div className="flex gap-1.5">
-                          <Button
-                            size="sm"
-                            variant={rsvp.status === 'approved' ? 'primary' : 'secondary'}
-                            disabled={savingRsvpFor === rsvp.userId || rsvp.status === 'approved'}
-                            onClick={() => handleSetRsvp(rsvp.userId, 'approved')}
-                          >
-                            Confirm
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={rsvp.status === 'declined' ? 'primary' : 'secondary'}
-                            disabled={savingRsvpFor === rsvp.userId || rsvp.status === 'declined'}
-                            onClick={() => handleSetRsvp(rsvp.userId, 'declined')}
-                          >
-                            Won&apos;t arrive
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {rsvpsQuery.data?.rsvps.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
-                        No RSVPs yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </Card>
-          )}
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
+        <p className="max-w-2xl text-sm text-ink">{activity.description}</p>
+        <a
+          href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}
+          className="text-sm text-accent-text hover:underline"
+        >
+          Download .ics
+        </a>
+      </div>
 
-          {/* Visitors show up in the table above once invited; this is just how you add them. */}
-          {activity?.status !== 'draft' && <ActivityVisitorsPanel activityId={activityId} />}
-        </section>
-      )}
+      {/* The route is the thing being built here, so it leads and takes the wider column; walking
+          it and the roll call happen on the leader's phone. Replies sit alongside rather than
+          below, because deciding the route and watching who's coming are the same sitting. */}
+      <div
+        className={`mt-8 grid items-start gap-8 ${
+          showAttendance ? 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''
+        }`}
+      >
+        {isLeader && (
+          <MeetingPointsPanel
+            activityId={activityId}
+            currentMeetingPointId={activity.currentMeetingPointId}
+          />
+        )}
 
-      {/* The route is planned here; walking it and the roll call happen on the leader's phone. */}
-      {isLeader && activity && (
-        <MeetingPointsPanel
-          activityId={activityId}
-          currentMeetingPointId={activity.currentMeetingPointId}
-        />
-      )}
+        {/* Nothing to chase when attendance isn't approved: everyone is already counted as coming,
+            so the dashboard would be a wall of identical rows. Inviting a visitor goes with it —
+            on a trip day the roster is the manifest, not something you top up. Marking someone as
+            not coming still works from the roll call on the leader's phone. */}
+        {showAttendance && (
+          <section>
+            <h2 className="text-lg font-semibold text-ink">Who&rsquo;s coming</h2>
+            {activity.status === 'draft' ? (
+              <p className="mt-2 text-sm text-ink-muted">
+                Publish this event to start collecting replies.
+              </p>
+            ) : (
+              <>
+                <AttendancePanel
+                  rsvps={rsvpsQuery.data?.rsvps ?? []}
+                  loading={rsvpsQuery.isLoading}
+                  savingFor={savingRsvpFor}
+                  error={rsvpError}
+                  onSet={handleSetRsvp}
+                />
+                {/* Visitors show up in the list above once invited; this is how you add them. */}
+                <ActivityVisitorsPanel activityId={activityId} />
+              </>
+            )}
+          </section>
+        )}
+      </div>
     </PageContainer>
   );
 }

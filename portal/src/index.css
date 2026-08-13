@@ -1,10 +1,56 @@
 @import "tailwindcss";
 
+/**
+ * These mirror `shared/src/theme/index.ts`, which is where colour is actually decided — CSS can't
+ * import the TypeScript tokens, so the hexes are repeated here and nowhere else in the portal.
+ * Change one, change both. Everything downstream uses the semantic names (`text-muted`,
+ * `bg-accent`) rather than raw slate/blue, so a palette change is a two-file edit.
+ */
 @theme {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --color-ink: #0f172a;
+  --color-ink-secondary: #64748b;
+  --color-ink-muted: #94a3b8;
+
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f8fafc;
+  --color-surface-raised: #f1f5f9;
+
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+
+  --color-accent: #2563eb;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-text: #1d4ed8;
+  --color-accent-surface: #eff6ff;
+
+  --color-tone-neutral-bg: #f1f5f9;
+  --color-tone-neutral-fg: #475569;
+  --color-tone-accent-bg: #eff6ff;
+  --color-tone-accent-fg: #1d4ed8;
+  --color-tone-success-bg: #dcfce7;
+  --color-tone-success-fg: #15803d;
+  --color-tone-warning-bg: #fef3c7;
+  --color-tone-warning-fg: #b45309;
+  --color-tone-danger-bg: #fee2e2;
+  --color-tone-danger-fg: #b91c1c;
+  --color-tone-info-bg: #f3e8ff;
+  --color-tone-info-fg: #7e22ce;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-surface-sunken text-ink antialiased;
+}
+
+/* The one animation in the app: a placeholder that reads as "loading" without a spinner. */
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
