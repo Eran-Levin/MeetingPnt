@@ -40,7 +40,9 @@ export function ActivityCreatePage() {
   const [submitting, setSubmitting] = useState(false);
 
   function toggleDay(day: number) {
-    setDaysOfWeek((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()));
+    setDaysOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
+    );
   }
 
   function updateMeetingPoint(index: number, patch: Partial<MeetingPointTemplateDto>) {
@@ -58,13 +60,13 @@ export function ActivityCreatePage() {
 
     // All-day activities cover whole days; timed ones share a date and differ only by clock time.
     const start = allDay ? new Date(`${date}T00:00:00`) : new Date(`${date}T${startTime}`);
-    const end = allDay
-      ? new Date(`${endDate || date}T23:59:59`)
-      : new Date(`${date}T${endTime}`);
+    const end = allDay ? new Date(`${endDate || date}T23:59:59`) : new Date(`${date}T${endTime}`);
 
     if (end <= start) {
       setError(
-        allDay ? 'The end date must not be before the start date.' : 'The end time must be after the start time.',
+        allDay
+          ? 'The end date must not be before the start date.'
+          : 'The end time must be after the start time.',
       );
       return;
     }
@@ -106,29 +108,49 @@ export function ActivityCreatePage() {
 
   return (
     <PageContainer>
-      <Link to={`/groups/${groupId}`} className="text-sm text-blue-600 hover:underline">
+      <Link to={`/groups/${groupId}`} className="text-sm text-accent-text hover:underline">
         &larr; Back to group
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-slate-900">New activity</h1>
+      <h1 className="mt-2 text-2xl font-semibold text-ink">New event</h1>
+      <p className="mt-1 text-sm text-ink-secondary">
+        Created as a draft — members see nothing until you publish it.
+      </p>
 
-      <Card className="mt-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <TextField label="Title" required value={title} onChange={(e) => setTitle(e.target.value)} />
+      <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
+        <FormSection title="What">
+          <TextField
+            label="Title"
+            required
+            placeholder="Sunrise walk — Old Town"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
           <TextArea
             label="Description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
           />
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={allDay}
-              onChange={(e) => setAllDay(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            Spans whole days (multi-day trip)
-          </label>
+          <Select
+            label="Mode of transport"
+            value={transportMode}
+            onChange={(e) => setTransportMode(e.target.value as TransportMode)}
+          >
+            {TRANSPORT_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {mode}
+              </option>
+            ))}
+          </Select>
+        </FormSection>
+
+        <FormSection title="When">
+          <CheckboxRow
+            label="Spans whole days"
+            hint="A multi-day trip. Each day of it is its own event."
+            checked={allDay}
+            onChange={setAllDay}
+          />
 
           {allDay ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -172,48 +194,34 @@ export function ActivityCreatePage() {
               />
             </div>
           )}
-          <Select
-            label="Mode of transport"
-            value={transportMode}
-            onChange={(e) => setTransportMode(e.target.value as TransportMode)}
-          >
-            {TRANSPORT_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {mode}
-              </option>
-            ))}
-          </Select>
+        </FormSection>
 
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={requiresRsvp}
-              onChange={(e) => setRequiresRsvp(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            Approve attendance
-          </label>
+        <FormSection title="Attendance">
           {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
               morning — but they can still decline the one day they're sitting out. */}
-          <p className="-mt-2 text-xs text-slate-500">
-            {requiresRsvp
-              ? 'Members are asked to confirm they’re coming.'
-              : 'Members count as coming as soon as this is published — they can still decline.'}
-          </p>
+          <CheckboxRow
+            label="Approve attendance"
+            hint={
+              requiresRsvp
+                ? 'Members are asked to confirm they’re coming.'
+                : 'Members count as coming as soon as this is published — they can still decline.'
+            }
+            checked={requiresRsvp}
+            onChange={setRequiresRsvp}
+          />
+        </FormSection>
 
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input
-              type="checkbox"
-              checked={repeats}
-              onChange={(e) => setRepeats(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            />
-            Repeat weekly
-          </label>
+        <FormSection title="Repeat">
+          <CheckboxRow
+            label="Repeat weekly"
+            hint="Creates one draft per occurrence, which you can publish together."
+            checked={repeats}
+            onChange={setRepeats}
+          />
 
           {repeats && (
-            <div className="flex flex-col gap-3 rounded-lg bg-slate-50 p-4">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+            <div className="flex flex-col gap-4 rounded-lg bg-surface-sunken p-4">
+              <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
                 Every
                 <input
                   type="number"
@@ -221,7 +229,7 @@ export function ActivityCreatePage() {
                   max={12}
                   value={intervalWeeks}
                   onChange={(e) => setIntervalWeeks(e.target.value)}
-                  className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  className="w-16 rounded-lg border border-line-strong bg-surface px-2 py-1 text-sm"
                 />
                 week(s), on:
               </label>
@@ -230,11 +238,12 @@ export function ActivityCreatePage() {
                   <button
                     type="button"
                     key={day}
+                    aria-pressed={daysOfWeek.includes(day)}
                     onClick={() => toggleDay(day)}
-                    className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                       daysOfWeek.includes(day)
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                        ? 'border-accent bg-accent text-white'
+                        : 'border-line-strong bg-surface text-ink hover:bg-surface-raised'
                     }`}
                   >
                     {label}
@@ -242,12 +251,12 @@ export function ActivityCreatePage() {
                 ))}
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
                 <input
                   type="radio"
                   checked={endType === 'count'}
                   onChange={() => setEndType('count')}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 text-accent-text focus:ring-accent"
                 />
                 For
                 <input
@@ -257,16 +266,16 @@ export function ActivityCreatePage() {
                   value={count}
                   onChange={(e) => setCount(e.target.value)}
                   disabled={endType !== 'count'}
-                  className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                  className="w-16 rounded-lg border border-line-strong bg-surface px-2 py-1 text-sm disabled:bg-surface-raised disabled:text-ink-muted"
                 />
                 occurrences
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
                 <input
                   type="radio"
                   checked={endType === 'until'}
                   onChange={() => setEndType('until')}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  className="h-4 w-4 text-accent-text focus:ring-accent"
                 />
                 Until
                 <input
@@ -274,48 +283,37 @@ export function ActivityCreatePage() {
                   value={until}
                   onChange={(e) => setUntil(e.target.value)}
                   disabled={endType !== 'until'}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-100 disabled:text-slate-400"
+                  className="rounded-lg border border-line-strong bg-surface px-2 py-1 text-sm disabled:bg-surface-raised disabled:text-ink-muted"
                 />
               </label>
             </div>
           )}
+        </FormSection>
 
-          <div className="flex flex-col gap-3 rounded-lg bg-slate-50 p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-700">
-                Meeting point{repeats ? ' (applied to every occurrence)' : ''}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setMeetingPoints((prev) => [...prev, emptyTemplate()])}
-              >
-                + Add meeting point
-              </Button>
-            </div>
-            {meetingPoints.map((mp, i) => (
-              <div key={i} className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3">
-                <TextField
-                  label="Label (optional)"
-                  value={mp.label ?? ''}
-                  onChange={(e) => updateMeetingPoint(i, { label: e.target.value })}
-                  className="min-w-[140px] flex-1"
-                />
-                <TextField
-                  label="Google Maps URL"
-                  required
-                  value={mp.googleMapsUrl}
-                  onChange={(e) => updateMeetingPoint(i, { googleMapsUrl: e.target.value })}
-                  className="min-w-[200px] flex-[2]"
-                />
-                <TextField
-                  label="Minutes from start"
-                  type="number"
-                  value={mp.offsetMinutes}
-                  onChange={(e) => updateMeetingPoint(i, { offsetMinutes: Number(e.target.value) })}
-                  className="w-32"
-                />
+        <FormSection
+          title="Meeting points"
+          description="Optional — you can also plan the route from the event page after creating it."
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setMeetingPoints((prev) => [...prev, emptyTemplate()])}
+            >
+              Add stop
+            </Button>
+          }
+        >
+          {repeats && meetingPoints.length > 0 && (
+            <p className="text-xs text-ink-secondary">Applied to every occurrence.</p>
+          )}
+
+          {meetingPoints.map((mp, i) => (
+            <div key={i} className="rounded-lg border border-line bg-surface-sunken p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  Stop {i + 1}
+                </p>
                 <Button
                   type="button"
                   variant="ghost"
@@ -325,20 +323,140 @@ export function ActivityCreatePage() {
                   Remove
                 </Button>
               </div>
-            ))}
-            {meetingPoints.length === 0 && (
-              <p className="text-xs text-slate-400">
-                Optional — you can also add meeting points from the activity page after creating it.
-              </p>
-            )}
-          </div>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                <TextField
+                  label="Label (optional)"
+                  value={mp.label ?? ''}
+                  onChange={(e) => updateMeetingPoint(i, { label: e.target.value })}
+                />
+                <TextField
+                  label="Minutes from start"
+                  type="number"
+                  value={mp.offsetMinutes}
+                  onChange={(e) => updateMeetingPoint(i, { offsetMinutes: Number(e.target.value) })}
+                  className="sm:w-40"
+                />
+              </div>
+              <div className="mt-3">
+                <TextField
+                  label="Google Maps URL"
+                  required
+                  value={mp.googleMapsUrl}
+                  onChange={(e) => updateMeetingPoint(i, { googleMapsUrl: e.target.value })}
+                />
+              </div>
+            </div>
+          ))}
+        </FormSection>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="rounded-md bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">
+            {error}
+          </p>
+        )}
+
+        {/* What the button is about to do, spelled out — the recurrence rules add up to a number
+            of drafts that is otherwise invisible until they land in the group. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+          <p className="text-sm text-ink-secondary">
+            {summarise({ repeats, daysOfWeek, intervalWeeks, endType, count, until, meetingPoints })}
+          </p>
           <Button type="submit" disabled={submitting}>
             {submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
           </Button>
-        </form>
-      </Card>
+        </div>
+      </form>
     </PageContainer>
+  );
+}
+
+function summarise({
+  repeats,
+  daysOfWeek,
+  intervalWeeks,
+  endType,
+  count,
+  until,
+  meetingPoints,
+}: {
+  repeats: boolean;
+  daysOfWeek: number[];
+  intervalWeeks: string;
+  endType: 'count' | 'until';
+  count: string;
+  until: string;
+  meetingPoints: MeetingPointTemplateDto[];
+}): string {
+  const stops =
+    meetingPoints.length > 0
+      ? ` with ${meetingPoints.length} stop${meetingPoints.length > 1 ? 's' : ''}`
+      : '';
+
+  if (!repeats) return `Creates one draft${stops}.`;
+
+  if (daysOfWeek.length === 0) return 'Pick at least one day of the week.';
+
+  const days = daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(', ');
+  const every = Number(intervalWeeks) > 1 ? `every ${intervalWeeks} weeks` : 'weekly';
+  const howMany =
+    endType === 'count'
+      ? `${count} draft${Number(count) === 1 ? '' : 's'}`
+      : until
+        ? `drafts until ${new Date(until).toLocaleDateString()}`
+        : 'drafts';
+
+  return `Creates ${howMany}, ${every} on ${days}${stops}.`;
+}
+
+/** A titled group of fields. The form was one undivided run of twelve controls. */
+function FormSection({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
+        {action}
+      </div>
+      {description && <p className="mt-1 text-sm text-ink-secondary">{description}</p>}
+      <Card className="mt-2 flex flex-col gap-4">{children}</Card>
+    </section>
+  );
+}
+
+/** A checkbox with its consequence written underneath, because every one of these changes what
+    members experience rather than just what's stored. */
+function CheckboxRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
+      />
+      <span>
+        <span className="block text-sm font-medium text-ink">{label}</span>
+        <span className="block text-sm text-ink-secondary">{hint}</span>
+      </span>
+    </label>
   );
 }

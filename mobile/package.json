@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "@meetingpnt/shared": "*",
+    "@react-navigation/bottom-tabs": "^7.18.14",
     "@react-native-community/datetimepicker": "8.4.4",
     "@tanstack/react-query": "^5.62.7",
     "expo": "^54.0.36",

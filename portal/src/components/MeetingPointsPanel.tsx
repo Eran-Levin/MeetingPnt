@@ -21,7 +21,7 @@ function toLocalInputValue(iso: string): string {
 }
 
 const fieldClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  'rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent';
 
 /**
  * The leader plans the route here, in the order the group will walk it. During the event they
@@ -121,26 +121,26 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
   }
 
   return (
-    <section className="mt-8">
+    <section>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-900">Itinerary</h2>
+        <h2 className="text-lg font-semibold text-ink">Itinerary</h2>
         {editing === null && (
           <Button variant="secondary" size="sm" onClick={startAdding}>
             + Add stop
           </Button>
         )}
       </div>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-ink-secondary">
         The stops in the order the group will walk them. During the event you move between them
         from your phone, and can still add stops the group hasn&rsquo;t reached.
       </p>
 
       {listError && (
-        <p className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{listError}</p>
+        <p className="mt-2 rounded-md bg-tone-danger-bg px-3 py-2 text-sm text-tone-danger-fg">{listError}</p>
       )}
 
       {meetingPoints.length > 0 && (
-        <Card className="mt-3 divide-y divide-slate-100 p-0">
+        <Card className="mt-3 divide-y divide-line p-0">
           {meetingPoints.map((point, index) => {
             const isCurrent = point.id === currentMeetingPointId;
             const reached = point.arrivedAt !== null;
@@ -151,26 +151,26 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
                     <span
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                         isCurrent
-                          ? 'bg-blue-600 text-white'
+                          ? 'bg-accent text-white'
                           : reached
-                            ? 'bg-slate-200 text-slate-600'
-                            : 'bg-white text-slate-400 ring-1 ring-slate-300'
+                            ? 'bg-surface-raised text-ink-secondary'
+                            : 'bg-white text-ink-muted ring-1 ring-line-strong'
                       }`}
                     >
                       {index + 1}
                     </span>
                     <span>
-                      <span className="text-slate-900">{point.label || 'Meeting point'}</span>{' '}
-                      <span className="text-slate-400">
+                      <span className="text-ink">{point.label || 'Meeting point'}</span>{' '}
+                      <span className="text-ink-muted">
                         {new Date(point.time).toLocaleString()}
                       </span>
                       {isCurrent && (
-                        <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="ml-2 rounded-full bg-tone-accent-bg px-2 py-0.5 text-xs font-medium text-tone-accent-fg">
                           Group is here
                         </span>
                       )}
                       {reached && !isCurrent && (
-                        <span className="ml-2 text-xs text-slate-400">visited</span>
+                        <span className="ml-2 text-xs text-ink-muted">visited</span>
                       )}
                     </span>
                   </span>
@@ -179,7 +179,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
                       href={point.googleMapsUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm font-medium text-blue-600 hover:underline"
+                      className="text-sm font-medium text-accent-text hover:underline"
                     >
                       Open in Maps
                     </a>
@@ -219,7 +219,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
 
       {meetingPoints.length === 0 && editing === null && (
         <Card className="mt-3">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-ink-muted">
             No stops planned yet — add where the group first gathers.
           </p>
         </Card>
@@ -260,10 +260,14 @@ interface FormProps {
   onCancel: () => void;
 }
 
+/**
+ * Stacked rather than one wrapping row: the itinerary now sits in a column beside the replies,
+ * and three inputs side by side in that width left the Maps URL — the long one — narrowest.
+ */
 function MeetingPointForm(props: FormProps) {
   return (
-    <div className="bg-slate-50 px-4 py-3">
-      <form onSubmit={props.onSubmit} className="flex flex-wrap items-center gap-2">
+    <div className="bg-surface-sunken px-4 py-3">
+      <form onSubmit={props.onSubmit} className="flex flex-col gap-2">
         <input
           placeholder="Label (optional)"
           value={props.label}
@@ -275,23 +279,25 @@ function MeetingPointForm(props: FormProps) {
           value={props.googleMapsUrl}
           onChange={(e) => props.setGoogleMapsUrl(e.target.value)}
           required
-          className={`min-w-[220px] flex-1 ${fieldClass}`}
-        />
-        <input
-          type="datetime-local"
-          value={props.time}
-          onChange={(e) => props.setTime(e.target.value)}
-          required
           className={fieldClass}
         />
-        <Button type="submit" disabled={props.submitting} size="sm">
-          {props.submitting ? 'Saving…' : props.submitLabel}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>
-          Cancel
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="datetime-local"
+            value={props.time}
+            onChange={(e) => props.setTime(e.target.value)}
+            required
+            className={`flex-1 ${fieldClass}`}
+          />
+          <Button type="submit" disabled={props.submitting} size="sm">
+            {props.submitting ? 'Saving…' : props.submitLabel}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>
+            Cancel
+          </Button>
+        </div>
       </form>
-      {props.error && <p className="mt-2 text-sm text-red-600">{props.error}</p>}
+      {props.error && <p className="mt-2 text-sm text-tone-danger-fg">{props.error}</p>}
     </div>
   );
 }

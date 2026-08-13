@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
+import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
 import { TextField } from '../../components/ui/TextField.js';
 
 export function GroupsPage() {
@@ -14,6 +15,7 @@ export function GroupsPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
+  const [composing, setComposing] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['groups'],
@@ -32,6 +34,7 @@ export function GroupsPage() {
       await groupsApi.create({ name, description: description || undefined });
       setName('');
       setDescription('');
+      setComposing(false);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     } finally {
       setCreating(false);
@@ -39,66 +42,84 @@ export function GroupsPage() {
   }
 
   return (
-    <PageContainer>
-      <h1 className="text-2xl font-semibold text-slate-900">Groups</h1>
-      <p className="mt-1 text-sm text-slate-500">Groups you lead or belong to.</p>
+    <PageContainer wide>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">Groups</h1>
+          <p className="mt-1 text-sm text-ink-secondary">Groups you lead or belong to.</p>
+        </div>
+        {!composing && <Button onClick={() => setComposing(true)}>New group</Button>}
+      </div>
 
-      <Card className="mt-6">
-        <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
-          <TextField
-            label="Group name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="min-w-[160px] flex-1"
+      {composing && (
+        <Card className="mt-6">
+          <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
+            <TextField
+              label="Group name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              className="min-w-[160px] flex-1"
+            />
+            <TextField
+              label="Description (optional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-w-[200px] flex-[2]"
+            />
+            <Button type="submit" disabled={creating}>
+              {creating ? 'Creating…' : 'Create group'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setComposing(false)}>
+              Cancel
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      {isLoading && (
+        <div className="mt-8">
+          <SkeletonRows rows={3} />
+        </div>
+      )}
+
+      {!isLoading && data?.groups.length === 0 && (
+        <div className="mt-8">
+          <EmptyState
+            headline="Start your first group"
+            body="A group holds a roster and the events that run inside it — a yoga term, a photo club, one trip departure."
+            action={<Button onClick={() => setComposing(true)}>New group</Button>}
           />
-          <TextField
-            label="Description (optional)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="min-w-[200px] flex-[2]"
-          />
-          <Button type="submit" disabled={creating}>
-            {creating ? 'Creating…' : 'Create group'}
-          </Button>
-        </form>
-      </Card>
+        </div>
+      )}
 
-      {isLoading && <p className="mt-6 text-sm text-slate-500">Loading…</p>}
-
-      <GroupSection title="Active" groups={activeGroups} emptyLabel="No active groups." />
+      {activeGroups.length > 0 && <GroupSection title="Active" groups={activeGroups} />}
       {closedGroups.length > 0 && <GroupSection title="Closed" groups={closedGroups} />}
-
-      {data?.groups.length === 0 && <p className="mt-6 text-sm text-slate-400">No groups yet.</p>}
     </PageContainer>
   );
 }
 
-function GroupSection({
-  title,
-  groups,
-  emptyLabel,
-}: {
-  title: string;
-  groups: GroupWithRole[];
-  emptyLabel?: string;
-}) {
+function GroupSection({ title, groups }: { title: string; groups: GroupWithRole[] }) {
   return (
     <section className="mt-8">
-      <h2 className="text-sm font-medium uppercase tracking-wide text-slate-400">
-        {title} <span className="text-slate-300">({groups.length})</span>
+      <h2 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+        {title} <span className="text-line-strong">({groups.length})</span>
       </h2>
 
-      <ul className="mt-3 flex flex-col gap-3">
+      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
         {groups.map((group) => (
           <li key={group.id}>
-            <Card className="transition-shadow hover:shadow-md">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link to={`/groups/${group.id}`} className="font-semibold text-slate-900 hover:text-blue-600">
-                  {group.name}
-                </Link>
-                <Badge status={group.status} />
-                {!group.isLeader && <span className="text-sm text-slate-400">(member)</span>}
-                <span className="ml-auto text-sm text-slate-500">
+            <Link to={`/groups/${group.id}`} className="block h-full">
+              <Card className="h-full transition-shadow hover:shadow-md">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-ink">{group.name}</span>
+                  <Badge status={group.status} />
+                  {!group.isLeader && <span className="text-sm text-ink-muted">(member)</span>}
+                </div>
+                {group.description && (
+                  <p className="mt-1 text-sm text-ink-secondary">{group.description}</p>
+                )}
+                <p className="mt-3 text-sm text-ink-secondary">
                   {group.nextActivityAt
                     ? `Next: ${new Date(group.nextActivityAt).toLocaleString(undefined, {
                         day: 'numeric',
@@ -107,15 +128,11 @@ function GroupSection({
                         minute: '2-digit',
                       })}`
                     : 'Nothing scheduled'}
-                </span>
-              </div>
-              {group.description && <p className="mt-1 text-sm text-slate-500">{group.description}</p>}
-            </Card>
+                </p>
+              </Card>
+            </Link>
           </li>
         ))}
-        {groups.length === 0 && emptyLabel && (
-          <p className="text-sm text-slate-400">{emptyLabel}</p>
-        )}
       </ul>
     </section>
   );

@@ -3,7 +3,7 @@ import { AppHeader } from './AppHeader.js';
 
 export function AuthenticatedLayout() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-surface-sunken">
       <AppHeader />
       <Outlet />
     </div>

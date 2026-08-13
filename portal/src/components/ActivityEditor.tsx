@@ -82,13 +82,13 @@ export function ActivityEditor({ activity, onDone }: Props) {
   }
 
   return (
-    <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3 rounded-lg bg-slate-50 p-4">
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+    <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3 rounded-lg bg-surface-sunken p-4">
+      <label className="flex items-center gap-2 text-sm font-medium text-ink">
         <input
           type="checkbox"
           checked={allDay}
           onChange={(e) => setAllDay(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
         />
         Spans whole days (multi-day trip)
       </label>
@@ -106,25 +106,25 @@ export function ActivityEditor({ activity, onDone }: Props) {
         </div>
       )}
 
-      <p className="text-xs text-slate-500">Meeting point times shift with the event.</p>
+      <p className="text-xs text-ink-secondary">Meeting point times shift with the event.</p>
 
-      <label className="flex items-center gap-2 border-t border-slate-200 pt-3 text-sm font-medium text-slate-700">
+      <label className="flex items-center gap-2 border-t border-line pt-3 text-sm font-medium text-ink">
         <input
           type="checkbox"
           checked={requiresRsvp}
           onChange={(e) => setRequiresRsvp(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          className="h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
         />
         Approve attendance
       </label>
-      <p className="-mt-2 text-xs text-slate-500">
+      <p className="-mt-2 text-xs text-ink-secondary">
         {requiresRsvp
           ? 'Members are asked to confirm they’re coming.'
           : 'Members count as coming without replying — they can still decline.'}
         {activity.status !== 'draft' && requiresRsvp !== activity.requiresRsvp && (
           <>
             {' '}
-            <span className="text-amber-700">
+            <span className="text-tone-warning-fg">
               {requiresRsvp
                 ? 'Anyone who never actually replied will go back to awaiting a reply.'
                 : 'Anyone who never replied will be counted as coming.'}{' '}
@@ -134,7 +134,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
         )}
       </p>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-tone-danger-fg">{error}</p>}
 
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={saving}>

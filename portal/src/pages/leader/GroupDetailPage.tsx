@@ -4,21 +4,20 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
+import { ApiError } from '../../api/client.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
-import { ApiError } from '../../api/client.js';
+import { GroupChatPanel } from '../../components/GroupChatPanel.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
-import { GroupChatPanel } from '../../components/GroupChatPanel.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Select } from '../../components/ui/Select.js';
+import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
+import { TextField } from '../../components/ui/TextField.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
-
-const inviteFieldClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -127,29 +126,32 @@ export function GroupDetailPage() {
     }
   }
 
-  const standaloneActivities = activitiesQuery.data?.activities.filter((a) => !a.seriesId) ?? [];
+  const members = membersQuery.data?.members ?? [];
+  const activities = activitiesQuery.data?.activities ?? [];
+  const standaloneActivities = activities.filter((a) => !a.seriesId);
   const seriesGroups = new Map<string, typeof standaloneActivities>();
-  for (const activity of activitiesQuery.data?.activities ?? []) {
+  for (const activity of activities) {
     if (!activity.seriesId) continue;
     seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
   }
 
   return (
-    <PageContainer>
-      <Link to="/groups" className="text-sm text-blue-600 hover:underline">
+    <PageContainer wide>
+      <Link to="/groups" className="text-sm text-accent-text hover:underline">
         &larr; Groups
       </Link>
-      <div className="mt-2 flex items-start justify-between gap-4">
+
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">
+          <h1 className="text-2xl font-semibold text-ink">
             {groupQuery.data?.group.name ?? '…'}
           </h1>
           {groupQuery.data?.group.description && (
-            <p className="mt-1 text-sm text-slate-500">{groupQuery.data.group.description}</p>
+            <p className="mt-1 text-sm text-ink-secondary">{groupQuery.data.group.description}</p>
           )}
         </div>
         {groupQuery.data && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Badge status={groupQuery.data.group.status} />
             {/* Planned vs in progress follows the events, so the only status call left to the
                 leader is whether the group is finished with. */}
@@ -189,163 +191,207 @@ export function GroupDetailPage() {
         )}
       </div>
 
-      <section className="mt-8">
-        <h2 className="text-lg font-semibold text-slate-900">Roster</h2>
-        <Card className="mt-3 divide-y divide-slate-100 p-0">
-          {membersQuery.data?.members.map((member) => (
-            <div key={member.id} className="flex items-center justify-between px-4 py-3">
-              <div className="text-sm">
-                <span className="text-slate-700">{member.user.name}</span>{' '}
-                <span className="text-slate-400">({member.user.email})</span>
-                {member.user.phone && (
-                  <a
-                    href={`tel:${member.user.phone}`}
-                    className="ml-2 text-slate-500 hover:text-blue-600 hover:underline"
-                  >
-                    {member.user.phone}
-                  </a>
-                )}
-              </div>
-              {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
-                <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member.userId)}>
-                  Remove
-                </Button>
-              )}
+      {/* Who's in the group and what they're booked onto are the two halves of planning, and on a
+          browser there's room to hold both in view at once. */}
+      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]">
+        <section>
+          <h2 className="text-lg font-semibold text-ink">
+            Roster <span className="text-sm font-normal text-ink-muted">{members.length}</span>
+          </h2>
+
+          {membersQuery.isLoading ? (
+            <div className="mt-3">
+              <SkeletonRows rows={3} />
             </div>
-          ))}
-          {membersQuery.data?.members.length === 0 && (
-            <p className="px-4 py-6 text-center text-sm text-slate-400">No members yet.</p>
-          )}
-        </Card>
-
-        {isLeader && (
-          <Card className="mt-3">
-            {/* The leader already knows who they're adding, so the roster is complete from the
-                moment the invitation goes out rather than after the invitee signs up. */}
-            <form onSubmit={handleInvite} className="flex flex-col gap-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <input
-                  placeholder="First name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  className={inviteFieldClass}
-                />
-                <input
-                  placeholder="Last name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  className={inviteFieldClass}
-                />
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="email"
-                  placeholder="member@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className={`flex-1 ${inviteFieldClass}`}
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone (optional)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className={`flex-1 ${inviteFieldClass}`}
-                />
-                <Button type="submit" disabled={inviting}>
-                  {inviting ? 'Sending…' : 'Invite member'}
-                </Button>
-              </div>
-            </form>
-            {inviteMessage && <p className="mt-2 text-sm text-green-600">{inviteMessage}</p>}
-            {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
-          </Card>
-        )}
-
-        {isLeader && invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
-          <Card className="mt-3 divide-y divide-slate-100 p-0">
-            <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Pending invitations
-            </p>
-            {invitationsQuery.data.invitations.map((invitation) => (
-              <div key={invitation.id} className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-slate-600">{invitation.email}</span>
-                <Button variant="ghost" size="sm" onClick={() => handleRevoke(invitation.id)}>
-                  Revoke
-                </Button>
-              </div>
-            ))}
-          </Card>
-        )}
-      </section>
-
-      <section className="mt-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Activities</h2>
-          {isLeader && (
-            <Link to={`/groups/${groupId}/activities/new`} className="text-sm font-medium text-blue-600 hover:underline">
-              + New activity
-            </Link>
-          )}
-        </div>
-
-        <div className="mt-3 flex flex-col gap-3">
-          {standaloneActivities.map((activity) => (
-            <Link key={activity.id} to={`/activities/${activity.id}`}>
-              <Card className="flex items-center justify-between transition-shadow hover:shadow-md">
-                <span className="font-medium text-slate-900">{activity.title}</span>
-                <span className="flex items-center gap-2 text-sm text-slate-500">
-                  {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
-                  <Badge status={activity.status} />
-                </span>
-              </Card>
-            </Link>
-          ))}
-
-          {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
-            const draftCount = occurrences.filter((o) => o.status === 'draft').length;
-            return (
-              <Card key={seriesId}>
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-slate-900">
-                    {occurrences[0]!.title}{' '}
-                    <span className="font-normal text-slate-400">
-                      (recurring, {occurrences.length} occurrences)
-                    </span>
-                  </p>
-                  {isLeader && draftCount > 0 && (
-                    <Button size="sm" onClick={() => handlePublishSeries(seriesId)}>
-                      Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
+          ) : members.length > 0 ? (
+            <Card className="mt-3 divide-y divide-line p-0">
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0 text-sm">
+                    <p className="truncate text-ink">{member.user.name}</p>
+                    <p className="truncate text-ink-muted">
+                      {member.user.email}
+                      {member.user.phone && (
+                        <>
+                          {' · '}
+                          <a
+                            href={`tel:${member.user.phone}`}
+                            className="text-ink-secondary hover:text-accent-text hover:underline"
+                          >
+                            {member.user.phone}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveMember(member.userId)}
+                    >
+                      Remove
                     </Button>
                   )}
                 </div>
-                <div className="mt-2 flex flex-col divide-y divide-slate-100">
-                  {occurrences.map((activity) => (
-                    <Link
-                      key={activity.id}
-                      to={`/activities/${activity.id}`}
-                      className="flex items-center justify-between py-2 text-sm hover:text-blue-600"
-                    >
-                      <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}</span>
-                      <Badge status={activity.status} />
-                    </Link>
-                  ))}
-                </div>
-              </Card>
-            );
-          })}
-
-          {activitiesQuery.data?.activities.length === 0 && (
-            <p className="text-sm text-slate-400">No activities scheduled yet.</p>
+              ))}
+            </Card>
+          ) : (
+            <div className="mt-3">
+              <EmptyState
+                headline="Nobody on the roster yet"
+                body={isLeader ? 'Invite someone below — they appear straight away.' : undefined}
+              />
+            </div>
           )}
-        </div>
-      </section>
+
+          {isLeader && (
+            <Card className="mt-3">
+              {/* The leader already knows who they're adding, so the roster is complete from the
+                  moment the invitation goes out rather than after the invitee signs up. */}
+              <form onSubmit={handleInvite} className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="First name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                  <TextField
+                    label="Last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Email"
+                    type="email"
+                    placeholder="member@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                  <TextField
+                    label="Phone (optional)"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" disabled={inviting} className="self-start">
+                  {inviting ? 'Sending…' : 'Invite member'}
+                </Button>
+              </form>
+              {inviteMessage && (
+                <p className="mt-2 text-sm text-tone-success-fg">{inviteMessage}</p>
+              )}
+              {inviteError && <p className="mt-2 text-sm text-tone-danger-fg">{inviteError}</p>}
+            </Card>
+          )}
+
+          {isLeader && invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
+            <Card className="mt-3 divide-y divide-line p-0">
+              <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                Pending invitations
+              </p>
+              {invitationsQuery.data.invitations.map((invitation) => (
+                <div key={invitation.id} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-ink-secondary">{invitation.email}</span>
+                  <Button variant="ghost" size="sm" onClick={() => handleRevoke(invitation.id)}>
+                    Revoke
+                  </Button>
+                </div>
+              ))}
+            </Card>
+          )}
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-ink">Events</h2>
+            {isLeader && (
+              <Link to={`/groups/${groupId}/activities/new`}>
+                <Button size="sm">New event</Button>
+              </Link>
+            )}
+          </div>
+
+          {activitiesQuery.isLoading ? (
+            <div className="mt-3">
+              <SkeletonRows rows={4} />
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="mt-3">
+              <EmptyState
+                headline="Nothing scheduled yet"
+                body={
+                  isLeader
+                    ? 'Plan an event here, then publish it when the group should see it.'
+                    : undefined
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-3">
+              {standaloneActivities.map((activity) => (
+                <Link key={activity.id} to={`/activities/${activity.id}`}>
+                  <Card className="flex flex-wrap items-center justify-between gap-2 transition-shadow hover:shadow-md">
+                    <span className="font-medium text-ink">{activity.title}</span>
+                    <span className="flex items-center gap-2 text-sm text-ink-secondary">
+                      {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+                      <Badge status={activity.status} />
+                    </span>
+                  </Card>
+                </Link>
+              ))}
+
+              {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
+                const draftCount = occurrences.filter((o) => o.status === 'draft').length;
+                return (
+                  <Card key={seriesId}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-ink">
+                        {occurrences[0]!.title}{' '}
+                        <span className="font-normal text-ink-muted">
+                          (recurring, {occurrences.length} occurrences)
+                        </span>
+                      </p>
+                      {isLeader && draftCount > 0 && (
+                        <Button size="sm" onClick={() => handlePublishSeries(seriesId)}>
+                          Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-col divide-y divide-line">
+                      {occurrences.map((activity) => (
+                        <Link
+                          key={activity.id}
+                          to={`/activities/${activity.id}`}
+                          className="flex items-center justify-between py-2 text-sm hover:text-accent-text"
+                        >
+                          <span>
+                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+                          </span>
+                          <Badge status={activity.status} />
+                        </Link>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
 
       {groupQuery.data && (
-        <GroupChatPanel groupId={groupId} chatMode={groupQuery.data.group.chatMode} isLeader={isLeader} />
+        <GroupChatPanel
+          groupId={groupId}
+          chatMode={groupQuery.data.group.chatMode}
+          isLeader={isLeader}
+        />
       )}
     </PageContainer>
   );

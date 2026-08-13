@@ -10,7 +10,7 @@ interface Props {
 }
 
 const fieldClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+  'rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent';
 
 /**
  * Invites someone to this one activity without adding them to the group. Once they have an
@@ -26,6 +26,7 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const invitationsQuery = useQuery({
     queryKey: ['activities', activityId, 'invitations'],
@@ -63,10 +64,22 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
     }
   }
 
+  const hasPending = (invitationsQuery.data?.invitations.length ?? 0) > 0;
+
+  // Four fields for something a leader does occasionally — folded away unless they want it, or
+  // unless there's an invitation still waiting to be accepted.
+  if (!open && !hasPending) {
+    return (
+      <Button variant="secondary" size="sm" className="mt-3" onClick={() => setOpen(true)}>
+        Invite a visitor
+      </Button>
+    );
+  }
+
   return (
     <Card className="mt-3">
-      <p className="text-sm font-medium text-slate-700">Invite a visitor</p>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="text-sm font-medium text-ink">Invite a visitor</p>
+      <p className="mt-1 text-xs text-ink-secondary">
         Someone joining just this activity, without joining the group.
       </p>
 
@@ -87,37 +100,42 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
             className={fieldClass}
           />
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <input
             type="email"
             placeholder="visitor@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className={`flex-1 ${fieldClass}`}
+            className={fieldClass}
           />
           <input
             type="tel"
             placeholder="Phone (optional)"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className={`flex-1 ${fieldClass}`}
+            className={fieldClass}
           />
+        </div>
+        <div className="flex gap-2">
           <Button type="submit" disabled={inviting}>
             {inviting ? 'Sending…' : 'Invite'}
           </Button>
+          <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            Close
+          </Button>
         </div>
       </form>
-      {message && <p className="mt-2 text-sm text-green-600">{message}</p>}
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {message && <p className="mt-2 text-sm text-tone-success-fg">{message}</p>}
+      {error && <p className="mt-2 text-sm text-tone-danger-fg">{error}</p>}
 
       {invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
             Awaiting sign-up
           </p>
           {invitationsQuery.data.invitations.map((invitation) => (
-            <p key={invitation.id} className="mt-1 text-sm text-slate-500">
+            <p key={invitation.id} className="mt-1 text-sm text-ink-secondary">
               {invitation.email}
             </p>
           ))}
