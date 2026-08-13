@@ -32,6 +32,7 @@ function toSharedActivity(activity: Activity): SharedActivity {
     allDay: activity.allDay,
     transportMode: activity.transportMode,
     requiresRsvp: activity.requiresRsvp,
+    singleLocation: activity.singleLocation,
     status: activity.status,
     currentMeetingPointId: activity.currentMeetingPointId,
     leaderBroadcastUntil: activity.leaderBroadcastUntil?.toISOString() ?? null,
@@ -110,6 +111,7 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
           allDay: dto.allDay,
           transportMode: dto.transportMode,
           requiresRsvp: dto.requiresRsvp,
+          singleLocation: dto.singleLocation,
           createdBy: requesterId,
           status: 'draft',
         },
@@ -228,6 +230,7 @@ export async function updateActivity(activityId: string, requesterId: string, dt
       ...(dto.allDay !== undefined ? { allDay: dto.allDay } : {}),
       ...(dto.transportMode !== undefined ? { transportMode: dto.transportMode } : {}),
       ...(dto.requiresRsvp !== undefined ? { requiresRsvp: dto.requiresRsvp } : {}),
+      ...(dto.singleLocation !== undefined ? { singleLocation: dto.singleLocation } : {}),
     },
   });
 

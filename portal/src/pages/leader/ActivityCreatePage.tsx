@@ -29,6 +29,7 @@ export function ActivityCreatePage() {
   const [endDate, setEndDate] = useState('');
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
+  const [singleLocation, setSingleLocation] = useState(false);
   const [repeats, setRepeats] = useState(false);
   const [intervalWeeks, setIntervalWeeks] = useState('1');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
@@ -81,6 +82,7 @@ export function ActivityCreatePage() {
         allDay,
         transportMode,
         requiresRsvp,
+        singleLocation,
         recurrence: repeats
           ? {
               frequency: 'weekly',
@@ -290,20 +292,36 @@ export function ActivityCreatePage() {
           )}
         </FormSection>
 
+        {/* The first one is "the meeting point" — where everybody gathers. Only once that exists
+            does the idea of a route, and of further stops, mean anything. A single-location event
+            never gets past that first one. */}
         <FormSection
-          title="Meeting points"
-          description="Optional — you can also plan the route from the event page after creating it."
+          title={meetingPoints.length > 1 ? 'Meeting points' : 'Meeting point'}
+          description="Optional — you can also plan this from the event page after creating it."
           action={
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setMeetingPoints((prev) => [...prev, emptyTemplate()])}
-            >
-              Add stop
-            </Button>
+            (singleLocation ? meetingPoints.length === 0 : true) && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setMeetingPoints((prev) => [...prev, emptyTemplate()])}
+              >
+                {meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
+              </Button>
+            )
           }
         >
+          <CheckboxRow
+            label="Single location"
+            hint="One place, no route — a class in the same room every week. Turns off the itinerary."
+            checked={singleLocation}
+            onChange={(value) => {
+              setSingleLocation(value);
+              // Dropping back to one place shouldn't silently discard a route the leader typed —
+              // but keeping five stops on an event that claims to have one is worse.
+              if (value) setMeetingPoints((prev) => prev.slice(0, 1));
+            }}
+          />
           {repeats && meetingPoints.length > 0 && (
             <p className="text-xs text-ink-secondary">Applied to every occurrence.</p>
           )}
@@ -312,7 +330,7 @@ export function ActivityCreatePage() {
             <div key={i} className="rounded-lg border border-line bg-surface-sunken p-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                  Stop {i + 1}
+                  {i === 0 ? 'Meeting point' : `Stop ${i + 1}`}
                 </p>
                 <Button
                   type="button"

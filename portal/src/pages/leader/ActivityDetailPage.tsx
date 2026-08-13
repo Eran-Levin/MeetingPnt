@@ -197,6 +197,7 @@ export function ActivityDetailPage() {
           <MeetingPointsPanel
             activityId={activityId}
             currentMeetingPointId={activity.currentMeetingPointId}
+            singleLocation={activity.singleLocation}
           />
         )}
 

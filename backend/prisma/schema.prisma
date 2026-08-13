@@ -217,6 +217,10 @@ model Activity {
   allDay        Boolean        @default(false) @map("all_day")
   transportMode TransportMode  @default(driving) @map("transport_mode")
   requiresRsvp  Boolean        @default(true) @map("requires_rsvp")
+  // One place, no route: a yoga class in the same room every week. The clients show a single
+  // meeting point and no way to add a second. Stored rather than inferred from having one stop,
+  // since a walk mid-planning also has one and must keep its "add stop" button.
+  singleLocation Boolean       @default(false) @map("single_location")
   status        ActivityStatus @default(draft)
   // Where the group is right now — the stop the apps show and the ETA is measured to. Deliberately
   // a stored pointer rather than "the newest meeting point": once the leader plans the whole

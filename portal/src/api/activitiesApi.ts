@@ -1,8 +1,15 @@
-import type { Activity, CreateActivityDto, UpdateActivityDto } from '@meetingpnt/shared';
+import type {
+  Activity,
+  ActivityWithGroup,
+  CreateActivityDto,
+  UpdateActivityDto,
+} from '@meetingpnt/shared';
 import { apiFetch } from './client.js';
 
 export const activitiesApi = {
   list: (groupId: string) => apiFetch<{ activities: Activity[] }>(`/api/groups/${groupId}/activities`),
+  /** Every group's events in one timeline, oldest first. */
+  listMine: () => apiFetch<{ activities: ActivityWithGroup[] }>('/api/activities/mine'),
   create: (groupId: string, dto: CreateActivityDto) =>
     apiFetch<{ activity: Activity } | { activities: Activity[] }>(
       `/api/groups/${groupId}/activities`,
