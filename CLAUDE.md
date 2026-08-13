@@ -90,6 +90,39 @@ ordinary events in the same group, and they *do* take RSVPs.
 - Members see the **names of who's coming**, not the leader's roll call.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
+- **A member has one destination.** Their read-only view of a roster didn't earn a permanent tab,
+  so mobile hides Groups for them and the tab bar goes away — the calendar is the app. Chat moved
+  onto the event as a result, which is where a member's conversation nearly always belongs
+  ("where are you", "I'm running late").
+
+## Look and feel
+
+- **Neither client invents a colour.** `shared/src/theme` holds the palette, the spacing and type
+  scales, and `STATUS_TONE` — which maps every status to what it *means* (`declined` → danger,
+  `in_progress` → accent). Clients pick a tone; the platform decides the pixels. Before this, the
+  same concept drifted: a live event was a blue-tinted card on mobile and a pale blue pill on the
+  web, with nothing saying which was right. Same argument as `formatActivityWhen`.
+- **The portal mirrors the hexes** into `@theme` in `portal/src/index.css`, because CSS can't
+  import the TypeScript tokens. That file is the only place in the portal allowed to name a hex,
+  and everything downstream uses semantic utilities (`text-ink`, `bg-accent`, `bg-tone-danger-bg`)
+  rather than `slate-500`/`blue-600`. A palette change is a two-file edit.
+- **Nothing interactive on mobile is below 44pt** (`minTouchTarget`). This isn't box-ticking: the
+  roll call is tapped outdoors, one-handed, in glare, with a group waiting, and it used to be a
+  row of `Text` links.
+- **Accent is reserved for where the group is now** — the live event, the current meeting point.
+  Spend it anywhere else and it stops meaning anything.
+- **Mobile composes from `mobile/src/ui`** (`Screen`, `Card`, `Button`, `Row`, `Chip`, `Badge`,
+  `Section`, `Empty`); screen files should not be declaring their own colours or spacing. The
+  portal's equivalents are `portal/src/components/ui`.
+- **The running event is a bar, not a tab.** It docks above the tab bar and is present on every
+  screen. A leader runs a few hours of live event a week, so a tab would sit empty the rest of the
+  time — while "reachable the moment they log in" has to hold wherever they happen to be standing
+  in the app, not only on the tab they last left selected.
+- **Planning screens go wide** on the web (`<PageContainer wide>`): roster beside events on a
+  group, itinerary beside replies on an event. Holding both in view is the reason to plan on a
+  browser at all. Reading-width pages — login, a form — stay narrow.
+- **Empty states name the space and say what would fill it**, rather than apologising ("Start your
+  first group", not "No groups yet"). Most of these screens are empty on the day someone signs up.
 
 ## Traps that have bitten
 
@@ -101,6 +134,12 @@ ordinary events in the same group, and they *do* take RSVPs.
   (hoisted at the root) but not reliably for Metro.
 - **Prisma engine lock:** `prisma generate` fails with `EPERM` while the backend dev server is
   running. Stop it first.
+- **`npm install` while Metro is running kills Metro** — same shape as the Prisma lock above. The
+  watcher crawls the workspace root, npm rewrites `node_modules` underneath it, and it dies on
+  `ENOENT: watch ...` for a path that existed a moment earlier. Stop Metro, install, then
+  `npx expo start -c`. `mobile/metro.config.js` now blocks the portal's `vite`/`esbuild` trees,
+  which removes the most common trigger (esbuild leaves other platforms' binary folders lying
+  around), but any install can still race the crawl.
 - **`prisma migrate dev` refuses to run non-interactively** whenever it wants to warn. Write the
   migration SQL by hand and apply with `prisma migrate deploy`.
 - **PostGIS columns are `Unsupported`** — Prisma Client can't read or write them. All meeting-point
