@@ -96,6 +96,9 @@ const createActivityBaseSchema = z.object({
     TransportMode.Transit,
   ]),
   requiresRsvp: z.boolean().default(true),
+  // A yoga class happens in one room: there is no route to plan, so the clients drop the
+  // itinerary entirely rather than showing a one-item list and an "add stop" button.
+  singleLocation: z.boolean().default(false),
   recurrence: recurrenceRuleSchema.optional(),
   meetingPoints: z.array(meetingPointTemplateSchema).max(5).optional(),
 });

@@ -23,9 +23,22 @@ export function AppHeader() {
 
         <nav className="flex items-center gap-1">
           {(user?.role === 'leader' || user?.role === 'admin') && (
-            <NavLink to="/groups" active={pathname.startsWith('/groups')}>
-              Groups
-            </NavLink>
+            <>
+              <NavLink to="/groups" active={pathname.startsWith('/groups')}>
+                Groups
+              </NavLink>
+              {/* An activity opens at /activities/:id from either page, so it lights up Events —
+                  which is where a leader is more often coming from. */}
+              <NavLink
+                to="/events"
+                active={pathname.startsWith('/events') || pathname.startsWith('/activities')}
+              >
+                Events
+              </NavLink>
+              <NavLink to="/analysis" active={pathname.startsWith('/analysis')}>
+                Analysis
+              </NavLink>
+            </>
           )}
           {user?.role === 'admin' && (
             <NavLink to="/admin/users" active={pathname.startsWith('/admin')}>

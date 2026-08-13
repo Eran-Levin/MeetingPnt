@@ -35,6 +35,7 @@ export default function NewActivityScreen() {
   const [picker, setPicker] = useState<null | 'date' | 'startTime' | 'endTime' | 'endDate'>(null);
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
+  const [singleLocation, setSingleLocation] = useState(false);
   const [repeats, setRepeats] = useState(false);
   const [intervalWeeks, setIntervalWeeks] = useState('1');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
@@ -84,6 +85,7 @@ export default function NewActivityScreen() {
         allDay,
         transportMode,
         requiresRsvp,
+        singleLocation,
         recurrence: repeats
           ? {
               frequency: 'weekly',
@@ -181,6 +183,17 @@ export default function NewActivityScreen() {
           }
           value={requiresRsvp}
           onValueChange={setRequiresRsvp}
+        />
+      </Section>
+
+      <Section label="Where">
+        {/* One room, every week — there's no route, so the clients drop the itinerary rather than
+            showing a one-item list. */}
+        <Toggle
+          label="Single location"
+          hint="One place, no route — a class in the same room every week."
+          value={singleLocation}
+          onValueChange={setSingleLocation}
         />
       </Section>
 

@@ -11,6 +11,8 @@ import { Card } from './ui/Card.js';
 interface Props {
   activityId: string;
   currentMeetingPointId: string | null;
+  /** One place, no route: the panel becomes a single meeting point with nothing to add to. */
+  singleLocation: boolean;
 }
 
 /** Converts an ISO instant to the value a datetime-local input expects (local time, no zone). */
@@ -28,7 +30,7 @@ const fieldClass =
  * work down this list from their phone; stops they've reached are marked, and the plan can still
  * be edited ahead of the group.
  */
-export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props) {
+export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLocation }: Props) {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -123,16 +125,21 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-ink">Itinerary</h2>
-        {editing === null && (
+        <h2 className="text-lg font-semibold text-ink">
+          {singleLocation ? 'Meeting point' : 'Itinerary'}
+        </h2>
+        {/* A single-location event has one place and no route, so once it's set there is nothing
+            to add. Everything else can gain a stop at any time. */}
+        {editing === null && !(singleLocation && meetingPoints.length > 0) && (
           <Button variant="secondary" size="sm" onClick={startAdding}>
-            + Add stop
+            {singleLocation || meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
           </Button>
         )}
       </div>
       <p className="mt-1 text-sm text-ink-secondary">
-        The stops in the order the group will walk them. During the event you move between them
-        from your phone, and can still add stops the group hasn&rsquo;t reached.
+        {singleLocation
+          ? 'Where the class meets. The same place every time — there is no route to walk.'
+          : 'The stops in the order the group will walk them. During the event you move between them from your phone, and can still add stops the group hasn’t reached.'}
       </p>
 
       {listError && (
@@ -148,17 +155,21 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
               <div key={point.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                   <span className="flex items-center gap-2 text-sm">
-                    <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                        isCurrent
-                          ? 'bg-accent text-white'
-                          : reached
-                            ? 'bg-surface-raised text-ink-secondary'
-                            : 'bg-white text-ink-muted ring-1 ring-line-strong'
-                      }`}
-                    >
-                      {index + 1}
-                    </span>
+                    {/* The number is a position in a route. With one place there's no route, so
+                        it would only ever say "1". */}
+                    {!singleLocation && (
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                          isCurrent
+                            ? 'bg-accent text-white'
+                            : reached
+                              ? 'bg-surface-raised text-ink-secondary'
+                              : 'bg-surface text-ink-muted ring-1 ring-line-strong'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                    )}
                     <span>
                       <span className="text-ink">{point.label || 'Meeting point'}</span>{' '}
                       <span className="text-ink-muted">
@@ -220,7 +231,9 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
       {meetingPoints.length === 0 && editing === null && (
         <Card className="mt-3">
           <p className="text-sm text-ink-muted">
-            No stops planned yet — add where the group first gathers.
+            {singleLocation
+              ? 'No meeting point yet — add where the class meets.'
+              : 'No stops planned yet — add where the group first gathers.'}
           </p>
         </Card>
       )}
@@ -235,7 +248,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId }: Props)
             time={time}
             setTime={setTime}
             submitting={submitting}
-            submitLabel="Add stop"
+            submitLabel={singleLocation || meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
             error={formError}
             onSubmit={handleSubmit}
             onCancel={() => setEditing(null)}

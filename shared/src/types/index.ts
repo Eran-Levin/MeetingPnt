@@ -105,6 +105,13 @@ export interface Activity {
   allDay: boolean;
   transportMode: TransportMode;
   requiresRsvp: boolean;
+  /**
+   * One place, no route — a yoga class in the same room every week. The clients show a single
+   * meeting point instead of an itinerary and offer no way to add a second stop. Stored rather
+   * than derived from the number of stops, because a walk being planned also has one stop and
+   * must keep its "add stop" button.
+   */
+  singleLocation: boolean;
   status: ActivityStatus;
   /**
    * Where the group is right now. Null before the event starts, and while it runs it lags the

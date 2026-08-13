@@ -152,9 +152,14 @@ export function GroupDetailPage() {
         </div>
         {groupQuery.data && (
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Badge status={groupQuery.data.group.status} />
-            {/* Planned vs in progress follows the events, so the only status call left to the
-                leader is whether the group is finished with. */}
+            {/* Open groups say nothing — a badge reading "planned" on every group was noise.
+                Closed is the only state worth announcing, because it changes what the page is:
+                a record rather than a plan. For a guide it's the end of the trip. */}
+            {groupQuery.data.group.status === 'completed' && (
+              <span className="rounded-full bg-tone-neutral-bg px-2.5 py-0.5 text-xs font-medium text-tone-neutral-fg">
+                Closed
+              </span>
+            )}
             {isLeader &&
               (groupQuery.data.group.status === 'completed' ? (
                 <Button variant="secondary" size="sm" onClick={() => handleStatusChange('planned')}>
