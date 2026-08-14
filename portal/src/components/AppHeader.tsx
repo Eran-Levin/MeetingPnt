@@ -27,13 +27,10 @@ export function AppHeader() {
               <NavLink to="/groups" active={pathname.startsWith('/groups')}>
                 Groups
               </NavLink>
-              {/* An activity opens at /activities/:id from either page, so it lights up Events —
-                  which is where a leader is more often coming from. */}
-              <NavLink
-                to="/events"
-                active={pathname.startsWith('/events') || pathname.startsWith('/activities')}
-              >
-                Events
+              {/* The list is /activities and a single one is /activities/:id, so one prefix
+                  lights the tab from either. */}
+              <NavLink to="/activities" active={pathname.startsWith('/activities')}>
+                Activities
               </NavLink>
               <NavLink to="/analysis" active={pathname.startsWith('/analysis')}>
                 Analysis

@@ -58,7 +58,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
     // leader can correct the record; the backend applies the same rule.
     const notYetRun = activity.status === 'draft' || activity.status === 'published';
     if (notYetRun && start.getTime() < Date.now()) {
-      setError("You can't schedule an event in the past.");
+      setError("You can't schedule an activity in the past.");
       return;
     }
 
@@ -75,7 +75,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
       queryClient.invalidateQueries({ queryKey: ['groups', activity.groupId, 'activities'] });
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save the event');
+      setError(err instanceof ApiError ? err.message : 'Failed to save the activity');
     } finally {
       setSaving(false);
     }
@@ -106,7 +106,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
         </div>
       )}
 
-      <p className="text-xs text-ink-secondary">Meeting point times shift with the event.</p>
+      <p className="text-xs text-ink-secondary">Meeting point times shift with the activity.</p>
 
       <label className="flex items-center gap-2 border-t border-line pt-3 text-sm font-medium text-ink">
         <input

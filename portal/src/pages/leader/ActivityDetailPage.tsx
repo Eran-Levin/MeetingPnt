@@ -69,7 +69,7 @@ export function ActivityDetailPage() {
 
   async function handleEnd() {
     const confirmed = window.confirm(
-      'End this event? Location sharing and location requests will stop for it. Attendance stays editable.',
+      'End this activity? Location sharing and location requests will stop for it. Attendance stays editable.',
     );
     if (!confirmed) return;
     await runLifecycleAction(() => activitiesApi.end(activityId));
@@ -136,7 +136,7 @@ export function ActivityDetailPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {activity.status !== 'completed' && !editingSchedule && (
               <Button variant="secondary" size="sm" onClick={() => setEditingSchedule(true)}>
-                Edit event
+                Edit activity
               </Button>
             )}
             {activity.status === 'draft' && (
@@ -146,12 +146,12 @@ export function ActivityDetailPage() {
             )}
             {activity.status === 'published' && (
               <Button size="sm" onClick={handleStart}>
-                Start event
+                Start activity
               </Button>
             )}
             {(activity.status === 'published' || activity.status === 'in_progress') && (
               <Button variant="secondary" size="sm" onClick={handleEnd}>
-                End event
+                End activity
               </Button>
             )}
           </div>
@@ -160,7 +160,7 @@ export function ActivityDetailPage() {
 
       {activity.status === 'completed' && (
         <p className="mt-3 text-sm text-ink-secondary">
-          This event has ended — location sharing is closed.
+          This activity has ended — location sharing is closed.
         </p>
       )}
       {lifecycleError && (

@@ -141,7 +141,7 @@ export default function CalendarScreen() {
           {needsReply(activity) && <Pill tone="warning" label="Reply needed" />}
           {startableToday(activity) && (
             <Button
-              label={startingId === activity.id ? 'Starting…' : 'Start event'}
+              label={startingId === activity.id ? 'Starting…' : 'Start activity'}
               onPress={() => handleStart(activity)}
               busy={startingId === activity.id}
               style={styles.startButton}
@@ -179,7 +179,7 @@ export default function CalendarScreen() {
       {buckets.length === 0 && (
         <Empty
           headline="Nothing coming up"
-          body="Events you're scheduled for will appear here, newest first."
+          body="Activities you're scheduled for will appear here, newest first."
         />
       )}
 
@@ -187,7 +187,7 @@ export default function CalendarScreen() {
         <Section label={`Earlier (${past.length})`}>
           <Pressable onPress={() => setShowPast((v) => !v)} style={styles.toggle}>
             <Text style={[text.secondary, { color: color.accentText }]}>
-              {showPast ? 'Hide past events' : 'Show past events'}
+              {showPast ? 'Hide past activities' : 'Show past activities'}
             </Text>
           </Pressable>
           {showPast &&

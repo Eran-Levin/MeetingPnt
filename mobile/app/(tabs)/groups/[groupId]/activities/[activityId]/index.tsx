@@ -430,15 +430,15 @@ export default function ActivityDetailScreen() {
         <View style={styles.controls}>
           {activity.status === 'published' && (
             <ButtonRow>
-              <Button label="Start event" onPress={handleStart} grow />
-              <Button label="End event" onPress={handleEnd} variant="secondary" grow />
+              <Button label="Start activity" onPress={handleStart} grow />
+              <Button label="End activity" onPress={handleEnd} variant="secondary" grow />
             </ButtonRow>
           )}
           {running && (
             <>
               <ButtonRow>
                 <Button label="Next meeting point" onPress={() => openEditor('next')} grow />
-                <Button label="End event" onPress={handleEnd} variant="secondary" grow />
+                <Button label="End activity" onPress={handleEnd} variant="secondary" grow />
               </ButtonRow>
               {nextPlanned && (
                 <Text style={[text.secondary, styles.planned]}>
@@ -476,7 +476,7 @@ export default function ActivityDetailScreen() {
 
       {activity.status === 'completed' && (
         <Text style={[text.secondary, styles.planned]}>
-          This event has ended — location sharing is closed.
+          This activity has ended — location sharing is closed.
         </Text>
       )}
 

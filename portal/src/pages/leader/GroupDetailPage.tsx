@@ -315,10 +315,10 @@ export function GroupDetailPage() {
 
         <section>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-ink">Events</h2>
+            <h2 className="text-lg font-semibold text-ink">Activities</h2>
             {isLeader && (
               <Link to={`/groups/${groupId}/activities/new`}>
-                <Button size="sm">New event</Button>
+                <Button size="sm">New activity</Button>
               </Link>
             )}
           </div>
@@ -333,7 +333,7 @@ export function GroupDetailPage() {
                 headline="Nothing scheduled yet"
                 body={
                   isLeader
-                    ? 'Plan an event here, then publish it when the group should see it.'
+                    ? 'Plan an activity here, then publish it when the group should see it.'
                     : undefined
                 }
               />
