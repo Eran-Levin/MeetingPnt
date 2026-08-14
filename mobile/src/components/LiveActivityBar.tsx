@@ -18,7 +18,7 @@ const REFRESH_MS = 30_000;
  * empty the rest of the time — and because "reachable the moment they log in" has to hold wherever
  * they happen to be standing in the app, not only on the tab they last left selected.
  */
-export function LiveEventBar() {
+export function LiveActivityBar() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -58,7 +58,7 @@ export function LiveEventBar() {
     <View style={[styles.dock, { paddingBottom: insets.bottom ? 0 : space.sm }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open the running event, ${live.title}`}
+        accessibilityLabel={`Open the running activity, ${live.title}`}
         onPress={() => router.push(`/(tabs)/groups/${live.groupId}/activities/${live.id}`)}
         style={({ pressed }) => [styles.bar, pressed && styles.pressed]}
       >

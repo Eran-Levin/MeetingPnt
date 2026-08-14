@@ -113,7 +113,7 @@ export function ActivityCreatePage() {
       <Link to={`/groups/${groupId}`} className="text-sm text-accent-text hover:underline">
         &larr; Back to group
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-ink">New event</h1>
+      <h1 className="mt-2 text-2xl font-semibold text-ink">New activity</h1>
       <p className="mt-1 text-sm text-ink-secondary">
         Created as a draft — members see nothing until you publish it.
       </p>
@@ -149,7 +149,7 @@ export function ActivityCreatePage() {
         <FormSection title="When">
           <CheckboxRow
             label="Spans whole days"
-            hint="A multi-day trip. Each day of it is its own event."
+            hint="A multi-day trip. Each day of it is its own activity."
             checked={allDay}
             onChange={setAllDay}
           />
@@ -297,7 +297,7 @@ export function ActivityCreatePage() {
             never gets past that first one. */}
         <FormSection
           title={meetingPoints.length > 1 ? 'Meeting points' : 'Meeting point'}
-          description="Optional — you can also plan this from the event page after creating it."
+          description="Optional — you can also plan this from the activity page after creating it."
           action={
             (singleLocation ? meetingPoints.length === 0 : true) && (
               <Button

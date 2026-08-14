@@ -97,7 +97,7 @@ export function GroupsPage() {
         <div className="mt-8">
           <EmptyState
             headline="Start your first group"
-            body="A group holds a roster and the events that run inside it — a yoga term, a photo club, one trip departure."
+            body="A group holds a roster and the activities that run inside it — a yoga term, a photo club, one trip departure."
             action={<Button onClick={() => setComposing(true)}>New group</Button>}
           />
         </div>

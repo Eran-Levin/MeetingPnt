@@ -32,7 +32,7 @@ export function CurrentPointCard({
       <Card>
         <Text style={text.secondary}>
           {plannedCount > 0
-            ? "The event hasn't started — the route is below."
+            ? "The activity hasn't started — the route is below."
             : 'No meeting point set yet.'}
         </Text>
       </Card>

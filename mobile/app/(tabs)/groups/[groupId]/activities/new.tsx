@@ -109,7 +109,7 @@ export default function NewActivityScreen() {
   }
 
   return (
-    <Screen title="New event" bottomInset={80}>
+    <Screen title="New activity" bottomInset={80}>
       <TextField
         label="Title"
         placeholder="Sunrise walk — Old Town"
@@ -125,7 +125,7 @@ export default function NewActivityScreen() {
       <Section label="When" first>
         <Toggle
           label="Spans whole days"
-          hint="A multi-day trip. Each day is its own event."
+          hint="A multi-day trip. Each day is its own activity."
           value={allDay}
           onValueChange={setAllDay}
         />

@@ -19,7 +19,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  * question a leader running three groups actually has, and which the group list can't answer
  * because it splits the same week across three pages.
  */
-export function EventsPage() {
+export function ActivitiesPage() {
   const [showPast, setShowPast] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -53,7 +53,7 @@ export function EventsPage() {
 
   return (
     <PageContainer wide>
-      <h1 className="text-2xl font-semibold text-ink">Events</h1>
+      <h1 className="text-2xl font-semibold text-ink">Activities</h1>
       <p className="mt-1 text-sm text-ink-secondary">
         Everything scheduled across your groups, in the order it happens.
       </p>
@@ -71,7 +71,7 @@ export function EventsPage() {
           </h2>
           <div className="mt-3 flex flex-col gap-3">
             {live.map((activity) => (
-              <EventRow key={activity.id} activity={activity} accent />
+              <ActivityRow key={activity.id} activity={activity} accent />
             ))}
           </div>
         </section>
@@ -84,7 +84,7 @@ export function EventsPage() {
           </h2>
           <div className="mt-3 flex flex-col gap-3">
             {month.items.map((activity) => (
-              <EventRow key={activity.id} activity={activity} />
+              <ActivityRow key={activity.id} activity={activity} />
             ))}
           </div>
         </section>
@@ -94,7 +94,7 @@ export function EventsPage() {
         <div className="mt-8">
           <EmptyState
             headline="Nothing coming up"
-            body="Events you schedule in any of your groups appear here, soonest first."
+            body="Activities you schedule in any of your groups appear here, soonest first."
           />
         </div>
       )}
@@ -102,12 +102,12 @@ export function EventsPage() {
       {past.length > 0 && (
         <section className="mt-10 border-t border-line pt-6">
           <Button variant="secondary" size="sm" onClick={() => setShowPast((v) => !v)}>
-            {showPast ? 'Hide past events' : `Show past events (${past.length})`}
+            {showPast ? 'Hide past activities' : `Show past activities (${past.length})`}
           </Button>
           {showPast && (
             <div className="mt-3 flex flex-col gap-3">
               {past.map((activity) => (
-                <EventRow key={activity.id} activity={activity} muted />
+                <ActivityRow key={activity.id} activity={activity} muted />
               ))}
             </div>
           )}
@@ -117,7 +117,7 @@ export function EventsPage() {
   );
 }
 
-function EventRow({
+function ActivityRow({
   activity,
   accent = false,
   muted = false,

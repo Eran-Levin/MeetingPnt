@@ -3,7 +3,7 @@ import { BottomTabBar, type BottomTabBarProps } from '@react-navigation/bottom-t
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LiveEventBar } from '../../src/components/LiveEventBar';
+import { LiveActivityBar } from '../../src/components/LiveActivityBar';
 import { useAuthStore } from '../../src/store/authStore';
 import { color, fontSize, space } from '../../src/ui/theme';
 
@@ -31,7 +31,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="activities"
         options={{
-          title: leads ? 'Calendar' : 'Your events',
+          title: leads ? 'Calendar' : 'Your activities',
           tabBarIcon: ({ color: c, size }) => (
             <Ionicons name="calendar-outline" color={c} size={size} />
           ),
@@ -57,7 +57,7 @@ function DockedTabBar({ showTabs, ...props }: BottomTabBarProps & { showTabs: bo
 
   return (
     <View style={styles.dock}>
-      <LiveEventBar />
+      <LiveActivityBar />
       {showTabs ? (
         <BottomTabBar {...props} />
       ) : (

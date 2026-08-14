@@ -147,7 +147,7 @@ export default function GroupsScreen() {
           headline={isLeaderOrAdmin ? 'Start your first group' : 'No groups yet'}
           body={
             isLeaderOrAdmin
-              ? 'A group holds a roster and the events that run inside it.'
+              ? 'A group holds a roster and the activities that run inside it.'
               : "You'll see a group here once a leader adds you."
           }
         />

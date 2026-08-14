@@ -170,10 +170,10 @@ export default function GroupDetailScreen() {
           ))}
       </Section>
 
-      <Section label="Events">
+      <Section label="Activities">
         {isLeader && (
           <Button
-            label="New event"
+            label="New activity"
             onPress={() => router.push(`/(tabs)/groups/${groupId}/activities/new`)}
             variant="secondary"
             style={styles.newEvent}
@@ -225,7 +225,7 @@ export default function GroupDetailScreen() {
         {activities.length === 0 && (
           <Empty
             headline="Nothing scheduled yet"
-            body={isLeader ? 'Add an event and the group will see it once published.' : undefined}
+            body={isLeader ? 'Add an activity and the group will see it once published.' : undefined}
           />
         )}
       </Section>

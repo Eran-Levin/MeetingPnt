@@ -139,7 +139,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       <p className="mt-1 text-sm text-ink-secondary">
         {singleLocation
           ? 'Where the class meets. The same place every time — there is no route to walk.'
-          : 'The stops in the order the group will walk them. During the event you move between them from your phone, and can still add stops the group hasn’t reached.'}
+          : 'The stops in the order the group will walk them. During the activity you move between them from your phone, and can still add stops the group hasn’t reached.'}
       </p>
 
       {listError && (
