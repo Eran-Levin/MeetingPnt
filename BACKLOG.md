@@ -156,9 +156,28 @@ code change is the same: the four call sites each invoke `sendPushNotifications`
 thin `notify(userId, event)` layer that fans out per channel and per user preference belongs in
 between before any second channel is threaded through them.
 
+**Direct messages have no inbox, and no unread state.** You reach a one-to-one thread through a
+person — a name in the attendee list, a row on the roster — and there is nowhere that lists your
+conversations or tells you one has a new message in it. Deliberate for now: an inbox needs a home,
+and a member's tab bar was removed on purpose (they have one destination, the calendar). The push
+notification is what tells someone a message arrived, and tapping it currently opens the app
+rather than the thread — `pingHandler` routes `location_ping` and `leader_location_request` and
+ignores `direct_message`. Deep-linking that is the smallest useful next step; an inbox only earns
+its place once people are running more than one or two threads.
+
+**Replacing a profile photo orphans the old file.** `PUT /users/me/avatar` writes a new file and
+repoints the row; nothing deletes what it replaced. Losing a photo to a failed write is worse than
+an orphan, so the sweep belongs with the BullMQ jobs above — and with the storage move, since on
+Render today those files don't survive a deploy anyway.
+
+**The portal shows names where mobile now shows faces.** `avatarUrl` is on every user the API
+returns, including the portal's roster and RSVP dashboard, and the portal ignores it. Capture is
+a phone thing — camera, in the moment — so the upload was built mobile-only; rendering the photo
+on the web is display-only work whenever it's wanted.
+
 **Chat history has no pagination UI.** The backend serves 50 messages a page and accepts
 a `before` cursor, but neither client passes it. Groups will silently cap at the most
-recent 50 messages with no way to scroll back.
+recent 50 messages with no way to scroll back. Direct threads inherited exactly the same gap.
 
 **No analysis section on the Web.** The groups list now separates Active from Closed, and the
 intent was a third, separate analysis area alongside them. Closed groups are where a leader

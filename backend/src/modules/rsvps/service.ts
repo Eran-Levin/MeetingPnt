@@ -101,7 +101,7 @@ export async function listAttendees(activityId: string, requesterId: string): Pr
 
   return approved
     .map((rsvp) => ({
-      user: { id: rsvp.user.id, name: displayName(rsvp.user) },
+      user: { id: rsvp.user.id, name: displayName(rsvp.user), avatarUrl: rsvp.user.avatarUrl },
       isVisitor: guestIds.has(rsvp.userId),
     }))
     .sort((a, b) => a.user.name.localeCompare(b.user.name));

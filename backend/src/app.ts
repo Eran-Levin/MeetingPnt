@@ -12,6 +12,7 @@ import {
 } from './modules/attendance/routes.js';
 import { authRouter } from './modules/auth/routes.js';
 import { chatRouter } from './modules/chat/routes.js';
+import { directMessagesRouter } from './modules/directMessages/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
 import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
 import {
@@ -67,6 +68,7 @@ export function createApp() {
   app.use('/api/activities', locationsRouter);
   app.use('/api/activities/:activityId', activityInvitationsRouter);
   app.use('/api/users', usersRouter);
+  app.use('/api/direct-messages', directMessagesRouter);
 
   app.use(errorHandler);
 

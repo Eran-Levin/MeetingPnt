@@ -5,12 +5,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../src/api/activitiesApi';
-import { authApi } from '../../../src/api/authApi';
-import { secureStore } from '../../../src/services/secureStore';
-import { endSession } from '../../../src/services/session';
+import { useAuthStore } from '../../../src/store/authStore';
 import {
   Badge,
   Button,
+  ButtonRow,
+  Card,
   DateBlock,
   Empty,
   Pill,
@@ -59,8 +59,12 @@ function bucketFor(activity: ActivityWithGroup, nearTermCutoff: number): string 
 export default function CalendarScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const [startingId, setStartingId] = useState<string | null>(null);
+  const [endingId, setEndingId] = useState<string | null>(null);
+  const [dismissedOverdueId, setDismissedOverdueId] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const leads = user?.role === 'leader' || user?.role === 'admin';
 
   const { data, isFetching } = useQuery({
     queryKey: ['activities', 'mine'],
@@ -87,6 +91,17 @@ export default function CalendarScreen() {
     .filter((a) => a.status !== 'in_progress' && hasEnded(a))
     .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
 
+  /**
+   * A leader who walked away without ending the event: it stays in_progress indefinitely, keeps
+   * location sharing open for everyone on the roster, and blocks starting the next one — a leader
+   * runs one at a time. So ask, once, on the screen they land on. Only the leader is asked; a
+   * member can't end anything, and for them the event simply carries on.
+   */
+  const overdueLive = activities.find(
+    (a) => a.isLeader && a.status === 'in_progress' && new Date(a.endAt).getTime() < now,
+  );
+  const askToClose = overdueLive && overdueLive.id !== dismissedOverdueId ? overdueLive : null;
+
   const nearTermCutoff = now + NEAR_TERM_DAYS * 24 * 60 * 60 * 1000;
   const buckets: { label: string; items: ActivityWithGroup[] }[] = [];
   for (const activity of upcoming) {
@@ -112,11 +127,15 @@ export default function CalendarScreen() {
     }
   }
 
-  async function handleLogout() {
-    const refreshToken = await secureStore.getRefreshToken();
-    await endSession();
-    router.replace('/(auth)/login');
-    if (refreshToken) authApi.logout(refreshToken).catch(() => undefined);
+  /** Ends the event the leader forgot to close, from the prompt on this screen. */
+  async function handleEnd(activity: ActivityWithGroup) {
+    setEndingId(activity.id);
+    try {
+      await activitiesApi.end(activity.id);
+      queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
+    } finally {
+      setEndingId(null);
+    }
   }
 
   function EventRow({ activity, last }: { activity: ActivityWithGroup; last: boolean }) {
@@ -154,16 +173,37 @@ export default function CalendarScreen() {
 
   return (
     <Screen
-      title="Calendar"
+      title={leads ? 'Calendar' : 'Your activities'}
+      back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] })}
       refreshing={isFetching}
       bottomInset={80}
-      headerRight={
-        <Pressable onPress={handleLogout} style={styles.logout}>
-          <Text style={[text.secondary, { color: color.accentText }]}>Log out</Text>
-        </Pressable>
-      }
     >
+      {askToClose && (
+        <Card style={styles.askToClose}>
+          <Text style={text.bodyStrong}>{askToClose.title} is still running</Text>
+          <Text style={[text.secondary, styles.askToCloseBody]}>
+            It was scheduled for{' '}
+            {formatActivityWhen(askToClose.startAt, askToClose.endAt, askToClose.allDay)} and hasn't
+            been ended. Ending it stops location sharing; attendance stays editable.
+          </Text>
+          <ButtonRow>
+            <Button
+              label={endingId === askToClose.id ? 'Ending…' : 'End activity'}
+              onPress={() => handleEnd(askToClose)}
+              busy={endingId === askToClose.id}
+              grow
+            />
+            <Button
+              label="Keep it running"
+              variant="secondary"
+              onPress={() => setDismissedOverdueId(askToClose.id)}
+              grow
+            />
+          </ButtonRow>
+        </Card>
+      )}
+
       {buckets.map((bucket, i) => (
         <Section key={bucket.label} label={bucket.label} first={i === 0}>
           {bucket.items.map((activity, index) => (
@@ -212,7 +252,8 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  logout: { paddingVertical: space.sm, paddingLeft: space.sm },
+  askToClose: { marginBottom: space.lg },
+  askToCloseBody: { marginTop: space.xs, marginBottom: space.md },
   rowExtras: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.sm },
   startButton: { flexGrow: 1 },
   toggle: { paddingVertical: space.sm },

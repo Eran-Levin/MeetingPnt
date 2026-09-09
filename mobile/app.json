@@ -26,7 +26,8 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -38,6 +39,13 @@
         "expo-notifications",
         {
           "color": "#2563eb"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "MeetingPnt uses the camera so you can take a photo of yourself for your profile, and send photos in a chat.",
+          "photosPermission": "MeetingPnt reads your photo library so you can pick a profile photo, or send one in a chat."
         }
       ],
       [

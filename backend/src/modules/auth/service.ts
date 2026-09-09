@@ -1,4 +1,4 @@
-import type { LoginDto, RegisterDto, User as SharedUser } from '@meetingpnt/shared';
+import type { LoginDto, RegisterDto } from '@meetingpnt/shared';
 import { prisma } from '../../db/prisma.js';
 import { env } from '../../config/env.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -7,22 +7,8 @@ import { signAccessToken } from '../../lib/jwt.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { generateRefreshToken, hashRefreshToken } from '../../lib/refreshToken.js';
 import { consumeInvitation } from '../invitations/service.js';
-import { displayName } from '../../lib/userName.js';
+import { toSharedUser } from '../../lib/userName.js';
 import type { User } from '@prisma/client';
-
-function toSharedUser(user: User): SharedUser {
-  return {
-    id: user.id,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    name: displayName(user),
-    phone: user.phone,
-    role: user.role,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  };
-}
 
 async function issueTokens(user: User) {
   const accessToken = signAccessToken({ sub: user.id, role: user.role });

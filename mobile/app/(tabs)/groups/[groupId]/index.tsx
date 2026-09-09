@@ -10,6 +10,7 @@ import { groupsApi } from '../../../../src/api/groupsApi';
 import { invitationsApi } from '../../../../src/api/invitationsApi';
 import { useAuthStore } from '../../../../src/store/authStore';
 import {
+  Avatar,
   Badge,
   Button,
   Card,
@@ -119,6 +120,12 @@ export default function GroupDetailScreen() {
             key={member.id}
             title={member.user.name}
             subtitle={[member.user.email, member.user.phone].filter(Boolean).join('  ·  ')}
+            leading={<Avatar name={member.user.name} uri={member.user.avatarUrl} />}
+            /* A leader reaching one person — "you're the only one who hasn't replied". The group
+               thread is the wrong place for that. */
+            onPress={
+              member.user.id === user?.id ? undefined : () => router.push(`/dm/${member.user.id}`)
+            }
             last={index === members.length - 1}
           />
         ))}

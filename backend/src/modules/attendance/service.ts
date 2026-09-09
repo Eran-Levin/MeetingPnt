@@ -162,7 +162,12 @@ export async function getRollCall(
       return rsvpByUser.get(user.id)?.status !== 'declined';
     })
     .map((user) => ({
-      user: { id: user.id, name: displayName(user), email: user.email },
+      user: {
+        id: user.id,
+        name: displayName(user),
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+      },
       isVisitor: guestIds.has(user.id),
       rsvpStatus: rsvpByUser.get(user.id)?.status ?? 'pending',
       attendance: attendanceByUser.get(user.id) ?? null,

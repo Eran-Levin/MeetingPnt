@@ -1,22 +1,7 @@
-import type { Role, User as SharedUser } from '@meetingpnt/shared';
-import type { User } from '@prisma/client';
+import type { Role } from '@meetingpnt/shared';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
-import { displayName } from '../../lib/userName.js';
-
-function toSharedUser(user: User): SharedUser {
-  return {
-    id: user.id,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    name: displayName(user),
-    phone: user.phone,
-    role: user.role,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  };
-}
+import { toSharedUser } from '../../lib/userName.js';
 
 export async function listUsers(params: { search?: string; role?: Role }) {
   const users = await prisma.user.findMany({

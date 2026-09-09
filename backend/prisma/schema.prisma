@@ -79,6 +79,7 @@ model User {
   firstName    String   @map("first_name")
   lastName     String   @map("last_name")
   phone        String?
+  avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(user)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -99,6 +100,8 @@ model User {
   attendanceRecords     Attendance[]       @relation("AttendanceUser")
   attendanceMarked      Attendance[]       @relation("AttendanceMarker")
   messages              Message[]
+  directMessagesSent    DirectMessage[]    @relation("DirectMessageSender")
+  directMessagesGot     DirectMessage[]    @relation("DirectMessageRecipient")
 
   @@map("users")
 }
@@ -281,6 +284,25 @@ model Message {
 
   @@index([groupId, createdAt])
   @@map("messages")
+}
+
+/// A message between two people. Deliberately not a Message with a null groupId: group chat is
+/// about the event and everyone in it, this is the side channel it can't carry — "can I give you
+/// a lift" — so it hangs off the pair and shares none of the group's read rules.
+model DirectMessage {
+  id          String   @id @default(uuid())
+  senderId    String   @map("sender_id")
+  recipientId String   @map("recipient_id")
+  body        String?
+  imageUrl    String?  @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sender    User @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("DirectMessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+  @@map("direct_messages")
 }
 
 model ActivityGuest {

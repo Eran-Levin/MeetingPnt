@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Image,
@@ -13,9 +13,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chatApi } from '../../../../src/api/chatApi';
-import { groupsApi } from '../../../../src/api/groupsApi';
-import { useAuthStore } from '../../../../src/store/authStore';
+import { ApiError } from '../../src/api/client';
+import { directMessagesApi } from '../../src/api/directMessagesApi';
+import { useAuthStore } from '../../src/store/authStore';
 import {
   Avatar,
   Button,
@@ -28,11 +28,16 @@ import {
   space,
   text,
   toneTint,
-} from '../../../../src/ui';
+} from '../../src/ui';
 
-export default function GroupChatScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
-  const user = useAuthStore((s) => s.user);
+/**
+ * One person, one thread. Reached by tapping someone in the attendee list or the roster — there's
+ * no inbox, because you go looking for a conversation through the person you want, not through a
+ * list of every conversation you've ever had.
+ */
+export default function DirectChatScreen() {
+  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const me = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [body, setBody] = useState('');
@@ -40,25 +45,18 @@ export default function GroupChatScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const groupQuery = useQuery({
-    queryKey: ['groups', groupId],
-    queryFn: () => groupsApi.get(groupId),
-  });
-  const isLeader = groupQuery.data?.group.leaderId === user?.id;
-  const chatMode = groupQuery.data?.group.chatMode;
-  const canPost = isLeader || chatMode === 'two_way';
-
-  const messagesQuery = useQuery({
-    queryKey: ['groups', groupId, 'messages'],
-    queryFn: () => chatApi.list(groupId),
+  const queryKey = ['direct-messages', userId];
+  const threadQuery = useQuery({
+    queryKey,
+    queryFn: () => directMessagesApi.thread(userId),
   });
 
-  // Mobile has no persistent socket connection — a push notification tells the user there's
-  // something new, and refetching on focus/pull-to-refresh picks it up.
+  // Same as group chat: no persistent socket on mobile, so a push says there's something new and
+  // focus/pull-to-refresh fetches it.
   useFocusEffect(
     useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] });
-    }, [groupId, queryClient]),
+      queryClient.invalidateQueries({ queryKey: ['direct-messages', userId] });
+    }, [queryClient, userId]),
   );
 
   async function handlePickImage() {
@@ -76,27 +74,37 @@ export default function GroupChatScreen() {
     setError(null);
     setSending(true);
     try {
-      await chatApi.send(
-        groupId,
+      await directMessagesApi.send(
+        userId,
         body.trim() || undefined,
         imageUri ? { uri: imageUri, name: 'photo.jpg', type: 'image/jpeg' } : undefined,
       );
       setBody('');
       setImageUri(null);
-      queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] });
-    } catch {
-      setError('Failed to send message.');
+      queryClient.invalidateQueries({ queryKey: ['direct-messages', userId] });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to send message.');
     } finally {
       setSending(false);
     }
   }
 
-  const messages = messagesQuery.data?.messages ?? [];
+  const thread = threadQuery.data?.thread;
+  const messages = thread?.messages ?? [];
+  const blocked = threadQuery.error instanceof ApiError && threadQuery.error.status === 403;
 
   return (
     <View style={styles.container}>
       <View style={[styles.headerPad, { paddingTop: insets.top + space.lg }]}>
-        <ScreenHeader title="Group chat" subtitle={groupQuery.data?.group.name} />
+        <ScreenHeader
+          title={thread?.withUser.name ?? '…'}
+          subtitle="Direct message"
+          right={
+            thread ? (
+              <Avatar name={thread.withUser.name} uri={thread.withUser.avatarUrl} size={36} />
+            ) : undefined
+          }
+        />
       </View>
 
       <ScrollView
@@ -104,29 +112,15 @@ export default function GroupChatScreen() {
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}
         refreshControl={
           <RefreshControl
-            refreshing={messagesQuery.isFetching}
-            onRefresh={() =>
-              queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] })
-            }
+            refreshing={threadQuery.isFetching}
+            onRefresh={() => queryClient.invalidateQueries({ queryKey: ['direct-messages', userId] })}
           />
         }
       >
-        <Text style={[text.secondary, styles.mode]}>
-          {chatMode === 'announcements'
-            ? 'Announcements only — members can read but not reply.'
-            : 'Two-way chat — anyone in the group can post.'}
-        </Text>
-
         {messages.map((message) => {
-          const mine = message.authorId === user?.id;
+          const mine = message.senderId === me?.id;
           return (
             <View key={message.id} style={[styles.message, mine && styles.messageMine]}>
-              {!mine && (
-                <View style={styles.author}>
-                  <Avatar name={message.author.name} uri={message.author.avatarUrl} size={24} />
-                  <Text style={text.caption}>{message.author.name}</Text>
-                </View>
-              )}
               {message.body && (
                 <View style={[styles.bubble, mine && styles.bubbleMine]}>
                   <Text style={mine ? styles.bodyMine : text.body}>{message.body}</Text>
@@ -139,15 +133,22 @@ export default function GroupChatScreen() {
           );
         })}
 
-        {messages.length === 0 && (
+        {blocked && (
           <Empty
-            headline="No messages yet"
-            body={canPost ? 'Say where you are, or what to bring.' : undefined}
+            headline="You can't message this person"
+            body="Direct messages only reach people you share a group or an activity with."
+          />
+        )}
+
+        {!blocked && messages.length === 0 && !threadQuery.isLoading && (
+          <Empty
+            headline={`Nothing yet with ${thread?.withUser.name ?? 'them'}`}
+            body="Sort a lift, swap a phone number, say you're running late — just the two of you."
           />
         )}
       </ScrollView>
 
-      {canPost ? (
+      {!blocked && (
         <View style={[styles.composer, { paddingBottom: space.md + insets.bottom }]}>
           {imageUri && <Image source={{ uri: imageUri }} style={styles.preview} />}
           <View style={styles.composerRow}>
@@ -170,10 +171,6 @@ export default function GroupChatScreen() {
           </View>
           {error && <Text style={styles.error}>{error}</Text>}
         </View>
-      ) : (
-        <Text style={[text.secondary, styles.readOnly, { paddingBottom: space.md + insets.bottom }]}>
-          Only the leader can post in this group.
-        </Text>
       )}
     </View>
   );
@@ -183,8 +180,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: color.surfaceSunken },
   headerPad: { paddingHorizontal: space.lg },
   scroll: { flex: 1 },
-  author: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  mode: { marginBottom: space.lg },
   message: { marginBottom: space.md, alignSelf: 'flex-start', maxWidth: '85%' },
   messageMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   bubble: {
@@ -193,7 +188,6 @@ const styles = StyleSheet.create({
     borderColor: color.border,
     borderRadius: radius.lg,
     padding: space.md,
-    marginTop: space.xs,
   },
   bubbleMine: { backgroundColor: color.accent, borderColor: color.accent },
   bodyMine: { fontSize: fontSize.body, color: color.textInverse },
@@ -226,5 +220,4 @@ const styles = StyleSheet.create({
   attachIcon: { fontSize: 24, color: color.textSecondary },
   preview: { width: 64, height: 64, borderRadius: radius.md, marginBottom: space.sm },
   error: { color: toneTint.danger.fg, marginTop: space.xs },
-  readOnly: { textAlign: 'center', padding: space.md, borderTopWidth: 1, borderTopColor: color.border },
 });
