@@ -8,13 +8,14 @@ export const directMessagesApi = {
     userId: string,
     body: string | undefined,
     image: { uri: string; name: string; type: string } | undefined,
-  ) => {
-    const formData = new FormData();
-    if (body) formData.append('body', body);
-    if (image) formData.append('image', image as unknown as Blob);
-    return apiFetch<{ message: DirectMessage }>(`/api/direct-messages/${userId}`, {
+  ) =>
+    apiFetch<{ message: DirectMessage }>(`/api/direct-messages/${userId}`, {
       method: 'POST',
-      formData,
-    });
-  },
+      formData: () => {
+        const formData = new FormData();
+        if (body) formData.append('body', body);
+        if (image) formData.append('image', image as unknown as Blob);
+        return formData;
+      },
+    }),
 };

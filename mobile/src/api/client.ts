@@ -16,8 +16,10 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   /** For multipart uploads — when set, `body` is ignored and Content-Type is left for the
-   * runtime to set (with the correct multipart boundary). */
-  formData?: FormData;
+   * runtime to set (with the correct multipart boundary). It's a factory, not a value, because a
+   * FormData is spent once it's been sent: the retry after a 401 refresh needs a fresh one, and
+   * replaying the used one uploads nothing at all. */
+  formData?: () => FormData;
   skipAuth?: boolean;
 }
 
@@ -30,7 +32,11 @@ async function rawFetch(path: string, options: RequestOptions = {}) {
       ...(options.formData ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken && !options.skipAuth ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: options.formData ?? (options.body ? JSON.stringify(options.body) : undefined),
+    body: options.formData
+      ? options.formData()
+      : options.body
+        ? JSON.stringify(options.body)
+        : undefined,
   });
 }
 

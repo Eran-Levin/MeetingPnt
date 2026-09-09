@@ -8,7 +8,29 @@ import { usersApi } from '../src/api/usersApi';
 import { secureStore } from '../src/services/secureStore';
 import { endSession } from '../src/services/session';
 import { useAuthStore } from '../src/store/authStore';
-import { Avatar, Button, ButtonRow, Card, Screen, Section, space, text } from '../src/ui';
+import {
+  Avatar,
+  Button,
+  ButtonRow,
+  Card,
+  Screen,
+  Section,
+  radius,
+  space,
+  text,
+  toneTint,
+} from '../src/ui';
+
+/**
+ * Says what actually went wrong. A photo upload can fail three ways that need different responses
+ * — the phone couldn't reach the server, the server refused the file, or the session had lapsed —
+ * and one flat "couldn't save that" sends you looking in the wrong place.
+ */
+function describeFailure(err: unknown): string {
+  if (err instanceof ApiError) return `${err.message} (HTTP ${err.status})`;
+  if (err instanceof Error) return `Couldn't reach the server: ${err.message}`;
+  return 'Could not save that photo.';
+}
 
 /**
  * Everything about *you*, in one place reachable from the header of every screen. It used to be
@@ -52,7 +74,7 @@ export default function AccountScreen() {
     try {
       await upload(result.assets[0]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save that photo.');
+      setError(describeFailure(err));
     } finally {
       setBusy(null);
     }
@@ -71,7 +93,7 @@ export default function AccountScreen() {
     try {
       await upload(result.assets[0]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save that photo.');
+      setError(describeFailure(err));
     } finally {
       setBusy(null);
     }
@@ -84,7 +106,7 @@ export default function AccountScreen() {
       const { user: updated } = await usersApi.removeAvatar();
       setUser(updated);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not remove that photo.');
+      setError(describeFailure(err));
     } finally {
       setBusy(null);
     }
@@ -140,7 +162,13 @@ export default function AccountScreen() {
               style={styles.remove}
             />
           )}
-          {error && <Text style={[text.secondary, styles.error]}>{error}</Text>}
+          {/* Loud on purpose: this used to be grey footnote text under two buttons, which is
+              indistinguishable from nothing having happened at all. */}
+          {error && (
+            <View style={styles.error}>
+              <Text style={[text.body, { color: toneTint.danger.fg }]}>{error}</Text>
+            </View>
+          )}
         </Card>
       </Section>
 
@@ -156,5 +184,10 @@ const styles = StyleSheet.create({
   identityText: { flex: 1, gap: space.xs },
   blurb: { marginBottom: space.md },
   remove: { marginTop: space.sm },
-  error: { marginTop: space.sm },
+  error: {
+    marginTop: space.md,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: toneTint.danger.bg,
+  },
 });
