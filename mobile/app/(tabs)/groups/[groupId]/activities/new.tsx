@@ -109,7 +109,7 @@ export default function NewActivityScreen() {
   }
 
   return (
-    <Screen title="New activity" bottomInset={80}>
+    <Screen title="New activity" bottomInset={56}>
       <TextField
         label="Title"
         placeholder="Sunrise walk — Old Town"

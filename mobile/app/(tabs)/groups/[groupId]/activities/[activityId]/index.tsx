@@ -416,7 +416,7 @@ export default function ActivityDetailScreen() {
     <Screen
       title={activity.title}
       subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
-      bottomInset={80}
+      bottomInset={56}
     >
       <View style={styles.status}>
         <Badge status={activity.status} />

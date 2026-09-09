@@ -177,7 +177,7 @@ export default function CalendarScreen() {
       back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] })}
       refreshing={isFetching}
-      bottomInset={80}
+      bottomInset={56}
     >
       {askToClose && (
         <Card style={styles.askToClose}>

@@ -104,7 +104,7 @@ export default function GroupDetailScreen() {
       subtitle={groupQuery.data?.group.description ?? undefined}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['groups', groupId] })}
       refreshing={groupQuery.isFetching}
-      bottomInset={80}
+      bottomInset={56}
       headerRight={
         <Pressable
           onPress={() => router.push(`/(tabs)/groups/${groupId}/chat`)}

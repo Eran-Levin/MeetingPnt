@@ -28,6 +28,7 @@ import {
   space,
   text,
   toneTint,
+  useTopInset,
 } from '../../src/ui';
 
 /**
@@ -40,6 +41,7 @@ export default function DirectChatScreen() {
   const me = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
   const [body, setBody] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -95,7 +97,7 @@ export default function DirectChatScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.headerPad, { paddingTop: insets.top + space.lg }]}>
+      <View style={[styles.headerPad, { paddingTop: topInset + space.lg }]}>
         <ScreenHeader
           title={thread?.withUser.name ?? '…'}
           subtitle="Direct message"

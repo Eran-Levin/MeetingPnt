@@ -58,7 +58,7 @@ export default function GroupsScreen() {
       back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['groups'] })}
       refreshing={isFetching}
-      bottomInset={80}
+      bottomInset={56}
     >
       {isLeaderOrAdmin &&
         (composing ? (

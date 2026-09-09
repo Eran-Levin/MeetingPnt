@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { createContext, useContext } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -14,6 +15,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import { Avatar } from './Avatar';
 import { color, minTouchTarget, sectionLabel, space, text } from './theme';
+
+/**
+ * True when chrome above the screen has already cleared the status bar — the tab layout does,
+ * because the running activity is pinned up there. Without this a screen underneath would clear
+ * the notch a second time and open with a band of empty space above its title.
+ */
+const TopInsetHandled = createContext(false);
+
+export function TopInsetHandledProvider({ children }: { children: React.ReactNode }) {
+  return <TopInsetHandled.Provider value>{children}</TopInsetHandled.Provider>;
+}
+
+/** How much a screen must pad to clear the status bar — zero when something above already did. */
+export function useTopInset(): number {
+  const insets = useSafeAreaInsets();
+  return useContext(TopInsetHandled) ? 0 : insets.top;
+}
 
 interface ScreenHeaderProps {
   title: string;
@@ -97,6 +115,7 @@ export function Screen({
   contentStyle,
 }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  const topInset = useTopInset();
 
   return (
     <ScrollView
@@ -106,7 +125,7 @@ export function Screen({
           padding: space.lg,
           // The status bar and the notch sit over this scroll — without clearing them the title
           // and the account button land under the hardware and can't be read or tapped.
-          paddingTop: insets.top + space.lg,
+          paddingTop: topInset + space.lg,
           paddingBottom: space.xxl + bottomInset + insets.bottom,
         },
         contentStyle,

@@ -133,10 +133,16 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Mobile composes from `mobile/src/ui`** (`Screen`, `Card`, `Button`, `Row`, `Chip`, `Badge`,
   `Section`, `Empty`); screen files should not be declaring their own colours or spacing. The
   portal's equivalents are `portal/src/components/ui`.
-- **The running event is a bar, not a tab.** It docks above the tab bar and is present on every
-  screen. A leader runs a few hours of live event a week, so a tab would sit empty the rest of the
-  time — while "reachable the moment they log in" has to hold wherever they happen to be standing
-  in the app, not only on the tab they last left selected.
+- **The running event is a bar, not a tab.** It sits under the status bar, above whatever screen
+  is showing. A leader runs a few hours of live event a week, so a tab would sit empty the rest of
+  the time — while "reachable the moment they log in" has to hold wherever they happen to be
+  standing in the app, not only on the tab they last left selected. It docked above the *tab* bar
+  first; the bottom of a screen is where the eye goes last, and it read as a footer rather than as
+  the live thing.
+- **The top safe area has exactly one owner.** `app/(tabs)/_layout.tsx` clears it for everything
+  inside the tabs, and `TopInsetHandledProvider` says so, because a `Screen` that clears the notch
+  under chrome that already did opens with a band of empty space. The strip is always there, even
+  with nothing running, so the inset doesn't jump when an activity starts.
 - **Planning screens go wide** on the web (`<PageContainer wide>`): roster beside events on a
   group, itinerary beside replies on an event. Holding both in view is the reason to plan on a
   browser at all. Reading-width pages — login, a form — stay narrow.

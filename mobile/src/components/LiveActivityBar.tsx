@@ -2,7 +2,6 @@ import type { ActivityWithGroup } from '@meetingpnt/shared';
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activitiesApi } from '../api/activitiesApi';
 import { attendanceApi } from '../api/attendanceApi';
 import { meetingPointsApi } from '../api/meetingPointsApi';
@@ -12,16 +11,17 @@ import { color, fontSize, fontWeight, radius, space, toneTint } from '../ui/them
 const REFRESH_MS = 30_000;
 
 /**
- * The running event, pinned above the tab bar and reachable from every screen.
+ * The running event, pinned under the status bar and reachable from every screen.
  *
  * It isn't a tab because a leader runs perhaps three hours of live event a week — a tab would sit
  * empty the rest of the time — and because "reachable the moment they log in" has to hold wherever
- * they happen to be standing in the app, not only on the tab they last left selected.
+ * they happen to be standing in the app, not only on the tab they last left selected. It sits at
+ * the top rather than above the tab bar because it is the one thing that should catch the eye on
+ * opening the app, and the bottom of a screen is where the eye goes last.
  */
 export function LiveActivityBar() {
   const router = useRouter();
   const pathname = usePathname();
-  const insets = useSafeAreaInsets();
 
   const { data } = useQuery({
     queryKey: ['activities', 'mine'],
@@ -55,7 +55,7 @@ export function LiveActivityBar() {
   if (pathname.includes(`/activities/${live.id}`)) return null;
 
   return (
-    <View style={[styles.dock, { paddingBottom: insets.bottom ? 0 : space.sm }]}>
+    <View style={styles.dock}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Open the running activity, ${live.title}`}
@@ -98,7 +98,7 @@ function summarise(
 }
 
 const styles = StyleSheet.create({
-  dock: { paddingHorizontal: space.sm, backgroundColor: color.surface },
+  dock: { paddingHorizontal: space.sm, paddingBottom: space.sm },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
