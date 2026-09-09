@@ -21,6 +21,11 @@ This split caused six features to be built and then removed. Check it before add
 Mobile's home is a **timeline of events**, not a list of groups — a leader's day is "what's
 happening", and a running event must be reachable the moment they log in.
 
+The calendar's first bucket, **Happening now, goes by the clock and not by status**. Nothing
+obliges anyone to press Start: a trek's Day 1 is happening today whether or not the guide opened
+the app, and it used to sit in "This week" reading exactly like Day 5 next Saturday. Anything
+genuinely `in_progress` is in the bar at the top instead and never reaches the list.
+
 ## How the three personas map onto groups
 
 A yoga class and a photo-walk club are **standing communities**: the group persists, events recur

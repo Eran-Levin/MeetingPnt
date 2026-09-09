@@ -44,12 +44,21 @@ function startableToday(activity: ActivityWithGroup): boolean {
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const NEAR_TERM_DAYS = 7;
 
+const HAPPENING_NOW = 'Happening now';
+
 /**
- * Events fall under "this week", then under the month they happen in. A twice-weekly yoga term is
- * otherwise twenty near-identical rows with nothing to navigate by, and a guide with a September
- * departure is reading about September in August.
+ * Events fall under what's running, then "this week", then the month they happen in. A
+ * twice-weekly yoga term is otherwise twenty near-identical rows with nothing to navigate by, and
+ * a guide with a September departure is reading about September in August.
+ *
+ * The first bucket goes by the clock, not the status, because nothing obliges anyone to press
+ * Start: a trek's Day 1 is happening today whether or not the guide opened the app, and it used to
+ * sit in "This week" reading exactly like Day 5 next Saturday. Anything genuinely started is in
+ * the bar at the top instead and never reaches this list.
  */
-function bucketFor(activity: ActivityWithGroup, nearTermCutoff: number): string {
+function bucketFor(activity: ActivityWithGroup, nearTermCutoff: number, now: number): string {
+  // Nothing here has ended — that's what put it in the upcoming list — so having begun is enough.
+  if (new Date(activity.startAt).getTime() <= now) return HAPPENING_NOW;
   if (new Date(activity.startAt).getTime() <= nearTermCutoff) return 'This week';
   return new Date(activity.startAt)
     .toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -102,10 +111,12 @@ export default function CalendarScreen() {
   );
   const askToClose = overdueLive && overdueLive.id !== dismissedOverdueId ? overdueLive : null;
 
+  // `upcoming` is oldest first, so anything already under way sorts ahead of anything that
+  // hasn't started — the Happening now bucket lands at the top without being ordered there.
   const nearTermCutoff = now + NEAR_TERM_DAYS * 24 * 60 * 60 * 1000;
   const buckets: { label: string; items: ActivityWithGroup[] }[] = [];
   for (const activity of upcoming) {
-    const label = bucketFor(activity, nearTermCutoff);
+    const label = bucketFor(activity, nearTermCutoff, now);
     const bucket = buckets.find((b) => b.label === label);
     if (bucket) bucket.items.push(activity);
     else buckets.push({ label, items: [activity] });
@@ -138,11 +149,20 @@ export default function CalendarScreen() {
     }
   }
 
-  function EventRow({ activity, last }: { activity: ActivityWithGroup; last: boolean }) {
+  function EventRow({
+    activity,
+    last,
+    active = false,
+  }: {
+    activity: ActivityWithGroup;
+    last: boolean;
+    active?: boolean;
+  }) {
     const start = new Date(activity.startAt);
     return (
       <View>
         <Row
+          active={active}
           title={activity.title}
           subtitle={`${activity.group.name}  ·  ${formatActivityWhen(
             activity.startAt,
@@ -210,6 +230,7 @@ export default function CalendarScreen() {
             <EventRow
               key={activity.id}
               activity={activity}
+              active={bucket.label === HAPPENING_NOW}
               last={index === bucket.items.length - 1}
             />
           ))}
