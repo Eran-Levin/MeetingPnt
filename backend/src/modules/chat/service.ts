@@ -18,7 +18,12 @@ function toSharedMessage(message: Message & { author: User }): MessageWithAuthor
     body: message.body,
     imageUrl: message.imageUrl,
     createdAt: message.createdAt.toISOString(),
-    author: { id: message.author.id, name: displayName(message.author), email: message.author.email },
+    author: {
+      id: message.author.id,
+      name: displayName(message.author),
+      email: message.author.email,
+      avatarUrl: message.author.avatarUrl,
+    },
   };
 }
 

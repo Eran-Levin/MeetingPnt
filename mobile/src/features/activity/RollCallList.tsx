@@ -1,6 +1,7 @@
 import type { RollCallEntry } from '@meetingpnt/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
+  Avatar,
   Empty,
   Section,
   color,
@@ -21,6 +22,7 @@ interface Props {
   onMark: (userId: string, status: 'present' | 'absent') => void;
   onLocate: (userId: string) => void;
   onRsvpFor: (userId: string, status: 'approved' | 'declined') => void;
+  onMessage: (userId: string) => void;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * happens outdoors, one-handed, with a group waiting — so present and absent are real buttons
  * that show their state, not text links you have to aim at.
  */
-export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor }: Props) {
+export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, onMessage }: Props) {
   const present = entries.filter((e) => e.attendance === 'present').length;
   const marked = entries.filter((e) => e.attendance !== null).length;
 
@@ -48,6 +50,8 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor }:
       {entries.map((entry) => (
         <View key={entry.user.id} style={styles.person}>
           <View style={styles.personHeader}>
+            {/* The face is the point of the photo: matching a name to someone you've met once. */}
+            <Avatar name={entry.user.name} uri={entry.user.avatarUrl} size={40} />
             <View style={styles.personText}>
               <Text style={text.bodyStrong} numberOfLines={1}>
                 {entry.user.name}
@@ -76,6 +80,7 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor }:
 
           <View style={styles.secondary}>
             <Quiet label="Locate" onPress={() => onLocate(entry.user.id)} />
+            <Quiet label="Message" onPress={() => onMessage(entry.user.id)} />
             {/* Answer for them if they replied by phone rather than in the app. */}
             {entry.rsvpStatus !== 'approved' && (
               <Quiet label="Confirm" onPress={() => onRsvpFor(entry.user.id, 'approved')} />

@@ -22,11 +22,13 @@ import { VisitorInvite } from '../../../../../../src/features/activity/VisitorIn
 import { getCurrentLocationSnapshot, watchPosition } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
 import {
+  Avatar,
   Badge,
   Button,
   ButtonRow,
   Card,
   Pill,
+  Row,
   Screen,
   Section,
   color,
@@ -180,6 +182,12 @@ export default function ActivityDetailScreen() {
   async function handleEnd() {
     await activitiesApi.end(activityId);
     queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
+  }
+
+  /** A thread with one person. Car-sharing, "I'll wait by the gate" — things the whole group
+   * doesn't need and the group chat buries. */
+  function openDirectChat(userId: string) {
+    router.push(`/dm/${userId}`);
   }
 
   async function handleMarkAttendance(userId: string, status: 'present' | 'absent') {
@@ -523,6 +531,7 @@ export default function ActivityDetailScreen() {
           onMark={handleMarkAttendance}
           onLocate={handleRequestLocation}
           onRsvpFor={handleRsvpForMember}
+          onMessage={openDirectChat}
         />
       )}
 
@@ -545,19 +554,26 @@ export default function ActivityDetailScreen() {
         />
       )}
 
-      {/* Who else is coming. Names only — attendance is the leader's view. */}
+      {/* Who else is coming. Names only — attendance is the leader's view. Tapping someone opens
+          a thread with just them, which is where sorting a lift belongs: the group chat is for
+          the whole group, and two people arranging a car aren't. */}
       {!isLeader && activity.status !== 'draft' && (
         <Section label={`Coming · ${attendees.length}`}>
           {attendees.length > 0 ? (
-            <View style={styles.attendees}>
-              {attendees.map((attendee) => (
-                <Pill
+            attendees.map((attendee, index) => {
+              const isMe = attendee.user.id === user?.id;
+              return (
+                <Row
                   key={attendee.user.id}
-                  tone={attendee.isVisitor ? 'accent' : 'neutral'}
-                  label={attendee.isVisitor ? `${attendee.user.name} · visitor` : attendee.user.name}
+                  title={isMe ? `${attendee.user.name} (you)` : attendee.user.name}
+                  subtitle={attendee.isVisitor ? 'Visitor' : undefined}
+                  leading={<Avatar name={attendee.user.name} uri={attendee.user.avatarUrl} />}
+                  trailing={isMe ? undefined : <Pill tone="neutral" label="Message" />}
+                  onPress={isMe ? undefined : () => openDirectChat(attendee.user.id)}
+                  last={index === attendees.length - 1}
                 />
-              ))}
-            </View>
+              );
+            })
           ) : (
             <Card>
               <Text style={text.secondary}>Nobody has confirmed yet.</Text>
@@ -598,5 +614,4 @@ const styles = StyleSheet.create({
   controls: { marginTop: space.sm },
   planned: { marginTop: space.sm },
   broadcast: { marginTop: space.md },
-  attendees: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

@@ -24,6 +24,9 @@ export interface User {
   /** `firstName lastName`, derived server-side so every screen renders a person the same way. */
   name: string;
   phone: string | null;
+  /** Absolute URL of the photo they took of themselves, or null. Everywhere a person is listed
+   * shows a face when there is one and their initials when there isn't. */
+  avatarUrl: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;
@@ -50,7 +53,7 @@ export interface GroupMember {
 
 export interface GroupMemberWithUser extends GroupMember {
   /** The roster carries the phone number — it's how a leader reaches someone who hasn't shown up. */
-  user: Pick<User, 'id' | 'name' | 'email' | 'phone'>;
+  user: Pick<User, 'id' | 'name' | 'email' | 'phone' | 'avatarUrl'>;
 }
 
 export interface GroupWithRole extends Group {
@@ -144,7 +147,7 @@ export interface ActivityWithGroup extends Activity {
 /** Someone confirmed as coming, as shown to fellow members. Deliberately carries no attendance
  * data — the roll call is the leader's view, not something peers see about each other. */
 export interface Attendee {
-  user: Pick<User, 'id' | 'name'>;
+  user: Pick<User, 'id' | 'name' | 'avatarUrl'>;
   isVisitor: boolean;
 }
 
@@ -167,7 +170,7 @@ export interface AttendanceWithUser extends Attendance {
  * expects everyone who hasn't declined, each later one expects whoever made the previous stop.
  */
 export interface RollCallEntry {
-  user: Pick<User, 'id' | 'name' | 'email'>;
+  user: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>;
   isVisitor: boolean;
   rsvpStatus: RsvpStatus;
   /** null until the leader marks them at this meeting point. */
@@ -192,7 +195,27 @@ export interface Message {
 }
 
 export interface MessageWithAuthor extends Message {
-  author: Pick<User, 'id' | 'name' | 'email'>;
+  author: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>;
+}
+
+/**
+ * One message in a conversation between two people. Group chat is about the event; this is the
+ * side channel it can't carry — "can I get a lift", "I'm two minutes behind you" — so it hangs
+ * off the pair of people, not off a group or an activity.
+ */
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  body: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
+/** A direct thread as one side sees it: the messages, and who they are talking to. */
+export interface DirectThread {
+  withUser: Pick<User, 'id' | 'name' | 'avatarUrl'>;
+  messages: DirectMessage[];
 }
 
 export interface Rsvp {

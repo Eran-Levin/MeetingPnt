@@ -2,10 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { authApi } from '../../../src/api/authApi';
 import { groupsApi } from '../../../src/api/groupsApi';
-import { secureStore } from '../../../src/services/secureStore';
-import { endSession } from '../../../src/services/session';
 import { useAuthStore } from '../../../src/store/authStore';
 import {
   Badge,
@@ -55,24 +52,13 @@ export default function GroupsScreen() {
     }
   }
 
-  async function handleLogout() {
-    const refreshToken = await secureStore.getRefreshToken();
-    await endSession();
-    router.replace('/(auth)/login');
-    if (refreshToken) authApi.logout(refreshToken).catch(() => undefined);
-  }
-
   return (
     <Screen
       title="Groups"
+      back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['groups'] })}
       refreshing={isFetching}
       bottomInset={80}
-      headerRight={
-        <Pressable onPress={handleLogout} style={styles.logout}>
-          <Text style={[text.secondary, { color: color.accentText }]}>Log out</Text>
-        </Pressable>
-      }
     >
       {isLeaderOrAdmin &&
         (composing ? (
@@ -157,6 +143,5 @@ export default function GroupsScreen() {
 }
 
 const styles = StyleSheet.create({
-  logout: { paddingVertical: space.sm, paddingLeft: space.sm },
   createActions: { flexDirection: 'row', gap: space.sm },
 });

@@ -62,6 +62,7 @@ function toSharedMember(member: GroupMember & { user: User }): GroupMemberWithUs
       name: displayName(member.user),
       email: member.user.email,
       phone: member.user.phone,
+      avatarUrl: member.user.avatarUrl,
     },
   };
 }

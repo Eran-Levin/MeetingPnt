@@ -87,7 +87,16 @@ ordinary events in the same group, and they *do* take RSVPs.
 
 ## Member experience
 
-- Members see the **names of who's coming**, not the leader's roll call.
+- Members see the **names of who's coming**, not the leader's roll call — and tapping one opens a
+  direct thread with that person. Car-sharing is the case that asked for it: two people arranging a
+  lift aren't a conversation the whole group should have to read, and the group chat buries it.
+  Reachability is the rule, not the list: `assertReachable` in
+  `backend/src/modules/directMessages/service.ts` allows a thread only between people who share a
+  group or an activity, so an attendee list can't become a way to reach a stranger. There is no
+  inbox — you go looking for a conversation through the person (see BACKLOG).
+- **A face, or their initials — never a silhouette.** `User.avatarUrl` is a photo the user takes of
+  themselves in Account; `Avatar` falls back to initials, because a roster of identical grey heads
+  distinguishes people worse than the names already did.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
 - **A member has one destination.** Their read-only view of a roster didn't earn a permanent tab,
@@ -111,6 +120,16 @@ ordinary events in the same group, and they *do* take RSVPs.
   row of `Text` links.
 - **Accent is reserved for where the group is now** — the live event, the current meeting point.
   Spend it anywhere else and it stops meaning anything.
+- **One header, and it's ours.** The native stack header is off everywhere; `ScreenHeader` in
+  `mobile/src/ui/Screen.tsx` draws the title, the back arrow and the account button. With both,
+  every pushed screen said its name twice — small in the navigation bar, large in the page — and
+  the page header is the one carrying the subtitle and the actions. It also owns the top safe-area
+  inset: the screen scrolls under the notch, so without `insets.top` the title sits under the
+  hardware and can't be read.
+- **The account button is on every screen**, not just the one you land on. It's the avatar at the
+  top right; it opens `app/account.tsx`, which is where the photo and Log out live. Signed-in
+  identity used to be the calendar's top-right corner only, so a leader two screens into a group
+  had no way to see who they were, let alone sign out.
 - **Mobile composes from `mobile/src/ui`** (`Screen`, `Card`, `Button`, `Row`, `Chip`, `Badge`,
   `Section`, `Empty`); screen files should not be declaring their own colours or spacing. The
   portal's equivalents are `portal/src/components/ui`.
