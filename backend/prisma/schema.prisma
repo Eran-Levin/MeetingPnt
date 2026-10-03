@@ -81,6 +81,11 @@ model User {
   phone        String?
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(user)
+  // A roster slot for someone with no account of their own (e.g. a child in a party) — a real
+  // User row so Rsvp/Attendance/GroupMember work unchanged, but passwordHash is unusable and
+  // login can never succeed. Flipped false in place when the person later claims it via their
+  // own invitation, keeping the same id so everything already attached to it stays valid.
+  isPlaceholder Boolean @default(false) @map("is_placeholder")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -91,6 +96,7 @@ model User {
   groupsLed             Group[]            @relation("GroupLeader")
   groupMemberships      GroupMember[]
   invitationsSent       Invitation[]
+  invitationClaims      Invitation[]       @relation("InvitationClaimsUser")
   activitiesCreated     Activity[]
   rsvps                 Rsvp[]
   meetingPointsCreated  MeetingPoint[]
@@ -160,6 +166,7 @@ model Group {
 
   leader        User           @relation("GroupLeader", fields: [leaderId], references: [id])
   members       GroupMember[]
+  parties       Party[]
   invitations   Invitation[]
   activities    Activity[]
   meetingPoints MeetingPoint[]
@@ -173,22 +180,55 @@ model GroupMember {
   id       String            @id @default(uuid())
   groupId  String            @map("group_id")
   userId   String            @map("user_id")
+  partyId  String?           @map("party_id")
   status   GroupMemberStatus @default(active)
   joinedAt DateTime          @default(now()) @map("joined_at")
 
-  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  party Party? @relation(fields: [partyId], references: [id], onDelete: SetNull)
 
   @@unique([groupId, userId])
   @@index([groupId, status])
   @@index([userId])
+  @@index([partyId])
   @@map("group_members")
+}
+
+// People who join as a unit — a family, a pair of friends — rather than individually. The rep
+// (always the person the leader directly invited) can later act on behalf of the whole party;
+// repMemberId is a plain column rather than a Prisma relation field, same reasoning as
+// Activity.currentMeetingPointId above: GroupMember.partyId -> Party plus a Party -> GroupMember
+// relation back the other way would be a two-way cascade cycle between the same two models. The
+// FK and its ON DELETE SET NULL live in the migration SQL instead.
+model Party {
+  id          String   @id @default(uuid())
+  groupId     String   @map("group_id")
+  name        String?
+  // Total size the leader declared when inviting the rep (rep included) — what the rep's
+  // "name your party" step must reach before the party is complete.
+  size        Int
+  repMemberId String?  @map("rep_member_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  group       Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  members     GroupMember[]
+  invitations Invitation[]
+
+  @@index([groupId])
+  @@map("parties")
 }
 
 model Invitation {
   id         String           @id @default(uuid())
   groupId    String           @map("group_id")
   activityId String?          @map("activity_id")
+  // Set when this invitation is for a member of a Party (either the rep's own invite, or one the
+  // rep sent for a named party member). claimsUserId, when set, is the placeholder User this
+  // invitation will claim in place on acceptance rather than creating a new account — only
+  // present for a party member who already has a placeholder roster slot waiting.
+  partyId      String?          @map("party_id")
+  claimsUserId String?          @map("claims_user_id")
   email      String           @db.Citext
   firstName  String?          @map("first_name")
   lastName   String?          @map("last_name")
@@ -199,12 +239,15 @@ model Invitation {
   expiresAt  DateTime         @map("expires_at")
   createdAt  DateTime         @default(now()) @map("created_at")
 
-  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  inviter  User      @relation(fields: [invitedBy], references: [id])
+  group      Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  inviter    User      @relation(fields: [invitedBy], references: [id])
+  party      Party?    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  claimsUser User?     @relation("InvitationClaimsUser", fields: [claimsUserId], references: [id], onDelete: Cascade)
 
   @@unique([tokenHash])
   @@index([groupId, email])
+  @@index([partyId])
   @@map("invitations")
 }
 

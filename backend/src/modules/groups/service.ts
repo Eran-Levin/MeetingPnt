@@ -5,7 +5,7 @@ import type {
   GroupWithRole,
   UpdateGroupDto,
 } from '@meetingpnt/shared';
-import type { Group, GroupMember, User } from '@prisma/client';
+import type { Group, GroupMember, Party, User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -50,11 +50,14 @@ function toSharedGroup(group: Group, hasRunAnEvent = false): SharedGroup {
   };
 }
 
-function toSharedMember(member: GroupMember & { user: User }): GroupMemberWithUser {
+function toSharedMember(
+  member: GroupMember & { user: User; party: Party | null },
+): GroupMemberWithUser {
   return {
     id: member.id,
     groupId: member.groupId,
     userId: member.userId,
+    partyId: member.partyId,
     status: member.status,
     joinedAt: member.joinedAt.toISOString(),
     user: {
@@ -63,7 +66,11 @@ function toSharedMember(member: GroupMember & { user: User }): GroupMemberWithUs
       email: member.user.email,
       phone: member.user.phone,
       avatarUrl: member.user.avatarUrl,
+      isPlaceholder: member.user.isPlaceholder,
     },
+    party: member.party
+      ? { id: member.party.id, name: member.party.name, isRep: member.party.repMemberId === member.id }
+      : null,
   };
 }
 
@@ -162,7 +169,7 @@ export async function listMembers(groupId: string, requesterId: string) {
   await assertMembership(groupId, requesterId);
   const members = await prisma.groupMember.findMany({
     where: { groupId, status: 'active' },
-    include: { user: true },
+    include: { user: true, party: true },
     orderBy: { joinedAt: 'asc' },
   });
   return members.map(toSharedMember);

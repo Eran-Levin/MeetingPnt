@@ -1,4 +1,4 @@
-import type { GroupChatMode, GroupStatus } from '@meetingpnt/shared';
+import type { GroupChatMode, GroupMemberWithUser, GroupStatus } from '@meetingpnt/shared';
 import { formatActivityWhen } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -31,6 +31,8 @@ export function GroupDetailPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [partySize, setPartySize] = useState(1);
+  const [partyName, setPartyName] = useState('');
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -65,17 +67,26 @@ export function GroupDetailPage() {
         firstName,
         lastName,
         ...(phone.trim() ? { phone: phone.trim() } : {}),
+        ...(partySize > 1
+          ? { partySize, ...(partyName.trim() ? { partyName: partyName.trim() } : {}) }
+          : {}),
       });
       const who = `${firstName} ${lastName}`.trim();
+      const partyNote =
+        partySize > 1
+          ? ` They'll be asked to name ${partySize - 1} more party member${partySize - 1 > 1 ? 's' : ''} once they sign up.`
+          : '';
       setInviteMessage(
-        result.type === 'added'
+        (result.type === 'added'
           ? `${who} was added to the group.`
-          : `Invitation sent to ${who} at ${email}.`,
+          : `Invitation sent to ${who} at ${email}.`) + partyNote,
       );
       setEmail('');
       setFirstName('');
       setLastName('');
       setPhone('');
+      setPartySize(1);
+      setPartyName('');
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'invitations'] });
     } catch (err) {
@@ -127,6 +138,19 @@ export function GroupDetailPage() {
   }
 
   const members = membersQuery.data?.members ?? [];
+  // Party members are shown grouped under their party (rep marked) rather than flattened into
+  // the plain roster — the route isn't secret and "who's travelling together" is useful context.
+  const partylessMembers = members.filter((m) => !m.party);
+  const partyOrder: string[] = [];
+  const partyMembersById = new Map<string, typeof members>();
+  for (const member of members) {
+    if (!member.party) continue;
+    if (!partyMembersById.has(member.party.id)) {
+      partyOrder.push(member.party.id);
+      partyMembersById.set(member.party.id, []);
+    }
+    partyMembersById.get(member.party.id)!.push(member);
+  }
   const activities = activitiesQuery.data?.activities ?? [];
   const standaloneActivities = activities.filter((a) => !a.seriesId);
   const seriesGroups = new Map<string, typeof standaloneActivities>();
@@ -210,36 +234,37 @@ export function GroupDetailPage() {
             </div>
           ) : members.length > 0 ? (
             <Card className="mt-3 divide-y divide-line p-0">
-              {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0 text-sm">
-                    <p className="truncate text-ink">{member.user.name}</p>
-                    <p className="truncate text-ink-muted">
-                      {member.user.email}
-                      {member.user.phone && (
-                        <>
-                          {' · '}
-                          <a
-                            href={`tel:${member.user.phone}`}
-                            className="text-ink-secondary hover:text-accent-text hover:underline"
-                          >
-                            {member.user.phone}
-                          </a>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  {isLeader && member.userId !== groupQuery.data?.group.leaderId && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveMember(member.userId)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
+              {partylessMembers.map((member) => (
+                <MemberRow
+                  key={member.id}
+                  member={member}
+                  isLeader={isLeader}
+                  isGroupLeader={member.userId === groupQuery.data?.group.leaderId}
+                  onRemove={() => handleRemoveMember(member.userId)}
+                />
               ))}
+              {partyOrder.map((partyId) => {
+                const partyMembers = partyMembersById.get(partyId)!;
+                const rep = partyMembers.find((m) => m.party?.isRep);
+                return (
+                  <div key={partyId} className="bg-surface-sunken/40 py-1">
+                    <p className="px-4 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
+                      {rep?.party?.name ?? `Party of ${partyMembers.length}`}
+                    </p>
+                    {partyMembers.map((member) => (
+                      <MemberRow
+                        key={member.id}
+                        member={member}
+                        isLeader={isLeader}
+                        isGroupLeader={member.userId === groupQuery.data?.group.leaderId}
+                        onRemove={() => handleRemoveMember(member.userId)}
+                        indented
+                        isRep={member.party?.isRep}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
             </Card>
           ) : (
             <div className="mt-3">
@@ -285,6 +310,29 @@ export function GroupDetailPage() {
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <TextField
+                    label="Party size"
+                    type="number"
+                    min={1}
+                    value={partySize}
+                    onChange={(e) => setPartySize(Math.max(1, Number(e.target.value) || 1))}
+                  />
+                  {partySize > 1 && (
+                    <TextField
+                      label="Party name (optional)"
+                      placeholder="The Smiths"
+                      value={partyName}
+                      onChange={(e) => setPartyName(e.target.value)}
+                    />
+                  )}
+                </div>
+                {partySize > 1 && (
+                  <p className="text-xs text-ink-muted">
+                    Once they sign up, they'll be asked to name the other {partySize - 1} member
+                    {partySize - 1 > 1 ? 's' : ''} of their party.
+                  </p>
+                )}
                 <Button type="submit" disabled={inviting} className="self-start">
                   {inviting ? 'Sending…' : 'Invite member'}
                 </Button>
@@ -399,5 +447,63 @@ export function GroupDetailPage() {
         />
       )}
     </PageContainer>
+  );
+}
+
+function MemberRow({
+  member,
+  isLeader,
+  isGroupLeader,
+  onRemove,
+  indented,
+  isRep,
+}: {
+  member: GroupMemberWithUser;
+  isLeader: boolean;
+  isGroupLeader: boolean;
+  onRemove: () => void;
+  indented?: boolean;
+  isRep?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 px-4 py-3 ${indented ? 'pl-8' : ''}`}
+    >
+      <div className="min-w-0 text-sm">
+        <p className="flex items-center gap-2 truncate text-ink">
+          {member.user.name}
+          {isRep && (
+            <span className="rounded-full bg-tone-neutral-bg px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-tone-neutral-fg">
+              Rep
+            </span>
+          )}
+        </p>
+        <p className="truncate text-ink-muted">
+          {member.user.isPlaceholder ? (
+            'No account yet'
+          ) : (
+            <>
+              {member.user.email}
+              {member.user.phone && (
+                <>
+                  {' · '}
+                  <a
+                    href={`tel:${member.user.phone}`}
+                    className="text-ink-secondary hover:text-accent-text hover:underline"
+                  >
+                    {member.user.phone}
+                  </a>
+                </>
+              )}
+            </>
+          )}
+        </p>
+      </div>
+      {isLeader && !isGroupLeader && (
+        <Button variant="ghost" size="sm" onClick={onRemove}>
+          Remove
+        </Button>
+      )}
+    </div>
   );
 }

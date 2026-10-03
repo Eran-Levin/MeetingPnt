@@ -15,12 +15,18 @@ export default function RegisterScreen() {
     firstName: prefilledFirstName,
     lastName: prefilledLastName,
     phone: prefilledPhone,
+    partyId,
+    partySize,
+    partyName,
   } = useLocalSearchParams<{
     invitationToken?: string;
     email?: string;
     firstName?: string;
     lastName?: string;
     phone?: string;
+    partyId?: string;
+    partySize?: string;
+    partyName?: string;
   }>();
   // Pre-filled from the invitation when there is one — the invitee confirms rather than retypes.
   const [firstName, setFirstName] = useState(prefilledFirstName ?? '');
@@ -44,7 +50,15 @@ export default function RegisterScreen() {
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
       await establishSession(data);
-      router.replace('/(tabs)/activities');
+      const size = Number(partySize ?? '1');
+      if (partyId && size > 1) {
+        router.replace({
+          pathname: '/(auth)/party-members',
+          params: { partyId, partySize: String(size), partyName: partyName ?? '' },
+        });
+      } else {
+        router.replace('/(tabs)/activities');
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {

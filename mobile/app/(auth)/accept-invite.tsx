@@ -48,10 +48,16 @@ export default function AcceptInviteScreen() {
     );
   }
 
+  const party = data.party;
+
   return (
     <AuthLayout
       title="You’re invited"
-      subtitle={`Join ${data.group.name} on MeetingPnt as ${data.email}.`}
+      subtitle={
+        party
+          ? `Join ${data.group.name} on MeetingPnt as ${data.email}. You're bringing a party of ${party.size} — you'll name the rest after signing up.`
+          : `Join ${data.group.name} on MeetingPnt as ${data.email}.`
+      }
       /* Carries through whatever the leader filled in, so signing up is password-only. */
       footer={
         <Link
@@ -63,6 +69,9 @@ export default function AcceptInviteScreen() {
               firstName: data.firstName ?? '',
               lastName: data.lastName ?? '',
               phone: data.phone ?? '',
+              partyId: party?.id ?? '',
+              partySize: String(party?.size ?? 1),
+              partyName: party?.name ?? '',
             },
           }}
           style={[text.body, { color: color.accentText }]}
