@@ -6,7 +6,7 @@ import { parseDurationMs } from '../../lib/duration.js';
 import { signAccessToken } from '../../lib/jwt.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { generateRefreshToken, hashRefreshToken } from '../../lib/refreshToken.js';
-import { consumeInvitation } from '../invitations/service.js';
+import { consumeInvitation, findPendingInvitationByToken } from '../invitations/service.js';
 import { toSharedUser } from '../../lib/userName.js';
 import type { User } from '@prisma/client';
 
@@ -26,6 +26,37 @@ async function issueTokens(user: User) {
 }
 
 export async function register(input: RegisterDto) {
+  // A party member invited with an email already has a placeholder User waiting for them (so
+  // the roster/RSVP/attendance already work for them) — registering claims that row in place
+  // rather than creating a second account, which is why this runs before the usual
+  // email-already-taken check below: the placeholder legitimately already owns that email.
+  if (input.invitationToken) {
+    const invitation = await findPendingInvitationByToken(input.invitationToken);
+    if (invitation?.claimsUserId) {
+      const placeholder = await prisma.user.findUnique({ where: { id: invitation.claimsUserId } });
+      if (placeholder?.isPlaceholder) {
+        if (invitation.email.toLowerCase() !== input.email.toLowerCase()) {
+          throw new HttpError(400, 'This invitation was issued for a different email address');
+        }
+        const passwordHash = await hashPassword(input.password);
+        const user = await prisma.user.update({
+          where: { id: placeholder.id },
+          data: {
+            email: input.email,
+            passwordHash,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            phone: input.phone ?? placeholder.phone,
+            isPlaceholder: false,
+          },
+        });
+        await consumeInvitation(input.invitationToken, user.email, user.id);
+        const tokens = await issueTokens(user);
+        return { user: toSharedUser(user), ...tokens };
+      }
+    }
+  }
+
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) {
     throw new HttpError(409, 'An account with this email already exists');

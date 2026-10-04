@@ -25,6 +25,7 @@ import {
   activityMeetingPointsRouter,
   meetingPointsRouter,
 } from './modules/meetingPoints/routes.js';
+import { partiesRouter } from './modules/parties/routes.js';
 import { rsvpsRouter } from './modules/rsvps/routes.js';
 import { usersRouter } from './modules/users/routes.js';
 
@@ -58,6 +59,7 @@ export function createApp() {
   app.use('/api/groups', chatRouter);
   app.use('/api/groups/:groupId/invitations', groupInvitationsRouter);
   app.use('/api/invitations', invitationsRouter);
+  app.use('/api/parties', partiesRouter);
   app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
   app.use('/api/activities', activitiesRouter);
   app.use('/api/activities', rsvpsRouter);

@@ -47,13 +47,31 @@ export interface GroupMember {
   id: string;
   groupId: string;
   userId: string;
+  /** Set when this member travels as part of a Party — see PartyMembership below. */
+  partyId: string | null;
   status: GroupMemberStatus;
   joinedAt: string;
 }
 
+/** People who joined as a unit (a family, a pair of friends) rather than individually. */
+export interface Party {
+  id: string;
+  groupId: string;
+  name: string | null;
+  /** Total size the leader declared, rep included — what the rep's roster must reach. */
+  size: number;
+  repMemberId: string | null;
+  createdAt: string;
+}
+
 export interface GroupMemberWithUser extends GroupMember {
   /** The roster carries the phone number — it's how a leader reaches someone who hasn't shown up. */
-  user: Pick<User, 'id' | 'name' | 'email' | 'phone' | 'avatarUrl'>;
+  user: Pick<User, 'id' | 'name' | 'email' | 'phone' | 'avatarUrl'> & {
+    /** True for a roster slot with no account behind it yet (e.g. a child in a party) — the
+     * roster shows this instead of their unusable placeholder email. */
+    isPlaceholder: boolean;
+  };
+  party: { id: string; name: string | null; isRep: boolean } | null;
 }
 
 export interface GroupWithRole extends Group {
@@ -66,6 +84,9 @@ export interface Invitation {
   id: string;
   groupId: string;
   activityId: string | null;
+  /** Set when this invitation belongs to a Party — either the rep's own, or one the rep sent for
+   * a named party member. */
+  partyId: string | null;
   email: string;
   status: InvitationStatus;
   invitedBy: string;
@@ -94,6 +115,9 @@ export interface InvitationPreview {
   /** Deep link into the app for this invitation, for someone who already has it installed. */
   appLink: string;
   group: Pick<Group, 'id' | 'name'>;
+  /** Present when this invitation makes the registrant a party rep — lets the client send them
+   * straight into naming the rest of the party once they've signed up. */
+  party: { id: string; name: string | null; size: number } | null;
 }
 
 export interface Activity {

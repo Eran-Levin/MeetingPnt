@@ -57,6 +57,22 @@ export const inviteMemberSchema = z.object({
   firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
   lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
   phone: phoneSchema.optional(),
+  // A party is declared here but formed later: the leader only sets its size and name when
+  // inviting the rep. The rep names the rest of the party themselves once they've registered.
+  partyName: z.string().trim().min(1).optional(),
+  partySize: z.number().int().min(1).max(20).optional(),
+});
+
+/** One named party member — the rep supplies these for everyone beyond themselves. */
+export const partyMemberSchema = z.object({
+  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
+  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  email: z.string().email().optional(),
+  phone: phoneSchema.optional(),
+});
+
+export const addPartyMembersSchema = z.object({
+  members: z.array(partyMemberSchema).min(1),
 });
 
 // ---- activities ----

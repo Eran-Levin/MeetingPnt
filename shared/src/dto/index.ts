@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type {
+  addPartyMembersSchema,
   attendanceEntrySchema,
   createActivitySchema,
   createGroupSchema,
@@ -8,6 +9,7 @@ import type {
   loginSchema,
   meetingPointTemplateSchema,
   omwLocationSchema,
+  partyMemberSchema,
   pingRequestSchema,
   pingResponseSchema,
   pushTokenSchema,
@@ -29,6 +31,8 @@ export type RoleElevationDto = z.infer<typeof roleElevationSchema>;
 export type CreateGroupDto = z.infer<typeof createGroupSchema>;
 export type UpdateGroupDto = z.infer<typeof updateGroupSchema>;
 export type InviteMemberDto = z.infer<typeof inviteMemberSchema>;
+export type PartyMemberDto = z.infer<typeof partyMemberSchema>;
+export type AddPartyMembersDto = z.infer<typeof addPartyMembersSchema>;
 export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
 export type MeetingPointTemplateDto = z.infer<typeof meetingPointTemplateSchema>;
 export type CreateActivityDto = z.infer<typeof createActivitySchema>;
