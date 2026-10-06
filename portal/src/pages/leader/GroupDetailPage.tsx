@@ -1,10 +1,10 @@
 import type { GroupChatMode, GroupMemberWithUser, GroupStatus } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, isolate } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { apiErrorMessage } from '../../i18n/index.js';
+import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
 import { GroupChatPanel } from '../../components/GroupChatPanel.js';
@@ -20,6 +20,8 @@ import { useAuthStore } from '../../store/authStore.js';
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
 
 export function GroupDetailPage() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const groupId = id!;
   const navigate = useNavigate();
@@ -72,14 +74,16 @@ export function GroupDetailPage() {
           : {}),
       });
       const who = `${firstName} ${lastName}`.trim();
-      const partyNote =
-        partySize > 1
-          ? ` They'll be asked to name ${partySize - 1} more party member${partySize - 1 > 1 ? 's' : ''} once they sign up.`
-          : '';
+      const partyNote = partySize > 1 ? t('groupPage.partyNote', { count: partySize - 1 }) : '';
       setInviteMessage(
-        (result.type === 'added'
-          ? `${who} was added to the group.`
-          : `Invitation sent to ${who} at ${email}.`) + partyNote,
+        [
+          result.type === 'added'
+            ? t('groupPage.added', { who: isolate(who) })
+            : t('groupPage.invited', { who: isolate(who), email: isolate(email) }),
+          partyNote,
+        ]
+          .filter(Boolean)
+          .join(' '),
       );
       setEmail('');
       setFirstName('');
@@ -90,7 +94,7 @@ export function GroupDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'invitations'] });
     } catch (err) {
-      setInviteError(apiErrorMessage(err, 'Failed to send invitation'));
+      setInviteError(apiErrorMessage(err, t('groupPage.inviteFailed')));
     } finally {
       setInviting(false);
     }
@@ -124,7 +128,7 @@ export function GroupDetailPage() {
 
   async function handleDeleteGroup() {
     const confirmed = window.confirm(
-      `Delete "${groupQuery.data?.group.name}"? This removes the group, its roster, activities, and meeting points. This cannot be undone.`,
+      t('groupPage.confirmDelete', { name: isolate(groupQuery.data?.group.name ?? '') }),
     );
     if (!confirmed) return;
     setDeleting(true);
@@ -162,7 +166,8 @@ export function GroupDetailPage() {
   return (
     <PageContainer wide>
       <Link to="/groups" className="text-sm text-accent-text hover:underline">
-        &larr; Groups
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">←</span>{' '}
+        {t('tabs.groups')}
       </Link>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
@@ -181,13 +186,13 @@ export function GroupDetailPage() {
                 a record rather than a plan. For a guide it's the end of the trip. */}
             {groupQuery.data.group.status === 'completed' && (
               <span className="rounded-full bg-tone-neutral-bg px-2.5 py-0.5 text-xs font-medium text-tone-neutral-fg">
-                Closed
+                {t('groupPage.closed')}
               </span>
             )}
             {isLeader &&
               (groupQuery.data.group.status === 'completed' ? (
                 <Button variant="secondary" size="sm" onClick={() => handleStatusChange('planned')}>
-                  Reopen group
+                  {t('groupPage.reopen')}
                 </Button>
               ) : (
                 <Button
@@ -195,7 +200,7 @@ export function GroupDetailPage() {
                   size="sm"
                   onClick={() => handleStatusChange('completed')}
                 >
-                  Close group
+                  {t('groupPage.close')}
                 </Button>
               ))}
             {isLeader && (
@@ -206,14 +211,14 @@ export function GroupDetailPage() {
               >
                 {CHAT_MODES.map((mode) => (
                   <option key={mode} value={mode}>
-                    {mode === 'two_way' ? 'two-way chat' : 'announcements only'}
+                    {mode === 'two_way' ? t('groupPage.chatTwoWay') : t('groupPage.chatAnnouncements')}
                   </option>
                 ))}
               </Select>
             )}
             {isLeader && (
               <Button variant="danger" size="sm" disabled={deleting} onClick={handleDeleteGroup}>
-                {deleting ? 'Deleting…' : 'Delete group'}
+                {deleting ? t('groupPage.deleting') : t('groupPage.delete')}
               </Button>
             )}
           </div>
@@ -225,7 +230,8 @@ export function GroupDetailPage() {
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,5fr)]">
         <section>
           <h2 className="text-lg font-semibold text-ink">
-            Roster <span className="text-sm font-normal text-ink-muted">{members.length}</span>
+            {t('groupPage.roster')}{' '}
+            <span className="text-sm font-normal text-ink-muted">{members.length}</span>
           </h2>
 
           {membersQuery.isLoading ? (
@@ -249,7 +255,7 @@ export function GroupDetailPage() {
                 return (
                   <div key={partyId} className="bg-surface-sunken/40 py-1">
                     <p className="px-4 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                      {rep?.party?.name ?? `Party of ${partyMembers.length}`}
+                      {rep?.party?.name ?? t('groupPage.partyOf', { count: partyMembers.length })}
                     </p>
                     {partyMembers.map((member) => (
                       <MemberRow
@@ -269,8 +275,8 @@ export function GroupDetailPage() {
           ) : (
             <div className="mt-3">
               <EmptyState
-                headline="Nobody on the roster yet"
-                body={isLeader ? 'Invite someone below — they appear straight away.' : undefined}
+                headline={t('groupPage.emptyHeadline')}
+                body={isLeader ? t('groupPage.emptyBody') : undefined}
               />
             </div>
           )}
@@ -282,13 +288,13 @@ export function GroupDetailPage() {
               <form onSubmit={handleInvite} className="flex flex-col gap-3">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <TextField
-                    label="First name"
+                    label={t('common.firstName')}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
                   />
                   <TextField
-                    label="Last name"
+                    label={t('common.lastName')}
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
@@ -296,7 +302,7 @@ export function GroupDetailPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <TextField
-                    label="Email"
+                    label={t('common.email')}
                     type="email"
                     placeholder="member@example.com"
                     value={email}
@@ -304,7 +310,7 @@ export function GroupDetailPage() {
                     required
                   />
                   <TextField
-                    label="Phone (optional)"
+                    label={t('common.phoneOptional')}
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
@@ -312,7 +318,7 @@ export function GroupDetailPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <TextField
-                    label="Party size"
+                    label={t('groupPage.partySize')}
                     type="number"
                     min={1}
                     value={partySize}
@@ -320,8 +326,8 @@ export function GroupDetailPage() {
                   />
                   {partySize > 1 && (
                     <TextField
-                      label="Party name (optional)"
-                      placeholder="The Smiths"
+                      label={t('groupPage.partyName')}
+                      placeholder={t('groupPage.partyNamePlaceholder')}
                       value={partyName}
                       onChange={(e) => setPartyName(e.target.value)}
                     />
@@ -329,12 +335,11 @@ export function GroupDetailPage() {
                 </div>
                 {partySize > 1 && (
                   <p className="text-xs text-ink-muted">
-                    Once they sign up, they'll be asked to name the other {partySize - 1} member
-                    {partySize - 1 > 1 ? 's' : ''} of their party.
+                    {t('groupPage.partyHint', { count: partySize - 1 })}
                   </p>
                 )}
                 <Button type="submit" disabled={inviting} className="self-start">
-                  {inviting ? 'Sending…' : 'Invite member'}
+                  {inviting ? t('groupDetail.sending') : t('groupPage.inviteMember')}
                 </Button>
               </form>
               {inviteMessage && (
@@ -347,13 +352,13 @@ export function GroupDetailPage() {
           {isLeader && invitationsQuery.data && invitationsQuery.data.invitations.length > 0 && (
             <Card className="mt-3 divide-y divide-line p-0">
               <p className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-ink-muted">
-                Pending invitations
+                {t('groupPage.pending')}
               </p>
               {invitationsQuery.data.invitations.map((invitation) => (
                 <div key={invitation.id} className="flex items-center justify-between px-4 py-3">
                   <span className="text-sm text-ink-secondary">{invitation.email}</span>
                   <Button variant="ghost" size="sm" onClick={() => handleRevoke(invitation.id)}>
-                    Revoke
+                    {t('groupPage.revoke')}
                   </Button>
                 </div>
               ))}
@@ -363,10 +368,10 @@ export function GroupDetailPage() {
 
         <section>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-ink">Activities</h2>
+            <h2 className="text-lg font-semibold text-ink">{t('groupDetail.activities')}</h2>
             {isLeader && (
               <Link to={`/groups/${groupId}/activities/new`}>
-                <Button size="sm">New activity</Button>
+                <Button size="sm">{t('groupDetail.newActivity')}</Button>
               </Link>
             )}
           </div>
@@ -378,12 +383,8 @@ export function GroupDetailPage() {
           ) : activities.length === 0 ? (
             <div className="mt-3">
               <EmptyState
-                headline="Nothing scheduled yet"
-                body={
-                  isLeader
-                    ? 'Plan an activity here, then publish it when the group should see it.'
-                    : undefined
-                }
+                headline={t('groupDetail.nothingScheduledYet')}
+                body={isLeader ? t('groupPage.planBody') : undefined}
               />
             </div>
           ) : (
@@ -393,7 +394,7 @@ export function GroupDetailPage() {
                   <Card className="flex flex-wrap items-center justify-between gap-2 transition-shadow hover:shadow-md">
                     <span className="font-medium text-ink">{activity.title}</span>
                     <span className="flex items-center gap-2 text-sm text-ink-secondary">
-                      {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+                      {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
                       <Badge status={activity.status} />
                     </span>
                   </Card>
@@ -408,12 +409,12 @@ export function GroupDetailPage() {
                       <p className="font-medium text-ink">
                         {occurrences[0]!.title}{' '}
                         <span className="font-normal text-ink-muted">
-                          (recurring, {occurrences.length} occurrences)
+                          {t('groupPage.recurring', { count: occurrences.length })}
                         </span>
                       </p>
                       {isLeader && draftCount > 0 && (
                         <Button size="sm" onClick={() => handlePublishSeries(seriesId)}>
-                          Publish all ({draftCount} draft{draftCount > 1 ? 's' : ''})
+                          {t('groupPage.publishAll', { count: draftCount })}
                         </Button>
                       )}
                     </div>
@@ -425,7 +426,7 @@ export function GroupDetailPage() {
                           className="flex items-center justify-between py-2 text-sm hover:text-accent-text"
                         >
                           <span>
-                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
                           </span>
                           <Badge status={activity.status} />
                         </Link>
@@ -465,6 +466,8 @@ function MemberRow({
   indented?: boolean;
   isRep?: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div
       className={`flex items-center justify-between gap-3 px-4 py-3 ${indented ? 'ps-8' : ''}`}
@@ -474,13 +477,13 @@ function MemberRow({
           {member.user.name}
           {isRep && (
             <span className="rounded-full bg-tone-neutral-bg px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-tone-neutral-fg">
-              Rep
+              {t('groupPage.rep')}
             </span>
           )}
         </p>
         <p className="truncate text-ink-muted">
           {member.user.isPlaceholder ? (
-            'No account yet'
+            t('groupPage.noAccount')
           ) : (
             <>
               {member.user.email}
@@ -501,7 +504,7 @@ function MemberRow({
       </div>
       {isLeader && !isGroupLeader && (
         <Button variant="ghost" size="sm" onClick={onRemove}>
-          Remove
+          {t('groupPage.remove')}
         </Button>
       )}
     </div>

@@ -3,7 +3,7 @@ import { SocketEvents } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { chatApi } from '../api/chatApi.js';
-import { apiErrorMessage } from '../i18n/index.js';
+import { apiErrorMessage, useTranslation } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { useAuthStore } from '../store/authStore.js';
 import { Button } from './ui/Button.js';
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
   const [body, setBody] = useState('');
@@ -63,7 +64,7 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
       setImage(null);
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] });
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to send message'));
+      setError(apiErrorMessage(err, t('chat.failed')));
     } finally {
       setSending(false);
     }
@@ -71,17 +72,15 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
 
   return (
     <section className="mt-8">
-      <h2 className="text-lg font-semibold text-ink">Chat</h2>
+      <h2 className="text-lg font-semibold text-ink">{t('groupDetail.chat')}</h2>
       <p className="mt-1 text-sm text-ink-secondary">
-        {chatMode === 'announcements'
-          ? 'Announcements only — members can read but not reply.'
-          : 'Two-way chat — anyone in the group can post.'}
+        {chatMode === 'announcements' ? t('chat.announcements') : t('chat.twoWay')}
       </p>
 
       <Card className="mt-3 p-0">
         <div ref={listRef} className="flex max-h-96 flex-col gap-3 overflow-y-auto p-4">
           {messages.map((message) => (
-            <div key={message.id} className={message.authorId === currentUser?.id ? 'self-end text-right' : ''}>
+            <div key={message.id} className={message.authorId === currentUser?.id ? 'self-end text-end' : ''}>
               <p className="text-xs text-ink-muted">{message.author.name}</p>
               {message.body && (
                 <p className="mt-0.5 inline-block rounded-lg bg-surface-raised px-3 py-2 text-sm text-ink">
@@ -91,21 +90,21 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
               {message.imageUrl && (
                 <img
                   src={message.imageUrl}
-                  alt="Shared"
+                  alt={t('chatPanel.imageAlt')}
                   className="mt-1 max-h-64 rounded-lg border border-line"
                 />
               )}
             </div>
           ))}
           {messages.length === 0 && (
-            <p className="py-6 text-center text-sm text-ink-muted">No messages yet.</p>
+            <p className="py-6 text-center text-sm text-ink-muted">{t('chat.emptyHeadline')}</p>
           )}
         </div>
 
         {canPost ? (
           <form onSubmit={handleSend} className="flex flex-wrap items-center gap-2 border-t border-line p-3">
             <input
-              placeholder="Write a message…"
+              placeholder={t('common.writeMessage')}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               className="min-w-[160px] flex-1 rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -117,12 +116,12 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
               className="text-xs text-ink-secondary"
             />
             <Button type="submit" size="sm" disabled={sending}>
-              {sending ? 'Sending…' : 'Send'}
+              {sending ? t('groupDetail.sending') : t('common.send')}
             </Button>
           </form>
         ) : (
           <p className="border-t border-line p-3 text-center text-sm text-ink-muted">
-            Only the leader can post in this group.
+            {t('chat.onlyLeader')}
           </p>
         )}
         {error && <p className="px-3 pb-3 text-sm text-tone-danger-fg">{error}</p>}

@@ -2,7 +2,7 @@ import type { Activity } from '@meetingpnt/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
-import { apiErrorMessage } from '../i18n/index.js';
+import { apiErrorMessage, useTranslation } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 import { TextField } from './ui/TextField.js';
 
@@ -29,6 +29,7 @@ function toTimeInput(iso: string): string {
  * pre-trip gathering needs confirmations but the trek days don't.
  */
 export function ActivityEditor({ activity, onDone }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [allDay, setAllDay] = useState(activity.allDay);
   const [date, setDate] = useState(toDateInput(activity.startAt));
@@ -50,7 +51,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
     const end = allDay ? new Date(`${endDate || date}T23:59:59`) : new Date(`${date}T${endTime}`);
 
     if (end <= start) {
-      setError(allDay ? 'The end date must not be before the start date.' : 'The end time must be after the start time.');
+      setError(allDay ? t('newActivity.endDateBeforeStart') : t('newActivity.endTimeBeforeStart'));
       return;
     }
 
@@ -58,7 +59,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
     // leader can correct the record; the backend applies the same rule.
     const notYetRun = activity.status === 'draft' || activity.status === 'published';
     if (notYetRun && start.getTime() < Date.now()) {
-      setError("You can't schedule an activity in the past.");
+      setError(t('activityEditor.pastError'));
       return;
     }
 
@@ -75,7 +76,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
       queryClient.invalidateQueries({ queryKey: ['groups', activity.groupId, 'activities'] });
       onDone();
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to save the activity'));
+      setError(apiErrorMessage(err, t('activityEditor.failed')));
     } finally {
       setSaving(false);
     }
@@ -90,23 +91,23 @@ export function ActivityEditor({ activity, onDone }: Props) {
           onChange={(e) => setAllDay(e.target.checked)}
           className="h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
         />
-        Spans whole days (multi-day trip)
+        {t('activityEditor.spans')}
       </label>
 
       {allDay ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <TextField label="Start date" type="date" required min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
-          <TextField label="End date" type="date" required min={date || minDate} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <TextField label={t('newActivity.startDate')} type="date" required min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextField label={t('newActivity.endDate')} type="date" required min={date || minDate} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <TextField label="Date" type="date" required min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
-          <TextField label="Start time" type="time" required value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-          <TextField label="End time" type="time" required min={startTime} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+          <TextField label={t('newActivity.date')} type="date" required min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextField label={t('newActivity.startTime')} type="time" required value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          <TextField label={t('newActivity.endTime')} type="time" required min={startTime} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
         </div>
       )}
 
-      <p className="text-xs text-ink-secondary">Meeting point times shift with the activity.</p>
+      <p className="text-xs text-ink-secondary">{t('activityEditor.shiftNote')}</p>
 
       <label className="flex items-center gap-2 border-t border-line pt-3 text-sm font-medium text-ink">
         <input
@@ -115,20 +116,16 @@ export function ActivityEditor({ activity, onDone }: Props) {
           onChange={(e) => setRequiresRsvp(e.target.checked)}
           className="h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
         />
-        Approve attendance
+        {t('newActivity.approve')}
       </label>
       <p className="-mt-2 text-xs text-ink-secondary">
-        {requiresRsvp
-          ? 'Members are asked to confirm they’re coming.'
-          : 'Members count as coming without replying — they can still decline.'}
+        {requiresRsvp ? t('newActivity.approveOn') : t('activityEditor.approveOff')}
         {activity.status !== 'draft' && requiresRsvp !== activity.requiresRsvp && (
           <>
             {' '}
             <span className="text-tone-warning-fg">
-              {requiresRsvp
-                ? 'Anyone who never actually replied will go back to awaiting a reply.'
-                : 'Anyone who never replied will be counted as coming.'}{' '}
-              Replies already given are kept either way.
+              {requiresRsvp ? t('activityEditor.warnOn') : t('activityEditor.warnOff')}{' '}
+              {t('activityEditor.kept')}
             </span>
           </>
         )}
@@ -138,10 +135,10 @@ export function ActivityEditor({ activity, onDone }: Props) {
 
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={saving}>
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? t('common.saving') : t('activityEditor.saveChanges')}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>

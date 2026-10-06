@@ -1,10 +1,11 @@
-import type { Role, User } from '@meetingpnt/shared';
+import { isolate, type Role, type User } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { adminApi } from '../../api/adminApi.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
+import { useTranslation } from '../../i18n/index.js';
 
 const ROLES: Role[] = ['user', 'leader', 'admin'];
 const ROLE_ORDER: Record<Role, number> = { admin: 0, leader: 1, user: 2 };
@@ -21,6 +22,7 @@ function sortUsers(users: User[], column: SortColumn, direction: SortDirection):
 }
 
 export function UsersPage() {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [sortColumn, setSortColumn] = useState<SortColumn>('role');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -47,7 +49,7 @@ export function UsersPage() {
 
   async function handleRoleChange(userId: string, userName: string, role: Role) {
     if (role === 'admin') {
-      const confirmed = window.confirm(`Make ${userName} an admin? Admins can manage all users and roles.`);
+      const confirmed = window.confirm(t('usersPage.makeAdmin', { name: isolate(userName) }));
       if (!confirmed) return;
     }
     await adminApi.elevateRole(userId, role);
@@ -72,27 +74,27 @@ export function UsersPage() {
 
   return (
     <PageContainer className="max-w-4xl">
-      <h1 className="text-2xl font-semibold text-ink">Users</h1>
-      <p className="mt-1 text-sm text-ink-secondary">View all registered users and manage their role.</p>
+      <h1 className="text-2xl font-semibold text-ink">{t('portal.nav.users')}</h1>
+      <p className="mt-1 text-sm text-ink-secondary">{t('usersPage.subtitle')}</p>
 
       <input
-        placeholder="Search by name or email"
+        placeholder={t('usersPage.search')}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="mt-6 w-full rounded-lg border border-line-strong px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       />
 
-      {isLoading && <p className="mt-4 text-sm text-ink-secondary">Loading…</p>}
-      {error && <p className="mt-4 text-sm text-tone-danger-fg">Failed to load users.</p>}
+      {isLoading && <p className="mt-4 text-sm text-ink-secondary">{t('common.loading')}</p>}
+      {error && <p className="mt-4 text-sm text-tone-danger-fg">{t('usersPage.loadFailed')}</p>}
 
       {data && (
         <Card className="mt-4 overflow-hidden p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-line bg-surface-sunken text-left text-xs font-medium">
-                <SortHeader column="name" label="Name" />
-                <SortHeader column="email" label="Email" />
-                <SortHeader column="role" label="Role" />
+              <tr className="border-b border-line bg-surface-sunken text-start text-xs font-medium">
+                <SortHeader column="name" label={t('usersPage.name')} />
+                <SortHeader column="email" label={t('common.email')} />
+                <SortHeader column="role" label={t('usersPage.role')} />
               </tr>
             </thead>
             <tbody>
@@ -110,7 +112,7 @@ export function UsersPage() {
                       >
                         {ROLES.map((role) => (
                           <option key={role} value={role}>
-                            {role}
+                            {t(`status.${role}`)}
                           </option>
                         ))}
                       </select>
@@ -121,7 +123,7 @@ export function UsersPage() {
               {sortedUsers.length === 0 && (
                 <tr>
                   <td colSpan={3} className="px-4 py-6 text-center text-ink-muted">
-                    No users found.
+                    {t('usersPage.none')}
                   </td>
                 </tr>
               )}

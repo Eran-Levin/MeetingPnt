@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from '../../i18n/index.js';
 
 /**
  * A placeholder shaped like the content that's coming. It replaces `Loading…`, which told the
@@ -16,8 +17,10 @@ export function Skeleton({ className = '' }: { className?: string }) {
 
 /** Stand-in for a list of cards or rows, at roughly the height of the real thing. */
 export function SkeletonRows({ rows = 3 }: { rows?: number }) {
+  const { t } = useTranslation();
+
   return (
-    <div className="flex flex-col gap-3" role="status" aria-label="Loading">
+    <div className="flex flex-col gap-3" role="status" aria-label={t('common.loading')}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="rounded-xl border border-line bg-surface p-5">
           <Skeleton className="h-4 w-1/3" />

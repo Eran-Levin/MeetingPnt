@@ -3,7 +3,8 @@ import { SocketEvents } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { meetingPointsApi } from '../api/meetingPointsApi.js';
-import { apiErrorMessage } from '../i18n/index.js';
+import { isolate } from '@meetingpnt/shared';
+import { apiErrorMessage, useLocale, useTranslation } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
@@ -31,6 +32,8 @@ const fieldClass =
  * be edited ahead of the group.
  */
 export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLocation }: Props) {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [label, setLabel] = useState('');
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
@@ -99,10 +102,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
     } catch (err) {
       setFormError(
-        apiErrorMessage(
-          err,
-          "Couldn't read coordinates from that link — try a full (non-shortened) Google Maps URL.",
-        ),
+        apiErrorMessage(err, t('meetingPoints.coordsFailed')),
       );
     } finally {
       setSubmitting(false);
@@ -111,7 +111,9 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
 
   async function handleRemove(point: MeetingPoint) {
     const confirmed = window.confirm(
-      `Remove "${point.label || 'this stop'}" from the plan?`,
+      t('meetingPoints.confirmRemove', {
+        name: isolate(point.label || t('meetingPoints.thisStop')),
+      }),
     );
     if (!confirmed) return;
     setListError(null);
@@ -119,7 +121,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       await meetingPointsApi.remove(point.id);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
     } catch (err) {
-      setListError(apiErrorMessage(err, 'Failed to remove that stop'));
+      setListError(apiErrorMessage(err, t('meetingPoints.removeFailed')));
     }
   }
 
@@ -127,20 +129,20 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
     <section>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-ink">
-          {singleLocation ? 'Meeting point' : 'Itinerary'}
+          {singleLocation ? t('common.meetingPoint') : t('meetingPoints.itinerary')}
         </h2>
         {/* A single-location event has one place and no route, so once it's set there is nothing
             to add. Everything else can gain a stop at any time. */}
         {editing === null && !(singleLocation && meetingPoints.length > 0) && (
           <Button variant="secondary" size="sm" onClick={startAdding}>
-            {singleLocation || meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
+            {singleLocation || meetingPoints.length === 0
+              ? t('meetingPoints.addPoint')
+              : t('meetingPoints.addStop')}
           </Button>
         )}
       </div>
       <p className="mt-1 text-sm text-ink-secondary">
-        {singleLocation
-          ? 'Where the class meets. The same place every time — there is no route to walk.'
-          : 'The stops in the order the group will walk them. During the activity you move between them from your phone, and can still add stops the group hasn’t reached.'}
+        {singleLocation ? t('meetingPoints.descSingle') : t('meetingPoints.descRoute')}
       </p>
 
       {listError && (
@@ -172,17 +174,17 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
                       </span>
                     )}
                     <span>
-                      <span className="text-ink">{point.label || 'Meeting point'}</span>{' '}
+                      <span className="text-ink">{point.label || t('common.meetingPoint')}</span>{' '}
                       <span className="text-ink-muted">
-                        {new Date(point.time).toLocaleString()}
+                        {new Date(point.time).toLocaleString(locale)}
                       </span>
                       {isCurrent && (
                         <span className="ms-2 rounded-full bg-tone-accent-bg px-2 py-0.5 text-xs font-medium text-tone-accent-fg">
-                          Group is here
+                          {t('meetingPoints.groupIsHere')}
                         </span>
                       )}
                       {reached && !isCurrent && (
-                        <span className="ms-2 text-xs text-ink-muted">visited</span>
+                        <span className="ms-2 text-xs text-ink-muted">{t('meetingPoints.visited')}</span>
                       )}
                     </span>
                   </span>
@@ -193,17 +195,17 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
                       rel="noreferrer"
                       className="text-sm font-medium text-accent-text hover:underline"
                     >
-                      Open in Maps
+                      {t('meetingPoints.openInMaps')}
                     </a>
                     {editing === null && (
                       <Button variant="secondary" size="sm" onClick={() => startEditing(point)}>
-                        Change
+                        {t('meetingPoints.change')}
                       </Button>
                     )}
                     {/* A visited stop is part of the record of where the group went. */}
                     {editing === null && !reached && (
                       <Button variant="ghost" size="sm" onClick={() => handleRemove(point)}>
-                        Remove
+                        {t('meetingPoints.remove')}
                       </Button>
                     )}
                   </span>
@@ -217,7 +219,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
                     time={time}
                     setTime={setTime}
                     submitting={submitting}
-                    submitLabel="Save"
+                    submitLabel={t('common.save')}
                     error={formError}
                     onSubmit={handleSubmit}
                     onCancel={() => setEditing(null)}
@@ -232,9 +234,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       {meetingPoints.length === 0 && editing === null && (
         <Card className="mt-3">
           <p className="text-sm text-ink-muted">
-            {singleLocation
-              ? 'No meeting point yet — add where the class meets.'
-              : 'No stops planned yet — add where the group first gathers.'}
+            {singleLocation ? t('meetingPoints.emptySingle') : t('meetingPoints.emptyRoute')}
           </p>
         </Card>
       )}
@@ -249,7 +249,11 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
             time={time}
             setTime={setTime}
             submitting={submitting}
-            submitLabel={singleLocation || meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
+            submitLabel={
+              singleLocation || meetingPoints.length === 0
+                ? t('meetingPoints.addPoint')
+                : t('meetingPoints.addStop')
+            }
             error={formError}
             onSubmit={handleSubmit}
             onCancel={() => setEditing(null)}
@@ -279,17 +283,19 @@ interface FormProps {
  * and three inputs side by side in that width left the Maps URL — the long one — narrowest.
  */
 function MeetingPointForm(props: FormProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-surface-sunken px-4 py-3">
       <form onSubmit={props.onSubmit} className="flex flex-col gap-2">
         <input
-          placeholder="Label (optional)"
+          placeholder={t('meetingPointEditor.labelOptional')}
           value={props.label}
           onChange={(e) => props.setLabel(e.target.value)}
           className={fieldClass}
         />
         <input
-          placeholder="Google Maps URL"
+          placeholder={t('meetingPointEditor.mapsUrl')}
           value={props.googleMapsUrl}
           onChange={(e) => props.setGoogleMapsUrl(e.target.value)}
           required
@@ -304,10 +310,10 @@ function MeetingPointForm(props: FormProps) {
             className={`flex-1 ${fieldClass}`}
           />
           <Button type="submit" disabled={props.submitting} size="sm">
-            {props.submitting ? 'Saving…' : props.submitLabel}
+            {props.submitting ? t('common.saving') : props.submitLabel}
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       </form>

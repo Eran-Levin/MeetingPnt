@@ -1,8 +1,9 @@
 import type { MeetingPointTemplateDto, TransportMode } from '@meetingpnt/shared';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { apiErrorMessage } from '../../i18n/index.js';
+import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -10,13 +11,18 @@ import { Select } from '../../components/ui/Select.js';
 import { TextArea, TextField } from '../../components/ui/TextField.js';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function emptyTemplate(): MeetingPointTemplateDto {
   return { label: '', googleMapsUrl: '', offsetMinutes: 0 };
 }
 
 export function ActivityCreatePage() {
+  const { t } = useTranslation();
+  const locale = useLocale();
+  // 2023-01-01 was a Sunday, so day 0 lines up with the `daysOfWeek` the server expects.
+  const weekdayLabels = Array.from({ length: 7 }, (_, day) =>
+    new Date(2023, 0, 1 + day).toLocaleDateString(locale, { weekday: 'short' }),
+  );
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
@@ -55,7 +61,7 @@ export function ActivityCreatePage() {
     setError(null);
 
     if (repeats && daysOfWeek.length === 0) {
-      setError('Pick at least one day of the week to repeat on.');
+      setError(t('newActivity.pickDay'));
       return;
     }
 
@@ -65,9 +71,7 @@ export function ActivityCreatePage() {
 
     if (end <= start) {
       setError(
-        allDay
-          ? 'The end date must not be before the start date.'
-          : 'The end time must be after the start time.',
+        allDay ? t('newActivity.endDateBeforeStart') : t('newActivity.endTimeBeforeStart'),
       );
       return;
     }
@@ -102,7 +106,7 @@ export function ActivityCreatePage() {
         navigate(`/activities/${result.activity.id}`);
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to create activity'));
+      setError(apiErrorMessage(err, t('newActivity.failed')));
     } finally {
       setSubmitting(false);
     }
@@ -111,45 +115,44 @@ export function ActivityCreatePage() {
   return (
     <PageContainer>
       <Link to={`/groups/${groupId}`} className="text-sm text-accent-text hover:underline">
-        &larr; Back to group
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">←</span>{' '}
+        {t('activityForm.back')}
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-ink">New activity</h1>
-      <p className="mt-1 text-sm text-ink-secondary">
-        Created as a draft — members see nothing until you publish it.
-      </p>
+      <h1 className="mt-2 text-2xl font-semibold text-ink">{t('newActivity.title')}</h1>
+      <p className="mt-1 text-sm text-ink-secondary">{t('activityForm.subtitle')}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
-        <FormSection title="What">
+        <FormSection title={t('activityForm.what')}>
           <TextField
-            label="Title"
+            label={t('newActivity.fieldTitle')}
             required
-            placeholder="Sunrise walk — Old Town"
+            placeholder={t('newActivity.titlePlaceholder')}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
           <TextArea
-            label="Description"
+            label={t('activityForm.description')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
           />
           <Select
-            label="Mode of transport"
+            label={t('newActivity.transport')}
             value={transportMode}
             onChange={(e) => setTransportMode(e.target.value as TransportMode)}
           >
             {TRANSPORT_MODES.map((mode) => (
               <option key={mode} value={mode}>
-                {mode}
+                {t(`newActivity.${mode}`)}
               </option>
             ))}
           </Select>
         </FormSection>
 
-        <FormSection title="When">
+        <FormSection title={t('newActivity.when')}>
           <CheckboxRow
-            label="Spans whole days"
-            hint="A multi-day trip. Each day of it is its own activity."
+            label={t('newActivity.spansDays')}
+            hint={t('activityForm.hintSpans')}
             checked={allDay}
             onChange={setAllDay}
           />
@@ -157,14 +160,14 @@ export function ActivityCreatePage() {
           {allDay ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
-                label={repeats ? 'First occurrence start date' : 'Start date'}
+                label={repeats ? t('activityForm.firstStart') : t('newActivity.startDate')}
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
               <TextField
-                label="End date"
+                label={t('newActivity.endDate')}
                 type="date"
                 required
                 value={endDate}
@@ -174,21 +177,21 @@ export function ActivityCreatePage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <TextField
-                label={repeats ? 'First occurrence date' : 'Date'}
+                label={repeats ? t('activityForm.firstDate') : t('newActivity.date')}
                 type="date"
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
               <TextField
-                label="Start time"
+                label={t('newActivity.startTime')}
                 type="time"
                 required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
               />
               <TextField
-                label="End time"
+                label={t('newActivity.endTime')}
                 type="time"
                 required
                 value={endTime}
@@ -198,25 +201,21 @@ export function ActivityCreatePage() {
           )}
         </FormSection>
 
-        <FormSection title="Attendance">
+        <FormSection title={t('newActivity.attendance')}>
           {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
               morning — but they can still decline the one day they're sitting out. */}
           <CheckboxRow
-            label="Approve attendance"
-            hint={
-              requiresRsvp
-                ? 'Members are asked to confirm they’re coming.'
-                : 'Members count as coming as soon as this is published — they can still decline.'
-            }
+            label={t('newActivity.approve')}
+            hint={requiresRsvp ? t('newActivity.approveOn') : t('newActivity.approveOff')}
             checked={requiresRsvp}
             onChange={setRequiresRsvp}
           />
         </FormSection>
 
-        <FormSection title="Repeat">
+        <FormSection title={t('newActivity.repeat')}>
           <CheckboxRow
-            label="Repeat weekly"
-            hint="Creates one draft per occurrence, which you can publish together."
+            label={t('newActivity.repeatWeekly')}
+            hint={t('activityForm.hintRepeat')}
             checked={repeats}
             onChange={setRepeats}
           />
@@ -224,7 +223,7 @@ export function ActivityCreatePage() {
           {repeats && (
             <div className="flex flex-col gap-4 rounded-lg bg-surface-sunken p-4">
               <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
-                Every
+                {t('newActivity.every')}
                 <input
                   type="number"
                   min={1}
@@ -233,10 +232,10 @@ export function ActivityCreatePage() {
                   onChange={(e) => setIntervalWeeks(e.target.value)}
                   className="w-16 rounded-lg border border-line-strong bg-surface px-2 py-1 text-sm"
                 />
-                week(s), on:
+                {t('activityForm.weeksOn')}
               </label>
               <div className="flex flex-wrap gap-2">
-                {WEEKDAY_LABELS.map((label, day) => (
+                {weekdayLabels.map((label, day) => (
                   <button
                     type="button"
                     key={day}
@@ -260,7 +259,7 @@ export function ActivityCreatePage() {
                   onChange={() => setEndType('count')}
                   className="h-4 w-4 text-accent-text focus:ring-accent"
                 />
-                For
+                {t('newActivity.for')}
                 <input
                   type="number"
                   min={1}
@@ -270,7 +269,7 @@ export function ActivityCreatePage() {
                   disabled={endType !== 'count'}
                   className="w-16 rounded-lg border border-line-strong bg-surface px-2 py-1 text-sm disabled:bg-surface-raised disabled:text-ink-muted"
                 />
-                occurrences
+                {t('newActivity.occurrences')}
               </label>
               <label className="flex flex-wrap items-center gap-2 text-sm text-ink">
                 <input
@@ -279,7 +278,7 @@ export function ActivityCreatePage() {
                   onChange={() => setEndType('until')}
                   className="h-4 w-4 text-accent-text focus:ring-accent"
                 />
-                Until
+                {t('activityForm.until')}
                 <input
                   type="date"
                   value={until}
@@ -296,8 +295,8 @@ export function ActivityCreatePage() {
             does the idea of a route, and of further stops, mean anything. A single-location event
             never gets past that first one. */}
         <FormSection
-          title={meetingPoints.length > 1 ? 'Meeting points' : 'Meeting point'}
-          description="Optional — you can also plan this from the activity page after creating it."
+          title={meetingPoints.length > 1 ? t('activityForm.meetingPoints') : t('common.meetingPoint')}
+          description={t('activityForm.meetingPointsHint')}
           action={
             (singleLocation ? meetingPoints.length === 0 : true) && (
               <Button
@@ -306,14 +305,14 @@ export function ActivityCreatePage() {
                 size="sm"
                 onClick={() => setMeetingPoints((prev) => [...prev, emptyTemplate()])}
               >
-                {meetingPoints.length === 0 ? 'Add meeting point' : 'Add stop'}
+                {meetingPoints.length === 0 ? t('activityForm.addPoint') : t('activityForm.addStop')}
               </Button>
             )
           }
         >
           <CheckboxRow
-            label="Single location"
-            hint="One place, no route — a class in the same room every week. Turns off the itinerary."
+            label={t('newActivity.single')}
+            hint={t('activityForm.singleHint')}
             checked={singleLocation}
             onChange={(value) => {
               setSingleLocation(value);
@@ -323,14 +322,14 @@ export function ActivityCreatePage() {
             }}
           />
           {repeats && meetingPoints.length > 0 && (
-            <p className="text-xs text-ink-secondary">Applied to every occurrence.</p>
+            <p className="text-xs text-ink-secondary">{t('activityForm.appliedToAll')}</p>
           )}
 
           {meetingPoints.map((mp, i) => (
             <div key={i} className="rounded-lg border border-line bg-surface-sunken p-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                  {i === 0 ? 'Meeting point' : `Stop ${i + 1}`}
+                  {i === 0 ? t('common.meetingPoint') : t('activityForm.stopN', { n: i + 1 })}
                 </p>
                 <Button
                   type="button"
@@ -338,17 +337,17 @@ export function ActivityCreatePage() {
                   size="sm"
                   onClick={() => setMeetingPoints((prev) => prev.filter((_, idx) => idx !== i))}
                 >
-                  Remove
+                  {t('groupPage.remove')}
                 </Button>
               </div>
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
                 <TextField
-                  label="Label (optional)"
+                  label={t('meetingPointEditor.labelOptional')}
                   value={mp.label ?? ''}
                   onChange={(e) => updateMeetingPoint(i, { label: e.target.value })}
                 />
                 <TextField
-                  label="Minutes from start"
+                  label={t('activityForm.minutesFromStart')}
                   type="number"
                   value={mp.offsetMinutes}
                   onChange={(e) => updateMeetingPoint(i, { offsetMinutes: Number(e.target.value) })}
@@ -357,7 +356,7 @@ export function ActivityCreatePage() {
               </div>
               <div className="mt-3">
                 <TextField
-                  label="Google Maps URL"
+                  label={t('meetingPointEditor.mapsUrl')}
                   required
                   value={mp.googleMapsUrl}
                   onChange={(e) => updateMeetingPoint(i, { googleMapsUrl: e.target.value })}
@@ -377,10 +376,25 @@ export function ActivityCreatePage() {
             of drafts that is otherwise invisible until they land in the group. */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <p className="text-sm text-ink-secondary">
-            {summarise({ repeats, daysOfWeek, intervalWeeks, endType, count, until, meetingPoints })}
+            {summarise({
+              t,
+              weekdayLabels,
+              locale,
+              repeats,
+              daysOfWeek,
+              intervalWeeks,
+              endType,
+              count,
+              until,
+              meetingPoints,
+            })}
           </p>
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
+            {submitting
+              ? t('newActivity.creating')
+              : repeats
+                ? t('newActivity.createSeries')
+                : t('newActivity.createDraft')}
           </Button>
         </div>
       </form>
@@ -389,6 +403,9 @@ export function ActivityCreatePage() {
 }
 
 function summarise({
+  t,
+  weekdayLabels,
+  locale,
   repeats,
   daysOfWeek,
   intervalWeeks,
@@ -397,6 +414,9 @@ function summarise({
   until,
   meetingPoints,
 }: {
+  t: TFunction;
+  weekdayLabels: string[];
+  locale: string;
   repeats: boolean;
   daysOfWeek: number[];
   intervalWeeks: string;
@@ -406,24 +426,27 @@ function summarise({
   meetingPoints: MeetingPointTemplateDto[];
 }): string {
   const stops =
-    meetingPoints.length > 0
-      ? ` with ${meetingPoints.length} stop${meetingPoints.length > 1 ? 's' : ''}`
-      : '';
+    meetingPoints.length > 0 ? t('activityForm.summary.stops', { count: meetingPoints.length }) : '';
 
-  if (!repeats) return `Creates one draft${stops}.`;
+  if (!repeats) return t('activityForm.summary.one', { stops });
 
-  if (daysOfWeek.length === 0) return 'Pick at least one day of the week.';
+  if (daysOfWeek.length === 0) return t('activityForm.summary.pickDays');
 
-  const days = daysOfWeek.map((d) => WEEKDAY_LABELS[d]).join(', ');
-  const every = Number(intervalWeeks) > 1 ? `every ${intervalWeeks} weeks` : 'weekly';
+  const days = daysOfWeek.map((d) => weekdayLabels[d]).join(', ');
+  const every =
+    Number(intervalWeeks) > 1
+      ? t('activityForm.summary.everyN', { count: Number(intervalWeeks) })
+      : t('activityForm.summary.weekly');
   const howMany =
     endType === 'count'
-      ? `${count} draft${Number(count) === 1 ? '' : 's'}`
+      ? t('activityForm.summary.drafts', { count: Number(count) })
       : until
-        ? `drafts until ${new Date(until).toLocaleDateString()}`
-        : 'drafts';
+        ? t('activityForm.summary.draftsUntil', {
+            date: new Date(until).toLocaleDateString(locale),
+          })
+        : t('activityForm.summary.draftsPlain');
 
-  return `Creates ${howMany}, ${every} on ${days}${stops}.`;
+  return t('activityForm.summary.repeat', { howMany, every, days, stops });
 }
 
 /** A titled group of fields. The form was one undivided run of twelve controls. */

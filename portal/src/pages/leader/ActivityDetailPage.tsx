@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { apiErrorMessage } from '../../i18n/index.js';
+import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { ActivityEditor } from '../../components/ActivityEditor.js';
@@ -18,6 +18,8 @@ import { Skeleton } from '../../components/ui/Skeleton.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function ActivityDetailPage() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const activityId = id!;
   const queryClient = useQueryClient();
@@ -60,7 +62,7 @@ export function ActivityDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     } catch (err) {
-      setLifecycleError(apiErrorMessage(err, 'Something went wrong'));
+      setLifecycleError(apiErrorMessage(err, t('common.somethingWentWrong')));
     }
   }
 
@@ -68,9 +70,7 @@ export function ActivityDetailPage() {
   const handleStart = () => runLifecycleAction(() => activitiesApi.start(activityId));
 
   async function handleEnd() {
-    const confirmed = window.confirm(
-      'End this activity? Location sharing and location requests will stop for it. Attendance stays editable.',
-    );
+    const confirmed = window.confirm(t('activityPage.confirmEnd'));
     if (!confirmed) return;
     await runLifecycleAction(() => activitiesApi.end(activityId));
   }
@@ -82,7 +82,7 @@ export function ActivityDetailPage() {
       await rsvpsApi.setForMember(activityId, userId, status);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
     } catch (err) {
-      setRsvpError(apiErrorMessage(err, 'Failed to save that reply'));
+      setRsvpError(apiErrorMessage(err, t('activityPage.rsvpFailed')));
     } finally {
       setSavingRsvpFor(null);
     }
@@ -110,7 +110,8 @@ export function ActivityDetailPage() {
     <PageContainer wide>
       {groupId && (
         <Link to={`/groups/${groupId}`} className="text-sm text-accent-text hover:underline">
-          &larr; Back to group
+          <span aria-hidden="true" className="inline-block rtl:rotate-180">←</span>{' '}
+          {t('activityPage.back')}
         </Link>
       )}
 
@@ -120,13 +121,13 @@ export function ActivityDetailPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-ink">{activity.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
-            <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}</span>
+            <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}</span>
             <span>&middot;</span>
-            <span className="capitalize">{activity.transportMode}</span>
+            <span>{t(`newActivity.${activity.transportMode}`)}</span>
             <Badge status={activity.status} />
             {!activity.requiresRsvp && (
               <span className="inline-block whitespace-nowrap rounded-full bg-tone-warning-bg px-2.5 py-0.5 text-xs font-medium text-tone-warning-fg">
-                attendance not approved
+                {t('activityPage.notApproved')}
               </span>
             )}
           </div>
@@ -136,22 +137,22 @@ export function ActivityDetailPage() {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {activity.status !== 'completed' && !editingSchedule && (
               <Button variant="secondary" size="sm" onClick={() => setEditingSchedule(true)}>
-                Edit activity
+                {t('activityPage.edit')}
               </Button>
             )}
             {activity.status === 'draft' && (
               <Button size="sm" onClick={handlePublish}>
-                Publish &amp; notify members
+                {t('activityPage.publish')}
               </Button>
             )}
             {activity.status === 'published' && (
               <Button size="sm" onClick={handleStart}>
-                Start activity
+                {t('calendar.startActivity')}
               </Button>
             )}
             {(activity.status === 'published' || activity.status === 'in_progress') && (
               <Button variant="secondary" size="sm" onClick={handleEnd}>
-                End activity
+                {t('calendar.endActivity')}
               </Button>
             )}
           </div>
@@ -160,7 +161,7 @@ export function ActivityDetailPage() {
 
       {activity.status === 'completed' && (
         <p className="mt-3 text-sm text-ink-secondary">
-          This activity has ended — location sharing is closed.
+          {t('event.ended')}
         </p>
       )}
       {lifecycleError && (
@@ -181,7 +182,7 @@ export function ActivityDetailPage() {
           href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}
           className="text-sm text-accent-text hover:underline"
         >
-          Download .ics
+          {t('activityPage.download')}
         </a>
       </div>
 
@@ -207,10 +208,10 @@ export function ActivityDetailPage() {
             not coming still works from the roll call on the leader's phone. */}
         {showAttendance && (
           <section>
-            <h2 className="text-lg font-semibold text-ink">Who&rsquo;s coming</h2>
+            <h2 className="text-lg font-semibold text-ink">{t('activityPage.whosComing')}</h2>
             {activity.status === 'draft' ? (
               <p className="mt-2 text-sm text-ink-muted">
-                Publish this event to start collecting replies.
+                {t('activityPage.publishToCollect')}
               </p>
             ) : (
               <>

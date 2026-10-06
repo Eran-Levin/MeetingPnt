@@ -8,8 +8,10 @@ import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
 import { TextField } from '../../components/ui/TextField.js';
+import { useLocale, useTranslation } from '../../i18n/index.js';
 
 export function GroupsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -55,33 +57,33 @@ export function GroupsPage() {
     <PageContainer wide>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Groups</h1>
-          <p className="mt-1 text-sm text-ink-secondary">Groups you lead.</p>
+          <h1 className="text-2xl font-semibold text-ink">{t('tabs.groups')}</h1>
+          <p className="mt-1 text-sm text-ink-secondary">{t('groupsPage.subtitle')}</p>
         </div>
-        {!composing && <Button onClick={() => setComposing(true)}>New group</Button>}
+        {!composing && <Button onClick={() => setComposing(true)}>{t('groups.newGroup')}</Button>}
       </div>
 
       {composing && (
         <Card className="mt-6">
           <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
             <TextField
-              label="Group name"
+              label={t('groups.groupName')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
               className="min-w-[160px] flex-1"
             />
             <TextField
-              label="Description (optional)"
+              label={t('newActivity.description')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="min-w-[200px] flex-[2]"
             />
             <Button type="submit" disabled={creating}>
-              {creating ? 'Creating…' : 'Create group'}
+              {creating ? t('groups.creating') : t('groups.createGroup')}
             </Button>
             <Button type="button" variant="secondary" onClick={() => setComposing(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </form>
         </Card>
@@ -96,20 +98,23 @@ export function GroupsPage() {
       {!isLoading && myGroups.length === 0 && (
         <div className="mt-8">
           <EmptyState
-            headline="Start your first group"
-            body="A group holds a roster and the activities that run inside it — a yoga term, a photo club, one trip departure."
-            action={<Button onClick={() => setComposing(true)}>New group</Button>}
+            headline={t('groups.startFirst')}
+            body={t('groupsPage.emptyBody')}
+            action={<Button onClick={() => setComposing(true)}>{t('groups.newGroup')}</Button>}
           />
         </div>
       )}
 
-      {activeGroups.length > 0 && <GroupSection title="Active" groups={activeGroups} />}
-      {closedGroups.length > 0 && <GroupSection title="Closed" groups={closedGroups} />}
+      {activeGroups.length > 0 && <GroupSection title={t('groupsPage.active')} groups={activeGroups} />}
+      {closedGroups.length > 0 && <GroupSection title={t('groupsPage.closed')} groups={closedGroups} />}
     </PageContainer>
   );
 }
 
 function GroupSection({ title, groups }: { title: string; groups: GroupWithRole[] }) {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
   return (
     <section className="mt-8">
       <h2 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
@@ -129,13 +134,15 @@ function GroupSection({ title, groups }: { title: string; groups: GroupWithRole[
                 )}
                 <p className="mt-3 text-sm text-ink-secondary">
                   {group.nextActivityAt
-                    ? `Next: ${new Date(group.nextActivityAt).toLocaleString(undefined, {
-                        day: 'numeric',
-                        month: 'short',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}`
-                    : 'Nothing scheduled'}
+                    ? t('groups.nextAt', {
+                        when: new Date(group.nextActivityAt).toLocaleString(locale, {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }),
+                      })
+                    : t('groups.nothingScheduled')}
                 </p>
               </Card>
             </Link>

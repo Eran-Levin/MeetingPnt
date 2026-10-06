@@ -1,5 +1,5 @@
 import type { ActivityWithGroup } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, formatWeekdayShort, joinDot } from '@meetingpnt/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,8 +9,7 @@ import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+import { useLocale, useTranslation } from '../../i18n/index.js';
 
 /**
  * Everything scheduled, across every group, in the order it happens.
@@ -20,6 +19,8 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  * because it splits the same week across three pages.
  */
 export function ActivitiesPage() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const [showPast, setShowPast] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -42,7 +43,7 @@ export function ActivitiesPage() {
   // Month headings, because a yoga term is twenty near-identical rows with nothing to navigate by.
   const months: { label: string; items: ActivityWithGroup[] }[] = [];
   for (const activity of upcoming) {
-    const label = new Date(activity.startAt).toLocaleDateString(undefined, {
+    const label = new Date(activity.startAt).toLocaleDateString(locale, {
       month: 'long',
       year: 'numeric',
     });
@@ -53,10 +54,8 @@ export function ActivitiesPage() {
 
   return (
     <PageContainer wide>
-      <h1 className="text-2xl font-semibold text-ink">Activities</h1>
-      <p className="mt-1 text-sm text-ink-secondary">
-        Everything scheduled across your groups, in the order it happens.
-      </p>
+      <h1 className="text-2xl font-semibold text-ink">{t('groupDetail.activities')}</h1>
+      <p className="mt-1 text-sm text-ink-secondary">{t('activitiesPage.subtitle')}</p>
 
       {isLoading && (
         <div className="mt-8">
@@ -67,7 +66,7 @@ export function ActivitiesPage() {
       {live.length > 0 && (
         <section className="mt-8">
           <h2 className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-            Happening now
+            {t('activitiesPage.happeningNow')}
           </h2>
           <div className="mt-3 flex flex-col gap-3">
             {live.map((activity) => (
@@ -93,8 +92,8 @@ export function ActivitiesPage() {
       {!isLoading && upcoming.length === 0 && live.length === 0 && (
         <div className="mt-8">
           <EmptyState
-            headline="Nothing coming up"
-            body="Activities you schedule in any of your groups appear here, soonest first."
+            headline={t('calendar.emptyHeadline')}
+            body={t('activitiesPage.emptyBody')}
           />
         </div>
       )}
@@ -102,7 +101,7 @@ export function ActivitiesPage() {
       {past.length > 0 && (
         <section className="mt-10 border-t border-line pt-6">
           <Button variant="secondary" size="sm" onClick={() => setShowPast((v) => !v)}>
-            {showPast ? 'Hide past activities' : `Show past activities (${past.length})`}
+            {showPast ? t('calendar.hidePast') : t('activitiesPage.showPast', { count: past.length })}
           </Button>
           {showPast && (
             <div className="mt-3 flex flex-col gap-3">
@@ -126,6 +125,7 @@ function ActivityRow({
   accent?: boolean;
   muted?: boolean;
 }) {
+  const locale = useLocale();
   const start = new Date(activity.startAt);
 
   return (
@@ -137,15 +137,17 @@ function ActivityRow({
       >
         {/* A date block rather than a sentence — the point of this page is scanning down it. */}
         <div className="w-12 shrink-0 text-center">
-          <p className="text-xs uppercase text-ink-muted">{WEEKDAYS[start.getDay()]}</p>
+          <p className="text-xs uppercase text-ink-muted">{formatWeekdayShort(start, locale)}</p>
           <p className="text-xl font-semibold text-ink">{start.getDate()}</p>
         </div>
 
         <div className="min-w-0 flex-1">
           <p className="font-medium text-ink">{activity.title}</p>
           <p className="truncate text-sm text-ink-secondary">
-            {activity.group.name} &middot;{' '}
-            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+            {joinDot([
+              activity.group.name,
+              formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+            ])}
           </p>
         </div>
 
