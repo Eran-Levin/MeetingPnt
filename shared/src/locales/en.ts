@@ -10,6 +10,7 @@
 export const en = {
   common: {
     goBack: 'Go back',
+    loading: 'Loading…',
     cancel: 'Cancel',
     close: 'Close',
     save: 'Save',
@@ -385,6 +386,24 @@ export const en = {
     creating: 'Creating…',
     createSeries: 'Create series (drafts)',
     createDraft: 'Create draft',
+  },
+  portal: {
+    nav: { analysis: 'Analysis', users: 'Users' },
+    loginSubtitle: 'Leader & Admin console',
+    noAccess:
+      "This account doesn’t have Leader or Admin access. Group members use the MeetingPnt mobile app instead.",
+    invite: {
+      missing: 'This invitation link is missing its code. Ask whoever invited you to send it again.',
+      checking: 'Checking your invitation…',
+      expiredTitle: 'This invitation has expired',
+      expiredBody: 'Invitations last seven days. Ask the group leader to send you a new one.',
+      title: 'You’re invited to join {{group}}',
+      body: 'MeetingPnt is how the group shares where to meet, who’s coming, and where everyone is once the day starts. The invitation is for {{email}}.',
+      openApp: 'Open in the MeetingPnt app',
+      noAppTitle: 'Don’t have the app yet?',
+      noAppBody:
+        'MeetingPnt runs on your phone. Install it, then open this same link again on the phone — your invitation will still be waiting.',
+    },
   },
   notifications: {
     shareLocation: 'Share location',

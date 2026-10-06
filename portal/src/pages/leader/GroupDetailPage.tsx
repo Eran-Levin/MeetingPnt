@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { ApiError } from '../../api/client.js';
+import { apiErrorMessage } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
 import { GroupChatPanel } from '../../components/GroupChatPanel.js';
@@ -90,7 +90,7 @@ export function GroupDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'invitations'] });
     } catch (err) {
-      setInviteError(err instanceof ApiError ? err.message : 'Failed to send invitation');
+      setInviteError(apiErrorMessage(err, 'Failed to send invitation'));
     } finally {
       setInviting(false);
     }

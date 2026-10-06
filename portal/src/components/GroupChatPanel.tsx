@@ -3,7 +3,7 @@ import { SocketEvents } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { chatApi } from '../api/chatApi.js';
-import { ApiError } from '../api/client.js';
+import { apiErrorMessage } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { useAuthStore } from '../store/authStore.js';
 import { Button } from './ui/Button.js';
@@ -63,7 +63,7 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
       setImage(null);
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to send message');
+      setError(apiErrorMessage(err, 'Failed to send message'));
     } finally {
       setSending(false);
     }

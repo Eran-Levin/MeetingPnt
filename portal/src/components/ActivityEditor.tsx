@@ -2,7 +2,7 @@ import type { Activity } from '@meetingpnt/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
-import { ApiError } from '../api/client.js';
+import { apiErrorMessage } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 import { TextField } from './ui/TextField.js';
 
@@ -75,7 +75,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
       queryClient.invalidateQueries({ queryKey: ['groups', activity.groupId, 'activities'] });
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to save the activity');
+      setError(apiErrorMessage(err, 'Failed to save the activity'));
     } finally {
       setSaving(false);
     }

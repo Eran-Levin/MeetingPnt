@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { ApiError } from '../../api/client.js';
+import { apiErrorMessage } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { ActivityEditor } from '../../components/ActivityEditor.js';
@@ -60,7 +60,7 @@ export function ActivityDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
       queryClient.invalidateQueries({ queryKey: ['groups'] });
     } catch (err) {
-      setLifecycleError(err instanceof ApiError ? err.message : 'Something went wrong');
+      setLifecycleError(apiErrorMessage(err, 'Something went wrong'));
     }
   }
 
@@ -82,7 +82,7 @@ export function ActivityDetailPage() {
       await rsvpsApi.setForMember(activityId, userId, status);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
     } catch (err) {
-      setRsvpError(err instanceof ApiError ? err.message : 'Failed to save that reply');
+      setRsvpError(apiErrorMessage(err, 'Failed to save that reply'));
     } finally {
       setSavingRsvpFor(null);
     }

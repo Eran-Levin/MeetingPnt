@@ -3,7 +3,7 @@ import { SocketEvents } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { meetingPointsApi } from '../api/meetingPointsApi.js';
-import { ApiError } from '../api/client.js';
+import { apiErrorMessage } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
@@ -99,9 +99,10 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
     } catch (err) {
       setFormError(
-        err instanceof ApiError
-          ? err.message
-          : "Couldn't read coordinates from that link — try a full (non-shortened) Google Maps URL.",
+        apiErrorMessage(
+          err,
+          "Couldn't read coordinates from that link — try a full (non-shortened) Google Maps URL.",
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -118,7 +119,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       await meetingPointsApi.remove(point.id);
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'meeting-points'] });
     } catch (err) {
-      setListError(err instanceof ApiError ? err.message : 'Failed to remove that stop');
+      setListError(apiErrorMessage(err, 'Failed to remove that stop'));
     }
   }
 

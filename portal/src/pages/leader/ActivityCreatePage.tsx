@@ -2,7 +2,7 @@ import type { MeetingPointTemplateDto, TransportMode } from '@meetingpnt/shared'
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
-import { ApiError } from '../../api/client.js';
+import { apiErrorMessage } from '../../i18n/index.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -102,7 +102,7 @@ export function ActivityCreatePage() {
         navigate(`/activities/${result.activity.id}`);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create activity');
+      setError(apiErrorMessage(err, 'Failed to create activity'));
     } finally {
       setSubmitting(false);
     }

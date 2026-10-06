@@ -1,8 +1,9 @@
 import type { ActivityWithGroup } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, isolate } from '@meetingpnt/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
+import { useLocale, useTranslation } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 
 /**
@@ -14,6 +15,8 @@ import { Button } from './ui/Button.js';
  * Only the leader is asked: a member can't end anything.
  */
 export function OverdueActivityPrompt() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [dismissedId, setDismissedId] = useState<string | null>(null);
 
@@ -39,19 +42,21 @@ export function OverdueActivityPrompt() {
     <div className="border-b border-line bg-tone-warning-bg">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-3 px-6 py-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-ink">{overdue.title} is still running</p>
+          <p className="text-sm font-medium text-ink">
+            {t('calendar.stillRunning', { title: isolate(overdue.title) })}
+          </p>
           <p className="mt-0.5 text-sm text-ink-secondary">
-            It was scheduled for{' '}
-            {formatActivityWhen(overdue.startAt, overdue.endAt, overdue.allDay)} and hasn't been
-            ended. Ending it stops location sharing; attendance stays editable.
+            {t('calendar.overdueBody', {
+              when: formatActivityWhen(overdue.startAt, overdue.endAt, overdue.allDay, locale),
+            })}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" onClick={() => end.mutate(overdue.id)} disabled={end.isPending}>
-            {end.isPending ? 'Ending…' : 'End activity'}
+            {end.isPending ? t('calendar.ending') : t('calendar.endActivity')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setDismissedId(overdue.id)}>
-            Keep it running
+            {t('calendar.keepRunning')}
           </Button>
         </div>
       </div>

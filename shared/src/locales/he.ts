@@ -11,6 +11,7 @@ import type { Catalog } from './en.js';
 export const he: Catalog = {
   common: {
     goBack: 'חזרה',
+    loading: 'טוענים…',
     cancel: 'ביטול',
     close: 'סגירה',
     save: 'שמירה',
@@ -380,6 +381,23 @@ export const he: Catalog = {
     creating: 'יוצרים…',
     createSeries: 'יצירת סדרה (טיוטות)',
     createDraft: 'יצירת טיוטה',
+  },
+  portal: {
+    nav: { analysis: 'ניתוח', users: 'משתמשים' },
+    loginSubtitle: 'קונסולת מובילים ומנהלים',
+    noAccess: 'לחשבון הזה אין גישת מוביל או מנהל. חברי קבוצה משתמשים באפליקציית MeetingPnt לנייד.',
+    invite: {
+      missing: 'בקישור ההזמנה חסר קוד. בקשו ממי שהזמין אתכם לשלוח אותו שוב.',
+      checking: 'בודקים את ההזמנה…',
+      expiredTitle: 'ההזמנה הזו פגה',
+      expiredBody: 'הזמנות תקפות לשבעה ימים. בקשו ממוביל הקבוצה לשלוח לכם הזמנה חדשה.',
+      title: 'הוזמנתם להצטרף אל {{group}}',
+      body: 'MeetingPnt היא הדרך של הקבוצה לשתף איפה נפגשים, מי מגיע, ואיפה כולם נמצאים כשהיום מתחיל. ההזמנה נשלחה אל {{email}}.',
+      openApp: 'פתיחה באפליקציית MeetingPnt',
+      noAppTitle: 'עדיין אין לכם את האפליקציה?',
+      noAppBody:
+        'MeetingPnt רצה בטלפון. התקינו אותה, ואז פתחו שוב את אותו קישור בטלפון — ההזמנה תחכה לכם.',
+    },
   },
   notifications: {
     shareLocation: 'שיתוף מיקום',

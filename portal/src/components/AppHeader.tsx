@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { LOCALES, type Locale } from '@meetingpnt/shared';
 import { usersApi } from '../api/usersApi.js';
+import { useTranslation } from '../i18n/index.js';
 import { useAuthStore } from '../store/authStore.js';
 import { AppLogo } from './AppLogo.js';
 
@@ -9,6 +10,7 @@ import { AppLogo } from './AppLogo.js';
 const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', he: 'עברית' };
 
 export function AppHeader() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
   const setUser = useAuthStore((s) => s.setUser);
@@ -36,21 +38,21 @@ export function AppHeader() {
           {(user?.role === 'leader' || user?.role === 'admin') && (
             <>
               <NavLink to="/groups" active={pathname.startsWith('/groups')}>
-                Groups
+                {t('tabs.groups')}
               </NavLink>
               {/* The list is /activities and a single one is /activities/:id, so one prefix
                   lights the tab from either. */}
               <NavLink to="/activities" active={pathname.startsWith('/activities')}>
-                Activities
+                {t('groupDetail.activities')}
               </NavLink>
               <NavLink to="/analysis" active={pathname.startsWith('/analysis')}>
-                Analysis
+                {t('portal.nav.analysis')}
               </NavLink>
             </>
           )}
           {user?.role === 'admin' && (
             <NavLink to="/admin/users" active={pathname.startsWith('/admin')}>
-              Users
+              {t('portal.nav.users')}
             </NavLink>
           )}
         </nav>
@@ -58,7 +60,7 @@ export function AppHeader() {
         <div className="ms-auto flex items-center gap-4">
           {user && (
             <select
-              aria-label="Language"
+              aria-label={t('account.language')}
               value={user.locale}
               onChange={(e) => handleLocale(e.target.value as Locale)}
               className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink-secondary"
@@ -75,7 +77,7 @@ export function AppHeader() {
             onClick={handleLogout}
             className="text-sm font-medium text-ink-secondary hover:text-ink"
           >
-            Log out
+            {t('account.logOut')}
           </button>
         </div>
       </div>

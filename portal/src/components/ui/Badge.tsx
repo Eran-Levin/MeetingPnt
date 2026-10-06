@@ -1,4 +1,5 @@
 import { toneFor, type Tone } from '@meetingpnt/shared';
+import { useTranslation } from '../../i18n/index.js';
 
 /**
  * The status→meaning map lives in `shared`, so "declined" can't read as a warning here and a
@@ -14,11 +15,15 @@ const TONE_CLASSES: Record<Tone, string> = {
 };
 
 export function Badge({ status, className = '' }: { status: string; className?: string }) {
+  const { t, i18n } = useTranslation();
+  const key = `status.${status}`;
+  // A status the catalog does not know yet still renders, as its raw name.
+  const label = i18n.exists(key) ? t(key as 'status.draft') : status.replace(/_/g, ' ');
   return (
     <span
       className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${TONE_CLASSES[toneFor(status)]} ${className}`}
     >
-      {status.replace(/_/g, ' ')}
+      {label}
     </span>
   );
 }

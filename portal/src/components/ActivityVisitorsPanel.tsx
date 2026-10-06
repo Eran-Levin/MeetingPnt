@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activityInvitationsApi } from '../api/activityInvitationsApi.js';
-import { ApiError } from '../api/client.js';
+import { apiErrorMessage } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
 
@@ -58,7 +58,7 @@ export function ActivityVisitorsPanel({ activityId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'rsvps'] });
       queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'invitations'] });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to invite visitor');
+      setError(apiErrorMessage(err, 'Failed to invite visitor'));
     } finally {
       setInviting(false);
     }
