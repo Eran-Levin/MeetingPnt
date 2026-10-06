@@ -1,6 +1,7 @@
 import type { MeetingPoint } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useLocale, useTranslation } from '../../i18n';
 import {
   Button,
   ButtonRow,
@@ -58,26 +59,27 @@ export function MeetingPointEditor({
   submitting,
   error,
 }: Props) {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
   return (
     <Card style={styles.card}>
       <Text style={text.heading}>
         {mode === 'edit'
-          ? 'Edit meeting point'
+          ? t('meetingPointEditor.editTitle')
           : nextPlanned
-            ? 'Next stop on the plan'
-            : 'Next meeting point'}
+            ? t('meetingPointEditor.nextOnPlan')
+            : t('event.nextMeetingPoint')}
       </Text>
       {mode === 'next' && (
         <Text style={[text.secondary, styles.blurb]}>
-          {nextPlanned
-            ? 'Change anything that turned out differently, then confirm to move the group.'
-            : "You're past the last planned stop — add where the group is going now."}
+          {nextPlanned ? t('meetingPointEditor.blurbPlanned') : t('meetingPointEditor.blurbPastEnd')}
         </Text>
       )}
 
-      <TextField label="Label (optional)" value={label} onChangeText={onLabelChange} />
+      <TextField label={t('meetingPointEditor.labelOptional')} value={label} onChangeText={onLabelChange} />
       <TextField
-        label="Google Maps URL"
+        label={t('meetingPointEditor.mapsUrl')}
         autoCapitalize="none"
         autoCorrect={false}
         value={url}
@@ -85,14 +87,29 @@ export function MeetingPointEditor({
       />
 
       <View style={styles.sources}>
-        <Button label="Use my location" onPress={onUseCurrentLocation} variant="secondary" grow />
-        <Button label="Open Maps" onPress={onOpenMaps} variant="secondary" grow />
-        <Button label="Paste link" onPress={onPasteLink} variant="secondary" grow />
+        <Button
+          label={t('meetingPointEditor.useMyLocation')}
+          onPress={onUseCurrentLocation}
+          variant="secondary"
+          grow
+        />
+        <Button
+          label={t('meetingPointEditor.openMaps')}
+          onPress={onOpenMaps}
+          variant="secondary"
+          grow
+        />
+        <Button
+          label={t('meetingPointEditor.pasteLink')}
+          onPress={onPasteLink}
+          variant="secondary"
+          grow
+        />
       </View>
 
       <Pressable style={styles.timeField} onPress={() => onShowPicker(true)}>
         <Text style={time ? text.body : text.muted}>
-          {time ? time.toLocaleString() : 'Time (optional — defaults to now)'}
+          {time ? time.toLocaleString(locale) : t('meetingPointEditor.timePlaceholder')}
         </Text>
       </Pressable>
       {showPicker && (
@@ -108,12 +125,18 @@ export function MeetingPointEditor({
 
       <ButtonRow>
         <Button
-          label={submitting ? 'Saving…' : mode === 'edit' ? 'Save' : "We're here"}
+          label={
+            submitting
+              ? t('common.saving')
+              : mode === 'edit'
+                ? t('common.save')
+                : t('meetingPointEditor.weAreHere')
+          }
           onPress={onSave}
           busy={submitting}
           grow
         />
-        <Button label="Cancel" onPress={onCancel} variant="secondary" grow />
+        <Button label={t('common.cancel')} onPress={onCancel} variant="secondary" grow />
       </ButtonRow>
 
       {error && <Text style={styles.error}>{error}</Text>}

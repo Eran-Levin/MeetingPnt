@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { locationsApi } from '../api/locationsApi';
+import { i18n } from '../i18n';
 import { getCurrentLocationSnapshot } from './location';
 
 const LOCATION_PING_CATEGORY = 'location_ping';
@@ -9,19 +10,23 @@ const LOCATION_PING_CATEGORY = 'location_ping';
 const LEADER_LOCATION_REQUEST_CATEGORY = 'leader_location_request';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
-const SHARE_LOCATION_ACTION = [
-  {
-    identifier: 'share_location',
-    buttonTitle: 'Share Location',
-    options: { opensAppToForeground: true },
-  },
-];
+/** Built per call: the button's label is in the reader's language, which can change. */
+function shareLocationAction() {
+  return [
+    {
+      identifier: 'share_location',
+      buttonTitle: i18n.t('notifications.shareLocation'),
+      options: { opensAppToForeground: true },
+    },
+  ];
+}
 
+/** Re-run when the language changes — the OS keeps the labels it was last given. */
 export async function setupNotificationCategories() {
-  await Notifications.setNotificationCategoryAsync(LOCATION_PING_CATEGORY, SHARE_LOCATION_ACTION);
+  await Notifications.setNotificationCategoryAsync(LOCATION_PING_CATEGORY, shareLocationAction());
   await Notifications.setNotificationCategoryAsync(
     LEADER_LOCATION_REQUEST_CATEGORY,
-    SHARE_LOCATION_ACTION,
+    shareLocationAction(),
   );
 }
 
