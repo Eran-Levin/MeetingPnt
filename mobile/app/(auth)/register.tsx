@@ -2,12 +2,13 @@ import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { authApi } from '../../src/api/authApi';
-import { ApiError } from '../../src/api/client';
+import { apiErrorMessage, useTranslation } from '../../src/i18n';
 import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { establishSession } from '../../src/services/session';
 import { Button, TextField, color, space, text } from '../../src/ui';
 
 export default function RegisterScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const {
     invitationToken,
@@ -60,7 +61,7 @@ export default function RegisterScreen() {
         router.replace('/(tabs)/activities');
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      setError(apiErrorMessage(err, t('common.somethingWentWrong')));
     } finally {
       setSubmitting(false);
     }
@@ -68,25 +69,25 @@ export default function RegisterScreen() {
 
   return (
     <AuthLayout
-      title="Create account"
-      subtitle={invitationToken ? 'Confirm your details and pick a password.' : undefined}
+      title={t('auth.register.title')}
+      subtitle={invitationToken ? t('auth.register.subtitle') : undefined}
       error={error}
       footer={
         <Link href="/(auth)/login" style={[text.body, { color: color.accentText }]}>
-          Already have an account? Sign in
+          {t('auth.register.haveAccount')}
         </Link>
       }
     >
-      <TextField label="First name" value={firstName} onChangeText={setFirstName} />
-      <TextField label="Last name" value={lastName} onChangeText={setLastName} />
+      <TextField label={t('common.firstName')} value={firstName} onChangeText={setFirstName} />
+      <TextField label={t('common.lastName')} value={lastName} onChangeText={setLastName} />
       <TextField
-        label="Phone (optional)"
+        label={t('common.phoneOptional')}
         keyboardType="phone-pad"
         value={phone}
         onChangeText={setPhone}
       />
       <TextField
-        label="Email"
+        label={t('common.email')}
         placeholder="you@example.com"
         autoCapitalize="none"
         autoCorrect={false}
@@ -95,8 +96,8 @@ export default function RegisterScreen() {
         onChangeText={setEmail}
       />
       <TextField
-        label="Password"
-        placeholder="At least 8 characters"
+        label={t('common.password')}
+        placeholder={t('auth.register.passwordPlaceholder')}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -104,7 +105,7 @@ export default function RegisterScreen() {
         onChangeText={setPassword}
       />
       <Button
-        label={submitting ? 'Creating account…' : 'Register'}
+        label={submitting ? t('auth.register.submitting') : t('auth.register.submit')}
         onPress={handleSubmit}
         busy={submitting}
         style={styles.submit}

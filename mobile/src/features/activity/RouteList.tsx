@@ -1,5 +1,7 @@
 import type { MeetingPoint } from '@meetingpnt/shared';
+import { joinDot } from '@meetingpnt/shared';
 import { Linking, Text } from 'react-native';
+import { useLocale, useTranslation } from '../../i18n';
 import { Row, Section, StepMarker, color, text } from '../../ui';
 
 /**
@@ -14,24 +16,29 @@ export function RouteList({
   points: MeetingPoint[];
   currentPointId: string | null;
 }) {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
   if (points.length <= 1) return null;
 
   return (
-    <Section label="The route">
+    <Section label={t('route.title')}>
       {points.map((point, index) => {
         const isCurrent = point.id === currentPointId;
         const visited = point.arrivedAt !== null && !isCurrent;
         return (
           <Row
             key={point.id}
-            title={point.label || 'Meeting point'}
-            subtitle={
-              new Date(point.time).toLocaleString() +
-              (isCurrent ? '  ·  you are heading here' : visited ? '  ·  done' : '')
-            }
+            title={point.label || t('common.meetingPoint')}
+            subtitle={joinDot([
+              new Date(point.time).toLocaleString(locale),
+              isCurrent ? t('route.headingHere') : visited ? t('route.done') : null,
+            ])}
             leading={<StepMarker label={String(index + 1)} active={isCurrent} />}
             trailing={
-              <Text style={[text.secondary, { color: color.accentText }]}>Directions</Text>
+              <Text style={[text.secondary, { color: color.accentText }]}>
+                {t('common.directions')}
+              </Text>
             }
             onPress={() => Linking.openURL(point.googleMapsUrl)}
             active={isCurrent}

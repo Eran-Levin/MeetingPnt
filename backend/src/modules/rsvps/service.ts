@@ -33,7 +33,7 @@ export async function upsertRsvp(activityId: string, userId: string, dto: RsvpUp
   const activity = await assertActivityParticipant(activityId, userId);
 
   if (activity.startAt < new Date()) {
-    throw new HttpError(409, 'This activity has already started; RSVP is locked');
+    throw new HttpError(409, 'rsvp_locked');
   }
 
   const rsvp = await prisma.rsvp.upsert({
@@ -58,11 +58,11 @@ export async function setRsvpAsLeader(
 ) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can answer for someone else');
+    throw new HttpError(403, 'leader_only_answer_for_member');
   }
   await assertActivityParticipant(activityId, targetUserId);
 
@@ -115,11 +115,11 @@ export async function getMyRsvp(activityId: string, userId: string) {
 export async function listRsvps(activityId: string, requesterId: string): Promise<RsvpWithUser[]> {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can view the RSVP dashboard');
+    throw new HttpError(403, 'leader_only_view_rsvps');
   }
 
   const [rsvps, guests] = await Promise.all([

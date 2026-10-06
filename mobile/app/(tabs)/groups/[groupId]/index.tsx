@@ -1,11 +1,11 @@
 import type { Activity } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, joinDot } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../src/api/activitiesApi';
-import { ApiError } from '../../../../src/api/client';
+import { apiErrorMessage } from '../../../../src/i18n';
 import { groupsApi } from '../../../../src/api/groupsApi';
 import { invitationsApi } from '../../../../src/api/invitationsApi';
 import { useAuthStore } from '../../../../src/store/authStore';
@@ -88,7 +88,7 @@ export default function GroupDetailScreen() {
       setPhone('');
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
     } catch (err) {
-      setMessage(err instanceof ApiError ? err.message : 'Failed to invite');
+      setMessage(apiErrorMessage(err, 'Failed to invite'));
     } finally {
       setInviting(false);
     }
@@ -119,7 +119,7 @@ export default function GroupDetailScreen() {
           <Row
             key={member.id}
             title={member.user.name}
-            subtitle={[member.user.email, member.user.phone].filter(Boolean).join('  ·  ')}
+            subtitle={joinDot([member.user.email, member.user.phone])}
             leading={<Avatar name={member.user.name} uri={member.user.avatarUrl} />}
             /* A leader reaching one person — "you're the only one who hasn't replied". The group
                thread is the wrong place for that. */
@@ -241,7 +241,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerLink: { paddingVertical: space.sm, paddingLeft: space.sm },
+  headerLink: { paddingVertical: space.sm, paddingStart: space.sm },
   invite: { marginTop: space.md },
   inviteActions: { flexDirection: 'row', gap: space.sm },
   newEvent: { marginBottom: space.md },

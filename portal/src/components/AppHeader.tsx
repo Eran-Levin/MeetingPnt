@@ -1,12 +1,23 @@
 import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
+import { LOCALES, type Locale } from '@meetingpnt/shared';
+import { usersApi } from '../api/usersApi.js';
 import { useAuthStore } from '../store/authStore.js';
 import { AppLogo } from './AppLogo.js';
+
+/** Each language is named in itself — someone who can't read the current UI language can still find theirs. */
+const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', he: 'עברית' };
 
 export function AppHeader() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const setUser = useAuthStore((s) => s.setUser);
   const { pathname } = useLocation();
+
+  async function handleLocale(locale: Locale) {
+    const { user: updated } = await usersApi.setLocale(locale);
+    setUser(updated);
+  }
 
   async function handleLogout() {
     await authApi.logout();
@@ -44,7 +55,21 @@ export function AppHeader() {
           )}
         </nav>
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ms-auto flex items-center gap-4">
+          {user && (
+            <select
+              aria-label="Language"
+              value={user.locale}
+              onChange={(e) => handleLocale(e.target.value as Locale)}
+              className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink-secondary"
+            >
+              {LOCALES.map((l) => (
+                <option key={l} value={l}>
+                  {LANGUAGE_NAMES[l]}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-sm text-ink-secondary">{user?.name}</span>
           <button
             onClick={handleLogout}

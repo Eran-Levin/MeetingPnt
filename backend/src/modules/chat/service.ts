@@ -30,14 +30,14 @@ function toSharedMessage(message: Message & { author: User }): MessageWithAuthor
 async function assertChatParticipant(groupId: string, userId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   const isLeader = group.leaderId === userId;
   const isMember =
     isLeader ||
     !!(await prisma.groupMember.findFirst({ where: { groupId, userId, status: 'active' } }));
   if (!isMember) {
-    throw new HttpError(403, 'Not a member of this group');
+    throw new HttpError(403, 'not_group_member');
   }
   return { group, isLeader };
 }
@@ -71,16 +71,16 @@ export async function sendMessage(
   const { group, isLeader } = await assertChatParticipant(groupId, requesterId);
 
   if (!isLeader && group.chatMode === 'announcements') {
-    throw new HttpError(403, 'Only the group leader can post in this group');
+    throw new HttpError(403, 'leader_only_post');
   }
   if (!dto.body && !file) {
-    throw new HttpError(400, 'A message needs text or an image');
+    throw new HttpError(400, 'message_empty');
   }
 
   let imageUrl: string | null = null;
   if (file) {
     if (!isSupportedImageMime(file.mimetype)) {
-      throw new HttpError(400, 'Unsupported image type — use JPEG, PNG, or WebP');
+      throw new HttpError(400, 'unsupported_image');
     }
     imageUrl = await saveImage(file.buffer, file.mimetype);
   }

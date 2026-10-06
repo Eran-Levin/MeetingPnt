@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
+import { useLocaleSync } from '../src/i18n';
 import {
   registerBackgroundNotificationTask,
   registerNotificationResponseHandler,
@@ -21,6 +22,8 @@ Notifications.setNotificationHandler({
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
+  useLocaleSync();
+
   useEffect(() => {
     setupNotificationCategories().catch(() => undefined);
     registerBackgroundNotificationTask().catch(() => undefined);

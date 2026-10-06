@@ -176,12 +176,12 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
                         {new Date(point.time).toLocaleString()}
                       </span>
                       {isCurrent && (
-                        <span className="ml-2 rounded-full bg-tone-accent-bg px-2 py-0.5 text-xs font-medium text-tone-accent-fg">
+                        <span className="ms-2 rounded-full bg-tone-accent-bg px-2 py-0.5 text-xs font-medium text-tone-accent-fg">
                           Group is here
                         </span>
                       )}
                       {reached && !isCurrent && (
-                        <span className="ml-2 text-xs text-ink-muted">visited</span>
+                        <span className="ms-2 text-xs text-ink-muted">visited</span>
                       )}
                     </span>
                   </span>

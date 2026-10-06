@@ -4,10 +4,12 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LiveActivityBar } from '../../src/components/LiveActivityBar';
+import { useTranslation } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/authStore';
 import { color, fontSize, space } from '../../src/ui/theme';
 
 export default function TabsLayout() {
+  const { t } = useTranslation();
   const role = useAuthStore((s) => s.user?.role);
 
   /**
@@ -31,7 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="activities"
         options={{
-          title: leads ? 'Calendar' : 'Your activities',
+          title: leads ? t('tabs.calendar') : t('tabs.yourActivities'),
           tabBarIcon: ({ color: c, size }) => (
             <Ionicons name="calendar-outline" color={c} size={size} />
           ),
@@ -40,7 +42,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="groups"
         options={{
-          title: 'Groups',
+          title: t('tabs.groups'),
           href: leads ? undefined : null,
           tabBarIcon: ({ color: c, size }) => (
             <Ionicons name="people-outline" color={c} size={size} />

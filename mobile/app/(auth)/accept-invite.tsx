@@ -1,12 +1,14 @@
+import { isolate } from '@meetingpnt/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { ApiError } from '../../src/api/client';
 import { invitationsApi } from '../../src/api/invitationsApi';
+import { apiErrorMessage, useTranslation } from '../../src/i18n';
 import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { color, space, text } from '../../src/ui';
 
 export default function AcceptInviteScreen() {
+  const { t } = useTranslation();
   const { token } = useLocalSearchParams<{ token?: string }>();
 
   const { data, isLoading, error } = useQuery({
@@ -17,7 +19,7 @@ export default function AcceptInviteScreen() {
 
   if (!token) {
     return (
-      <AuthLayout title="Invitation" error="This invite link is missing a token.">
+      <AuthLayout title={t('auth.invite.title')} error={t('auth.invite.missingToken')}>
         {null}
       </AuthLayout>
     );
@@ -25,7 +27,7 @@ export default function AcceptInviteScreen() {
 
   if (isLoading) {
     return (
-      <AuthLayout title="Invitation">
+      <AuthLayout title={t('auth.invite.title')}>
         <View style={styles.centre}>
           <ActivityIndicator />
         </View>
@@ -36,12 +38,8 @@ export default function AcceptInviteScreen() {
   if (error || !data) {
     return (
       <AuthLayout
-        title="Invitation"
-        error={
-          error instanceof ApiError
-            ? error.message
-            : 'This invitation link is invalid or has expired.'
-        }
+        title={t('auth.invite.title')}
+        error={apiErrorMessage(error, t('auth.invite.invalid'))}
       >
         {null}
       </AuthLayout>
@@ -52,11 +50,15 @@ export default function AcceptInviteScreen() {
 
   return (
     <AuthLayout
-      title="You’re invited"
+      title={t('auth.invite.youreInvited')}
       subtitle={
         party
-          ? `Join ${data.group.name} on MeetingPnt as ${data.email}. You're bringing a party of ${party.size} — you'll name the rest after signing up.`
-          : `Join ${data.group.name} on MeetingPnt as ${data.email}.`
+          ? t('auth.invite.joinParty', {
+              group: isolate(data.group.name),
+              email: isolate(data.email),
+              size: party.size,
+            })
+          : t('auth.invite.join', { group: isolate(data.group.name), email: isolate(data.email) })
       }
       /* Carries through whatever the leader filled in, so signing up is password-only. */
       footer={
@@ -76,7 +78,7 @@ export default function AcceptInviteScreen() {
           }}
           style={[text.body, { color: color.accentText }]}
         >
-          Create your account
+          {t('auth.invite.createAccount')}
         </Link>
       }
     >

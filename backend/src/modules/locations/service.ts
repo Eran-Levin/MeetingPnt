@@ -38,7 +38,7 @@ function toSharedSnapshot(row: LocationSnapshotRow): SharedLocationSnapshot {
 async function assertApprovedRsvp(activityId: string, userId: string) {
   const rsvp = await prisma.rsvp.findFirst({ where: { activityId, userId, status: 'approved' } });
   if (!rsvp) {
-    throw new HttpError(403, 'Location features are limited to approved attendees');
+    throw new HttpError(403, 'locations_approved_only');
   }
 }
 
@@ -57,11 +57,11 @@ async function assertLeaderOrApproved(activityId: string, userId: string, leader
 async function getActivityWithLeader(activityId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
   if (!group) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   return { activity, group };
 }
@@ -70,7 +70,7 @@ async function getActivityWithLeader(activityId: string) {
  * activity closes the location features off. */
 function assertActivityLive(activity: { status: string }) {
   if (activity.status === 'completed' || activity.status === 'cancelled') {
-    throw new HttpError(409, 'This activity has ended; location sharing is closed');
+    throw new HttpError(409, 'location_sharing_closed');
   }
 }
 
@@ -86,7 +86,7 @@ async function recordSnapshot(
 
   const meetingPoint = await getCurrentMeetingPoint(activityId);
   if (!meetingPoint) {
-    throw new HttpError(409, 'No meeting point has been set for this activity yet');
+    throw new HttpError(409, 'no_meeting_point_yet');
   }
 
   // A broadcast fix gets no ETA. The leader isn't travelling to the meeting point — they're what
@@ -153,7 +153,7 @@ function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
 async function assertIsLeader(activityId: string, requesterId: string) {
   const { activity, group } = await getActivityWithLeader(activityId);
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can share a live position');
+    throw new HttpError(403, 'leader_only_share_position');
   }
   return { activity, group };
 }
@@ -181,7 +181,7 @@ export async function startLeaderBroadcast(activityId: string, requesterId: stri
   const { activity } = await assertIsLeader(activityId, requesterId);
   assertActivityLive(activity);
   if (activity.status !== 'in_progress') {
-    throw new HttpError(409, 'Start the event before sharing a live position');
+    throw new HttpError(409, 'start_before_sharing');
   }
 
   const until = new Date(Date.now() + BROADCAST_LEASE_MS);
@@ -221,7 +221,7 @@ export async function recordBroadcastFix(
   const { activity } = await assertIsLeader(activityId, requesterId);
   assertActivityLive(activity);
   if (!isLeaderBroadcasting(activity.leaderBroadcastUntil)) {
-    throw new HttpError(409, 'Live position sharing is not running for this activity');
+    throw new HttpError(409, 'broadcast_not_running');
   }
 
   const previous = await getLatestSnapshotForUser(activityId, requesterId);
@@ -257,7 +257,7 @@ export async function submitPingResponse(
 export async function requestPing(activityId: string, requesterId: string, dto: PingRequestDto) {
   const { activity, group } = await getActivityWithLeader(activityId);
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can request a location');
+    throw new HttpError(403, 'leader_only_request_location');
   }
   assertActivityLive(activity);
 
@@ -364,7 +364,7 @@ export async function requestLeaderLocation(
 export async function getLatestLocations(activityId: string, requesterId: string) {
   const { group } = await getActivityWithLeader(activityId);
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can view live locations');
+    throw new HttpError(403, 'leader_only_view_locations');
   }
 
   const rows = await getLatestSnapshotsForActivity(activityId);

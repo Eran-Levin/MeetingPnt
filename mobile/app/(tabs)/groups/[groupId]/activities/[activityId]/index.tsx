@@ -1,6 +1,7 @@
 import type { LocationSnapshotWithUser, MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
-import { formatActivityWhen, isLeaderBroadcasting } from '@meetingpnt/shared';
+import { formatActivityWhen, isLeaderBroadcasting, isolate } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -8,9 +9,9 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi';
 import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi';
 import { attendanceApi } from '../../../../../../src/api/attendanceApi';
-import { ApiError } from '../../../../../../src/api/client';
 import { groupsApi } from '../../../../../../src/api/groupsApi';
 import { locationsApi } from '../../../../../../src/api/locationsApi';
+import { apiErrorMessage, useLocale, useTranslation } from '../../../../../../src/i18n';
 import { meetingPointsApi } from '../../../../../../src/api/meetingPointsApi';
 import { rsvpsApi } from '../../../../../../src/api/rsvpsApi';
 import { CurrentPointCard } from '../../../../../../src/features/activity/CurrentPointCard';
@@ -37,13 +38,13 @@ import {
 } from '../../../../../../src/ui';
 
 /** How long ago a position was captured, in the words you'd use out loud. */
-function describeAge(capturedAt: string): string {
+function describeAge(capturedAt: string, t: TFunction): string {
   const minutes = Math.round((Date.now() - new Date(capturedAt).getTime()) / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes === 1) return 'a minute ago';
-  if (minutes < 60) return `${minutes} minutes ago`;
+  if (minutes < 1) return t('age.justNow');
+  if (minutes === 1) return t('age.minuteAgo');
+  if (minutes < 60) return t('age.minutesAgo', { count: minutes });
   const hours = Math.round(minutes / 60);
-  return hours === 1 ? 'an hour ago' : `${hours} hours ago`;
+  return hours === 1 ? t('age.hourAgo') : t('age.hoursAgo', { count: hours });
 }
 
 function mapsLinkFor(location: { lat: number; lng: number }): string {
@@ -51,6 +52,9 @@ function mapsLinkFor(location: { lat: number; lng: number }): string {
 }
 
 export default function ActivityDetailScreen() {
+  const { t } = useTranslation();
+  const locale = useLocale();
+  const age = (capturedAt: string) => describeAge(capturedAt, t);
   const { groupId, activityId } = useLocalSearchParams<{ groupId: string; activityId: string }>();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -169,7 +173,9 @@ export default function ActivityDetailScreen() {
       note: note || undefined,
     });
     setMyStatus(rsvp.status);
-    setRsvpMessage(`You're marked as ${rsvp.status}.`);
+    setRsvpMessage(
+      rsvp.status === 'approved' ? t('event.markedApproved') : t('event.markedDeclined'),
+    );
     queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'attendees'] });
     queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
   }
@@ -229,7 +235,7 @@ export default function ActivityDetailScreen() {
     setMpError(null);
     const location = await getCurrentLocationSnapshot();
     if (!location) {
-      setMpError('Location permission is required to use your current position.');
+      setMpError(t('event.locationForCurrent'));
       return;
     }
     setMpUrl(`https://www.google.com/maps/@${location.lat.toFixed(6)},${location.lng.toFixed(6)},17z`);
@@ -248,7 +254,7 @@ export default function ActivityDetailScreen() {
   async function pasteLink() {
     const copied = (await Clipboard.getStringAsync())?.trim();
     if (!copied) {
-      setMpError('Nothing on the clipboard to paste.');
+      setMpError(t('event.clipboardEmpty'));
       return;
     }
     setMpError(null);
@@ -275,9 +281,7 @@ export default function ActivityDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
     } catch (err) {
       setMpError(
-        err instanceof ApiError
-          ? err.message
-          : "Couldn't read that Maps link — try a full (non-shortened) URL.",
+        apiErrorMessage(err, t('event.mapsLinkBad')),
       );
     } finally {
       setMpSubmitting(false);
@@ -290,17 +294,17 @@ export default function ActivityDetailScreen() {
     try {
       const location = await getCurrentLocationSnapshot();
       if (!location) {
-        setOmwMessage('Location permission is required to share your ETA.');
+        setOmwMessage(t('event.omwNoPermission'));
         return;
       }
       const { snapshot } = await locationsApi.submitOmw(activityId, location);
       setOmwMessage(
         snapshot.etaSeconds != null
-          ? `Shared! ETA: ${Math.round(snapshot.etaSeconds / 60)} min.`
-          : "Shared your location, but couldn't calculate an ETA.",
+          ? t('event.omwShared', { minutes: Math.round(snapshot.etaSeconds / 60) })
+          : t('event.omwNoEta'),
       );
     } catch {
-      setOmwMessage('Failed to share your location.');
+      setOmwMessage(t('event.omwFailed'));
     } finally {
       setOmwSubmitting(false);
     }
@@ -329,7 +333,7 @@ export default function ActivityDetailScreen() {
         subscription?.remove();
         subscription = null;
       } else if (!subscription) {
-        setBroadcastError('Location permission is required to share your position.');
+        setBroadcastError(t('event.broadcastNoPermission'));
       }
     })();
 
@@ -353,7 +357,7 @@ export default function ActivityDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['activities', activityId] });
     } catch (err) {
       setBroadcastError(
-        err instanceof ApiError ? err.message : "Couldn't change live sharing just now.",
+        apiErrorMessage(err, t('event.broadcastFailed')),
       );
     } finally {
       setBroadcastBusy(false);
@@ -367,16 +371,16 @@ export default function ActivityDetailScreen() {
       const result = await locationsApi.askLeader(activityId);
       setLeaderLocation(result.location);
       if (!result.location) {
-        setAskMessage("Asked — you'll see their position here once they share it.");
+        setAskMessage(t('event.askedWaiting'));
       } else if (result.notified) {
         // A position exists but it's old enough that we disturbed the leader for a fresh one.
-        setAskMessage(`Asked. Last known position was ${describeAge(result.location.capturedAt)}.`);
+        setAskMessage(t('event.askedLast', { age: age(result.location.capturedAt) }));
       } else {
-        setAskMessage(`Shared ${describeAge(result.location.capturedAt)}.`);
+        setAskMessage(t('event.askedShared', { age: age(result.location.capturedAt) }));
       }
     } catch (err) {
       setAskMessage(
-        err instanceof ApiError ? err.message : "Couldn't ask right now — try again in a moment.",
+        apiErrorMessage(err, t('event.askFailed')),
       );
     } finally {
       setAskSubmitting(false);
@@ -395,14 +399,18 @@ export default function ActivityDetailScreen() {
         ...(visitorPhone.trim() ? { phone: visitorPhone.trim() } : {}),
       });
       const who = `${visitorFirstName} ${visitorLastName}`.trim();
-      setVisitorMessage(result.type === 'added' ? `${who} added.` : `Invitation sent to ${who}.`);
+      setVisitorMessage(
+        result.type === 'added'
+          ? t('event.visitorAdded', { who: isolate(who) })
+          : t('event.visitorInvited', { who: isolate(who) }),
+      );
       setVisitorEmail('');
       setVisitorFirstName('');
       setVisitorLastName('');
       setVisitorPhone('');
       refreshRollCall();
     } catch {
-      setVisitorMessage('Failed to invite visitor.');
+      setVisitorMessage(t('event.visitorFailed'));
     } finally {
       setVisitorSubmitting(false);
     }
@@ -415,7 +423,7 @@ export default function ActivityDetailScreen() {
   return (
     <Screen
       title={activity.title}
-      subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+      subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
       bottomInset={80}
     >
       <View style={styles.status}>
@@ -426,7 +434,7 @@ export default function ActivityDetailScreen() {
           style={styles.chat}
           onPress={() => router.push(`/(tabs)/groups/${groupId}/chat`)}
         >
-          <Text style={[text.body, { color: color.accentText }]}>Group chat</Text>
+          <Text style={[text.body, { color: color.accentText }]}>{t('event.groupChat')}</Text>
         </Pressable>
       </View>
 
@@ -438,19 +446,33 @@ export default function ActivityDetailScreen() {
         <View style={styles.controls}>
           {activity.status === 'published' && (
             <ButtonRow>
-              <Button label="Start activity" onPress={handleStart} grow />
-              <Button label="End activity" onPress={handleEnd} variant="secondary" grow />
+              <Button label={t('calendar.startActivity')} onPress={handleStart} grow />
+              <Button
+                label={t('calendar.endActivity')}
+                onPress={handleEnd}
+                variant="secondary"
+                grow
+              />
             </ButtonRow>
           )}
           {running && (
             <>
               <ButtonRow>
-                <Button label="Next meeting point" onPress={() => openEditor('next')} grow />
-                <Button label="End activity" onPress={handleEnd} variant="secondary" grow />
+                <Button
+                  label={t('event.nextMeetingPoint')}
+                  onPress={() => openEditor('next')}
+                  grow
+                />
+                <Button
+                label={t('calendar.endActivity')}
+                onPress={handleEnd}
+                variant="secondary"
+                grow
+              />
               </ButtonRow>
               {nextPlanned && (
                 <Text style={[text.secondary, styles.planned]}>
-                  Next on the plan: {nextPlanned.label || 'a stop'}
+                  {t('event.nextPlanned', { label: nextPlanned.label || t('event.aStop') })}
                 </Text>
               )}
 
@@ -459,10 +481,10 @@ export default function ActivityDetailScreen() {
               <Button
                 label={
                   broadcastBusy
-                    ? 'One moment…'
+                    ? t('event.oneMoment')
                     : broadcasting
-                      ? 'Stop sharing my position'
-                      : 'Share my live position'
+                      ? t('event.stopSharing')
+                      : t('event.shareLive')
                 }
                 onPress={handleToggleBroadcast}
                 busy={broadcastBusy}
@@ -471,7 +493,7 @@ export default function ActivityDetailScreen() {
               />
               {broadcasting && (
                 <Text style={[text.secondary, styles.planned]}>
-                  Your group can see where you are. Sharing stops if you leave this screen.
+                  {t('event.broadcastingNote')}
                 </Text>
               )}
               {broadcastError && (
@@ -484,13 +506,13 @@ export default function ActivityDetailScreen() {
 
       {activity.status === 'completed' && (
         <Text style={[text.secondary, styles.planned]}>
-          This activity has ended — location sharing is closed.
+          {t('event.ended')}
         </Text>
       )}
 
       {/* `onOnMyWay` isn't gated on the event running: a member sets off for the 06:30 meetup
           well before the leader taps start, and that's exactly when sharing an ETA matters. */}
-      <Section label={currentPoint ? 'Where to go now' : 'Meeting point'}>
+      <Section label={currentPoint ? t('event.whereToGoNow') : t('common.meetingPoint')}>
         <CurrentPointCard
           point={currentPoint}
           plannedCount={meetingPoints.length}
@@ -549,7 +571,7 @@ export default function ActivityDetailScreen() {
           onAskLeader={handleAskLeader}
           askBusy={askSubmitting}
           askMessage={askMessage}
-          describeAge={describeAge}
+          describeAge={age}
           mapsLinkFor={mapsLinkFor}
         />
       )}
@@ -558,17 +580,17 @@ export default function ActivityDetailScreen() {
           a thread with just them, which is where sorting a lift belongs: the group chat is for
           the whole group, and two people arranging a car aren't. */}
       {!isLeader && activity.status !== 'draft' && (
-        <Section label={`Coming · ${attendees.length}`}>
+        <Section label={t('event.coming', { count: attendees.length })}>
           {attendees.length > 0 ? (
             attendees.map((attendee, index) => {
               const isMe = attendee.user.id === user?.id;
               return (
                 <Row
                   key={attendee.user.id}
-                  title={isMe ? `${attendee.user.name} (you)` : attendee.user.name}
-                  subtitle={attendee.isVisitor ? 'Visitor' : undefined}
+                  title={isMe ? t('event.attendeeYou', { name: isolate(attendee.user.name) }) : attendee.user.name}
+                  subtitle={attendee.isVisitor ? t('event.visitor') : undefined}
                   leading={<Avatar name={attendee.user.name} uri={attendee.user.avatarUrl} />}
-                  trailing={isMe ? undefined : <Pill tone="neutral" label="Message" />}
+                  trailing={isMe ? undefined : <Pill tone="neutral" label={t('event.message')} />}
                   onPress={isMe ? undefined : () => openDirectChat(attendee.user.id)}
                   last={index === attendees.length - 1}
                 />
@@ -576,7 +598,7 @@ export default function ActivityDetailScreen() {
             })
           ) : (
             <Card>
-              <Text style={text.secondary}>Nobody has confirmed yet.</Text>
+              <Text style={text.secondary}>{t('event.nobodyConfirmed')}</Text>
             </Card>
           )}
         </Section>
@@ -609,7 +631,7 @@ export default function ActivityDetailScreen() {
 
 const styles = StyleSheet.create({
   status: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.md },
-  chat: { marginLeft: 'auto', paddingVertical: space.sm },
+  chat: { marginStart: 'auto', paddingVertical: space.sm },
   desc: { marginBottom: space.md },
   controls: { marginTop: space.sm },
   planned: { marginTop: space.sm },

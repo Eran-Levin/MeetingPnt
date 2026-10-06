@@ -1,4 +1,4 @@
-import type { User as SharedUser } from '@meetingpnt/shared';
+import { DEFAULT_LOCALE, LOCALES, type Locale, type User as SharedUser } from '@meetingpnt/shared';
 import type { User } from '@prisma/client';
 
 /**
@@ -8,6 +8,11 @@ import type { User } from '@prisma/client';
  */
 export function displayName(user: { firstName: string; lastName: string }): string {
   return `${user.firstName} ${user.lastName}`.trim();
+}
+
+/** The column is plain text; anything the clients do not know falls back rather than leaking out. */
+export function toLocale(value: string): Locale {
+  return LOCALES.includes(value as Locale) ? (value as Locale) : DEFAULT_LOCALE;
 }
 
 /** The full user as the clients receive it. Auth returns it on sign-in; the avatar upload returns
@@ -21,6 +26,7 @@ export function toSharedUser(user: User): SharedUser {
     name: displayName(user),
     phone: user.phone,
     avatarUrl: user.avatarUrl,
+    locale: toLocale(user.locale),
     role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),

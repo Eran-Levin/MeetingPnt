@@ -53,7 +53,7 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
                 <span className="min-w-0 flex-1">
                   <span className="text-sm text-ink">{rsvp.user.name}</span>
                   {rsvp.isVisitor && (
-                    <span className="ml-2 rounded-full bg-tone-info-bg px-2 py-0.5 text-xs font-medium text-tone-info-fg">
+                    <span className="ms-2 rounded-full bg-tone-info-bg px-2 py-0.5 text-xs font-medium text-tone-info-fg">
                       Visitor
                     </span>
                   )}

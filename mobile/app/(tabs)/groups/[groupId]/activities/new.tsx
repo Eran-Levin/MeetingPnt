@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../src/api/activitiesApi';
-import { ApiError } from '../../../../../src/api/client';
+import { apiErrorMessage } from '../../../../../src/i18n';
 import {
   Button,
   Chip,
@@ -102,7 +102,7 @@ export default function NewActivityScreen() {
         router.replace(`/(tabs)/groups/${groupId}/activities/${result.activity.id}`);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create activity');
+      setError(apiErrorMessage(err, 'Failed to create activity'));
     } finally {
       setSubmitting(false);
     }

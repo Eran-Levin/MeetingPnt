@@ -37,11 +37,11 @@ function toSharedMeetingPoint(row: MeetingPointRow): SharedMeetingPoint {
 async function assertActivityLeader(activityId: string, requesterId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage meeting points');
+    throw new HttpError(403, 'leader_only_manage_meeting_points');
   }
   return { activity, group };
 }
@@ -50,10 +50,7 @@ async function resolveLocation(googleMapsUrl: string, fallback?: { lat: number; 
   const parsed = await parseGoogleMapsUrl(googleMapsUrl);
   if (parsed) return parsed;
   if (fallback) return fallback;
-  throw new HttpError(
-    400,
-    "Couldn't read coordinates from that Google Maps link — please drop a pin instead.",
-  );
+  throw new HttpError(400, 'maps_link_unreadable');
 }
 
 /**
@@ -109,7 +106,7 @@ export async function advanceToNextMeetingPoint(
   const { activity, group } = await assertActivityLeader(activityId, requesterId);
 
   if (activity.status === 'completed') {
-    throw new HttpError(409, "This event has ended — you can't move the group on.");
+    throw new HttpError(409, 'event_ended_cannot_advance');
   }
 
   const location = await resolveLocation(dto.googleMapsUrl, dto.location);
@@ -137,7 +134,7 @@ export async function advanceToNextMeetingPoint(
       });
 
   if (!row) {
-    throw new HttpError(404, 'Meeting point not found');
+    throw new HttpError(404, 'meeting_point_not_found');
   }
 
   await prisma.activity.update({
@@ -157,17 +154,14 @@ export async function advanceToNextMeetingPoint(
 export async function removeMeetingPoint(meetingPointId: string, requesterId: string) {
   const existing = await getMeetingPointById(meetingPointId);
   if (!existing) {
-    throw new HttpError(404, 'Meeting point not found');
+    throw new HttpError(404, 'meeting_point_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: existing.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage meeting points');
+    throw new HttpError(403, 'leader_only_manage_meeting_points');
   }
   if (existing.arrivedAt) {
-    throw new HttpError(
-      409,
-      "The group already met here, so this stop is part of the event's record and can't be removed.",
-    );
+    throw new HttpError(409, 'stop_already_visited');
   }
 
   await deleteMeetingPoint(meetingPointId);
@@ -206,11 +200,11 @@ export async function updateMeetingPoint(
 ) {
   const existing = await getMeetingPointById(meetingPointId);
   if (!existing) {
-    throw new HttpError(404, 'Meeting point not found');
+    throw new HttpError(404, 'meeting_point_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: existing.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage meeting points');
+    throw new HttpError(403, 'leader_only_manage_meeting_points');
   }
 
   const location =
@@ -225,7 +219,7 @@ export async function updateMeetingPoint(
     time: dto.time ? new Date(dto.time) : undefined,
   });
   if (!row) {
-    throw new HttpError(404, 'Meeting point not found');
+    throw new HttpError(404, 'meeting_point_not_found');
   }
 
   const meetingPoint = toSharedMeetingPoint(row);

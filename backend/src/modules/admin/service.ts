@@ -26,7 +26,7 @@ export async function listUsers(params: { search?: string; role?: Role }) {
 export async function elevateUserRole(actorId: string, targetId: string, role: Role) {
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'user_not_found');
   }
 
   const [updated] = await prisma.$transaction([

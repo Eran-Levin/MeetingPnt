@@ -467,7 +467,7 @@ function MemberRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between gap-3 px-4 py-3 ${indented ? 'pl-8' : ''}`}
+      className={`flex items-center justify-between gap-3 px-4 py-3 ${indented ? 'ps-8' : ''}`}
     >
       <div className="min-w-0 text-sm">
         <p className="flex items-center gap-2 truncate text-ink">

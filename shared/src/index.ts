@@ -5,3 +5,5 @@ export * from './dto/index.js';
 export * from './socket-events/index.js';
 export * from './theme/index.js';
 export * from './utils/index.js';
+export * from './locales/index.js';
+export * from './errors/index.js';
