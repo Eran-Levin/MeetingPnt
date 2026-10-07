@@ -7,3 +7,5 @@ export * from './theme/index.js';
 export * from './utils/index.js';
 export * from './locales/index.js';
 export * from './errors/index.js';
+export * from './notify/index.js';
+export { renderText } from './locales/render.js';

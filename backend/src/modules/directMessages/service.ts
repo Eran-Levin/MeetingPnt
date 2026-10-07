@@ -1,9 +1,10 @@
 import type { DirectMessage as SharedDirectMessage, DirectThread, SendMessageDto } from '@meetingpnt/shared';
+import { pushText } from '@meetingpnt/shared';
 import type { DirectMessage } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
 const THREAD_PAGE_SIZE = 50;
@@ -130,11 +131,12 @@ export async function sendDirectMessage(
 
   const sender = await prisma.user.findUnique({ where: { id: requesterId } });
   const tokens = await prisma.pushToken.findMany({ where: { userId: other.id } });
+  const locale = toLocale(other.locale);
   await sendPushNotifications(
     tokens.map((token) => ({
       to: token.expoPushToken,
-      title: sender ? displayName(sender) : 'New message',
-      body: dto.body ?? 'Sent a photo',
+      title: sender ? displayName(sender) : pushText(locale, 'newMessage'),
+      body: dto.body ?? pushText(locale, 'sentPhoto'),
       data: { type: 'direct_message', userId: requesterId },
     })),
   );

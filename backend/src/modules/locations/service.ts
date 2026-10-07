@@ -5,7 +5,13 @@ import type {
   PingRequestDto,
   PingResponseDto,
 } from '@meetingpnt/shared';
-import { LocationSource, SocketEvents, isLeaderBroadcasting } from '@meetingpnt/shared';
+import {
+  LocationSource,
+  SocketEvents,
+  isLeaderBroadcasting,
+  isolate,
+  pushText,
+} from '@meetingpnt/shared';
 import {
   getLatestSnapshotForUser,
   getLatestSnapshotsForActivity,
@@ -14,7 +20,7 @@ import {
   type LocationSnapshotRow,
 } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { getEta } from '../../lib/googleMapsClient.js';
@@ -263,12 +269,19 @@ export async function requestPing(activityId: string, requesterId: string, dto: 
 
   await assertApprovedRsvp(activityId, dto.userId);
 
-  const pushTokens = await prisma.pushToken.findMany({ where: { userId: dto.userId } });
+  const [pushTokens, target] = await Promise.all([
+    prisma.pushToken.findMany({ where: { userId: dto.userId } }),
+    prisma.user.findUnique({ where: { id: dto.userId }, select: { locale: true } }),
+  ]);
+  const locale = toLocale(target?.locale ?? 'en');
   await sendPushNotifications(
     pushTokens.map((token) => ({
       to: token.expoPushToken,
-      title: 'Where are you?',
-      body: `The leader of ${group.name} requested your location for ${activity.title}.`,
+      title: pushText(locale, 'whereAreYou'),
+      body: pushText(locale, 'pingBody', {
+        group: isolate(group.name),
+        title: isolate(activity.title),
+      }),
       data: { type: 'location_ping', activityId },
       priority: 'high',
       categoryId: 'location_ping',
@@ -346,12 +359,19 @@ export async function requestLeaderLocation(
   lastAskNotifiedAt.set(activityId, now);
 
   const requester = await prisma.user.findUnique({ where: { id: requesterId } });
-  const pushTokens = await prisma.pushToken.findMany({ where: { userId: group.leaderId } });
+  const [pushTokens, leader] = await Promise.all([
+    prisma.pushToken.findMany({ where: { userId: group.leaderId } }),
+    prisma.user.findUnique({ where: { id: group.leaderId }, select: { locale: true } }),
+  ]);
+  const locale = toLocale(leader?.locale ?? 'en');
   await sendPushNotifications(
     pushTokens.map((token) => ({
       to: token.expoPushToken,
-      title: 'Where are you?',
-      body: `${displayName(requester!)} asked where you are in ${activity.title}.`,
+      title: pushText(locale, 'whereAreYou'),
+      body: pushText(locale, 'leaderAskBody', {
+        name: isolate(displayName(requester!)),
+        title: isolate(activity.title),
+      }),
       data: { type: 'leader_location_request', activityId },
       priority: 'high',
       categoryId: 'leader_location_request',

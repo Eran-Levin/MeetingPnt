@@ -1,4 +1,5 @@
 import { en } from '../locales/en.js';
+import { renderText } from '../locales/render.js';
 
 type Catalog = typeof en;
 /** Plural variants (`party_needs_members_one` …) are one code with a `count`. */
@@ -27,10 +28,5 @@ export function isErrorCode(value: unknown): value is ErrorCode {
 
 /** The English sentence for a code — what the server sends as `error`. */
 export function englishErrorMessage(code: ErrorCode, params: ErrorParams = {}): string {
-  const plural =
-    typeof params.count === 'number'
-      ? `${code}_${new Intl.PluralRules('en').select(params.count) === 'one' ? 'one' : 'other'}`
-      : null;
-  const template = (plural && errorCatalog[plural]) || errorCatalog[code] || errorCatalog[`${code}_other`] || code;
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(params[key] ?? ''));
+  return renderText('en', errorCatalog, code, params);
 }

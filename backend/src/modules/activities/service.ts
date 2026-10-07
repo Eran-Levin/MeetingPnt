@@ -5,6 +5,7 @@ import type {
   CreateActivityDto,
   UpdateActivityDto,
 } from '@meetingpnt/shared';
+import { isolate, pushText } from '@meetingpnt/shared';
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -17,6 +18,7 @@ import {
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { buildIcsEvent } from '../../lib/ics.js';
+import { toLocale } from '../../lib/userName.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
 import { assertMembership } from '../groups/service.js';
 
@@ -185,14 +187,22 @@ export async function publishSeries(seriesId: string, requesterId: string) {
     return tx.activity.findMany({ where: { seriesId }, orderBy: { startAt: 'asc' } });
   });
 
-  const recipients = members.filter((m) => m.userId !== requesterId).flatMap((m) => m.user.pushTokens);
+  // Each member is told in their own language.
   await sendPushNotifications(
-    recipients.map((token) => ({
-      to: token.expoPushToken,
-      title: `New recurring activity in ${group.name}`,
-      body: `${occurrences[0]!.title} — ${draftIds.length} session${draftIds.length > 1 ? 's' : ''} scheduled. RSVP now`,
-      data: { type: 'activity_series_published', seriesId },
-    })),
+    members
+      .filter((m) => m.userId !== requesterId)
+      .flatMap((m) => {
+        const locale = toLocale(m.user.locale);
+        return m.user.pushTokens.map((token) => ({
+          to: token.expoPushToken,
+          title: pushText(locale, 'seriesPublishedTitle', { group: isolate(group.name) }),
+          body: pushText(locale, 'seriesPublishedBody', {
+            title: isolate(occurrences[0]!.title),
+            count: draftIds.length,
+          }),
+          data: { type: 'activity_series_published', seriesId },
+        }));
+      }),
   );
 
   return updated.map(toSharedActivity);
@@ -299,14 +309,18 @@ export async function publishActivity(activityId: string, requesterId: string) {
     return publishedActivity;
   });
 
-  const recipients = members.filter((m) => m.userId !== requesterId).flatMap((m) => m.user.pushTokens);
   await sendPushNotifications(
-    recipients.map((token) => ({
-      to: token.expoPushToken,
-      title: `New activity in ${group.name}`,
-      body: `${activity.title} — RSVP now`,
-      data: { type: 'activity_published', activityId },
-    })),
+    members
+      .filter((m) => m.userId !== requesterId)
+      .flatMap((m) => {
+        const locale = toLocale(m.user.locale);
+        return m.user.pushTokens.map((token) => ({
+          to: token.expoPushToken,
+          title: pushText(locale, 'activityPublishedTitle', { group: isolate(group.name) }),
+          body: pushText(locale, 'activityPublishedBody', { title: isolate(activity.title) }),
+          data: { type: 'activity_published', activityId },
+        }));
+      }),
   );
 
   return toSharedActivity(updated);

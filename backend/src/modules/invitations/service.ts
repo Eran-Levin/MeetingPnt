@@ -8,7 +8,7 @@ import type {
 } from '@meetingpnt/shared';
 import type { Invitation, Party } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { env } from '../../config/env.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { hashPassword } from '../../lib/password.js';
@@ -152,7 +152,8 @@ async function inviteOnePerson(
   await sendInvitationEmail({
     to: contact.email,
     groupName: group.name,
-    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : null,
+    locale: toLocale(inviter?.locale ?? 'en'),
     acceptUrl,
   });
 
@@ -271,7 +272,8 @@ export async function addPartyMember(
   await sendInvitationEmail({
     to: pm.email,
     groupName: group!.name,
-    inviterName: requester ? displayName(requester) : 'A MeetingPnt leader',
+    inviterName: requester ? displayName(requester) : null,
+    locale: toLocale(requester?.locale ?? 'en'),
     acceptUrl: buildAcceptUrl(rawToken),
   });
 
@@ -330,7 +332,8 @@ export async function inviteActivityGuest(
   await sendInvitationEmail({
     to: dto.email,
     groupName: `${group.name} — ${activity.title}`,
-    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : null,
+    locale: toLocale(inviter?.locale ?? 'en'),
     acceptUrl,
   });
 

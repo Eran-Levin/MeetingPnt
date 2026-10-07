@@ -569,6 +569,30 @@ export const en = {
         'MeetingPnt runs on your phone. Install it, then open this same link again on the phone — your invitation will still be waiting.',
     },
   },
+  // Text the server writes, in the recipient's language: push notifications use the receiving
+  // user's locale, invitation emails the inviter's (the invitee has no account yet).
+  push: {
+    activityPublishedTitle: 'New activity in {{group}}',
+    activityPublishedBody: '{{title}} — RSVP now',
+    seriesPublishedTitle: 'New recurring activity in {{group}}',
+    seriesPublishedBody_one: '{{title}} — {{count}} session scheduled. RSVP now',
+    seriesPublishedBody_two: '{{title}} — {{count}} sessions scheduled. RSVP now',
+    seriesPublishedBody_other: '{{title}} — {{count}} sessions scheduled. RSVP now',
+    chatTitle: 'New message in {{group}}',
+    sentPhoto: 'Sent a photo',
+    newMessage: 'New message',
+    whereAreYou: 'Where are you?',
+    pingBody: 'The leader of {{group}} requested your location for {{title}}.',
+    leaderAskBody: '{{name}} asked where you are in {{title}}.',
+  },
+  email: {
+    inviterFallback: 'A MeetingPnt leader',
+    invitationSubject: '{{inviter}} invited you to join "{{group}}" on MeetingPnt',
+    invitationIntro: '{{inviter}} invited you to join {{group}} on MeetingPnt.',
+    invitationOpen: 'Open your invitation',
+    invitationPhone: '— best on your phone, where the app runs.',
+    invitationExpires: 'This link expires in 7 days.',
+  },
   notifications: {
     shareLocation: 'Share location',
   },

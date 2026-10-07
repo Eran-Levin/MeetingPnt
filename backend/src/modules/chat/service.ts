@@ -1,8 +1,8 @@
 import type { MessageWithAuthor, SendMessageDto } from '@meetingpnt/shared';
-import { SocketEvents } from '@meetingpnt/shared';
+import { SocketEvents, isolate, pushText } from '@meetingpnt/shared';
 import type { Message, User } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -97,14 +97,17 @@ export async function sendMessage(
     where: { groupId, status: 'active', userId: { not: requesterId } },
     include: { user: { include: { pushTokens: true } } },
   });
-  const tokens = recipients.flatMap((member) => member.user.pushTokens);
   await sendPushNotifications(
-    tokens.map((token) => ({
-      to: token.expoPushToken,
-      title: `New message in ${group.name}`,
-      body: dto.body ?? 'Sent a photo',
-      data: { type: 'chat_message', groupId },
-    })),
+    recipients.flatMap((member) => {
+      const locale = toLocale(member.user.locale);
+      return member.user.pushTokens.map((token) => ({
+        to: token.expoPushToken,
+        title: pushText(locale, 'chatTitle', { group: isolate(group.name) }),
+        // What was typed is shown as typed; only our own "sent a photo" is translated.
+        body: dto.body ?? pushText(locale, 'sentPhoto'),
+        data: { type: 'chat_message', groupId },
+      }));
+    }),
   );
 
   return message;
