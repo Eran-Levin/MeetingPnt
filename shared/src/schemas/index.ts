@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AttendanceStatus, GroupChatMode, GroupStatus, RsvpStatus, TransportMode } from '../enums/index.js';
+import { AttendanceStatus, GroupChatMode, GroupStatus, LOCALES, RsvpStatus, TransportMode, type Locale } from '../enums/index.js';
 
 export const geoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -13,13 +13,13 @@ export const phoneSchema = z
   .trim()
   .min(6)
   .max(30)
-  .regex(/^[+0-9][0-9\s\-()]*$/, 'Enter a valid phone number');
+  .regex(/^[+0-9][0-9\s\-()]*$/, 'invalid_phone');
 
 export const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
-  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  firstName: z.string({ required_error: 'first_name_required' }).trim().min(1, 'first_name_required'),
+  lastName: z.string({ required_error: 'last_name_required' }).trim().min(1, 'last_name_required'),
   phone: phoneSchema.optional(),
   invitationToken: z.string().optional(),
 });
@@ -54,8 +54,8 @@ export const updateGroupSchema = createGroupSchema
  */
 export const inviteMemberSchema = z.object({
   email: z.string().email(),
-  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
-  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  firstName: z.string({ required_error: 'first_name_required' }).trim().min(1, 'first_name_required'),
+  lastName: z.string({ required_error: 'last_name_required' }).trim().min(1, 'last_name_required'),
   phone: phoneSchema.optional(),
   // A party is declared here but formed later: the leader only sets its size and name when
   // inviting the rep. The rep names the rest of the party themselves once they've registered.
@@ -65,8 +65,8 @@ export const inviteMemberSchema = z.object({
 
 /** One named party member — the rep supplies these for everyone beyond themselves. */
 export const partyMemberSchema = z.object({
-  firstName: z.string({ required_error: 'First name is required' }).trim().min(1, 'First name is required'),
-  lastName: z.string({ required_error: 'Last name is required' }).trim().min(1, 'Last name is required'),
+  firstName: z.string({ required_error: 'first_name_required' }).trim().min(1, 'first_name_required'),
+  lastName: z.string({ required_error: 'last_name_required' }).trim().min(1, 'last_name_required'),
   email: z.string().email().optional(),
   phone: phoneSchema.optional(),
 });
@@ -87,7 +87,7 @@ export const recurrenceRuleSchema = z
     until: z.string().datetime().optional(),
   })
   .refine((rule) => (rule.endType === 'count' ? rule.count != null : rule.until != null), {
-    message: 'count is required when endType is "count", until is required when endType is "until"',
+    message: 'recurrence_end_required',
   });
 
 // A meeting point to clone onto every generated occurrence of a recurring activity.
@@ -121,7 +121,7 @@ const createActivityBaseSchema = z.object({
 
 export const createActivitySchema = createActivityBaseSchema.refine(
   (data) => new Date(data.endAt) > new Date(data.startAt),
-  { message: 'The end must be after the start', path: ['endAt'] },
+  { message: 'end_before_start', path: ['endAt'] },
 );
 
 export const updateActivitySchema = createActivityBaseSchema
@@ -130,7 +130,7 @@ export const updateActivitySchema = createActivityBaseSchema
   // Only enforceable when a patch carries both ends; a one-sided edit is checked in the service.
   .refine(
     (data) => !data.startAt || !data.endAt || new Date(data.endAt) > new Date(data.startAt),
-    { message: 'The end must be after the start', path: ['endAt'] },
+    { message: 'end_before_start', path: ['endAt'] },
   );
 
 // ---- rsvps ----
@@ -143,6 +143,10 @@ export const rsvpUpdateSchema = z.object({
 export const pushTokenSchema = z.object({
   expoPushToken: z.string().min(1),
   platform: z.enum(['ios', 'android']),
+});
+
+export const updateLocaleSchema = z.object({
+  locale: z.enum(LOCALES as [Locale, ...Locale[]]),
 });
 
 // ---- meeting points ----

@@ -36,7 +36,7 @@ export async function register(input: RegisterDto) {
       const placeholder = await prisma.user.findUnique({ where: { id: invitation.claimsUserId } });
       if (placeholder?.isPlaceholder) {
         if (invitation.email.toLowerCase() !== input.email.toLowerCase()) {
-          throw new HttpError(400, 'This invitation was issued for a different email address');
+          throw new HttpError(400, 'invitation_email_mismatch');
         }
         const passwordHash = await hashPassword(input.password);
         const user = await prisma.user.update({
@@ -59,10 +59,17 @@ export async function register(input: RegisterDto) {
 
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) {
-    throw new HttpError(409, 'An account with this email already exists');
+    throw new HttpError(409, 'email_taken');
   }
 
   const passwordHash = await hashPassword(input.password);
+  // Brought in by a leader (or a rep who was) — start in their language; the person can change it.
+  const inviterId = input.invitationToken
+    ? (await findPendingInvitationByToken(input.invitationToken))?.invitedBy
+    : undefined;
+  const inviter = inviterId
+    ? await prisma.user.findUnique({ where: { id: inviterId }, select: { locale: true } })
+    : null;
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -70,6 +77,7 @@ export async function register(input: RegisterDto) {
       firstName: input.firstName,
       lastName: input.lastName,
       phone: input.phone,
+      locale: inviter?.locale ?? 'en',
       role: 'user',
     },
   });
@@ -85,7 +93,7 @@ export async function register(input: RegisterDto) {
 export async function login(input: LoginDto) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
   if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
-    throw new HttpError(401, 'Invalid email or password');
+    throw new HttpError(401, 'invalid_credentials');
   }
 
   const tokens = await issueTokens(user);
@@ -105,12 +113,12 @@ export async function refresh(rawToken: string) {
         data: { revokedAt: new Date() },
       });
     }
-    throw new HttpError(401, 'Invalid or expired refresh token');
+    throw new HttpError(401, 'invalid_refresh_token');
   }
 
   const user = await prisma.user.findUnique({ where: { id: stored.userId } });
   if (!user) {
-    throw new HttpError(401, 'Invalid or expired refresh token');
+    throw new HttpError(401, 'invalid_refresh_token');
   }
 
   await prisma.refreshToken.update({
@@ -133,7 +141,7 @@ export async function logout(rawToken: string) {
 export async function me(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'user_not_found');
   }
   return toSharedUser(user);
 }

@@ -81,6 +81,8 @@ model User {
   phone        String?
   avatarUrl    String?  @map("avatar_url")
   role         UserRole @default(user)
+  // UI language (en | he). Plain text in the column, validated against the shared Locale list.
+  locale       String   @default("en")
   // A roster slot for someone with no account of their own (e.g. a child in a party) — a real
   // User row so Rsvp/Attendance/GroupMember work unchanged, but passwordHash is unusable and
   // login can never succeed. Flipped false in place when the person later claims it via their

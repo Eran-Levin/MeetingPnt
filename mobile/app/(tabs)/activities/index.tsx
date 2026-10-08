@@ -1,10 +1,11 @@
 import type { ActivityWithGroup } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, formatWeekdayShort, isolate, joinDot } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../src/api/activitiesApi';
+import { useLocale, useTranslation } from '../../../src/i18n';
 import { useAuthStore } from '../../../src/store/authStore';
 import {
   Badge,
@@ -41,7 +42,6 @@ function startableToday(activity: ActivityWithGroup): boolean {
   return start.toDateString() === today.toDateString();
 }
 
-const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const NEAR_TERM_DAYS = 7;
 
 /**
@@ -49,14 +49,21 @@ const NEAR_TERM_DAYS = 7;
  * otherwise twenty near-identical rows with nothing to navigate by, and a guide with a September
  * departure is reading about September in August.
  */
-function bucketFor(activity: ActivityWithGroup, nearTermCutoff: number): string {
-  if (new Date(activity.startAt).getTime() <= nearTermCutoff) return 'This week';
+function bucketFor(
+  activity: ActivityWithGroup,
+  nearTermCutoff: number,
+  thisWeek: string,
+  locale: string,
+): string {
+  if (new Date(activity.startAt).getTime() <= nearTermCutoff) return thisWeek;
   return new Date(activity.startAt)
-    .toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    .toLocaleDateString(locale, { month: 'long', year: 'numeric' })
     .toUpperCase();
 }
 
 export default function CalendarScreen() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const router = useRouter();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -105,7 +112,7 @@ export default function CalendarScreen() {
   const nearTermCutoff = now + NEAR_TERM_DAYS * 24 * 60 * 60 * 1000;
   const buckets: { label: string; items: ActivityWithGroup[] }[] = [];
   for (const activity of upcoming) {
-    const label = bucketFor(activity, nearTermCutoff);
+    const label = bucketFor(activity, nearTermCutoff, t('calendar.thisWeek'), locale);
     const bucket = buckets.find((b) => b.label === label);
     if (bucket) bucket.items.push(activity);
     else buckets.push({ label, items: [activity] });
@@ -144,23 +151,24 @@ export default function CalendarScreen() {
       <View>
         <Row
           title={activity.title}
-          subtitle={`${activity.group.name}  ·  ${formatActivityWhen(
-            activity.startAt,
-            activity.endAt,
-            activity.allDay,
-          )}`}
+          subtitle={joinDot([
+            activity.group.name,
+            formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+          ])}
           leading={
-            <DateBlock weekday={WEEKDAYS[start.getDay()]} day={String(start.getDate())} />
+            <DateBlock weekday={formatWeekdayShort(start, locale)} day={String(start.getDate())} />
           }
           onPress={() => open(activity)}
           last={last}
         />
         <View style={styles.rowExtras}>
           {activity.status === 'draft' && <Badge status="draft" />}
-          {needsReply(activity) && <Pill tone="warning" label="Reply needed" />}
+          {needsReply(activity) && <Pill tone="warning" label={t('calendar.replyNeeded')} />}
           {startableToday(activity) && (
             <Button
-              label={startingId === activity.id ? 'Starting…' : 'Start activity'}
+              label={
+                startingId === activity.id ? t('calendar.starting') : t('calendar.startActivity')
+              }
               onPress={() => handleStart(activity)}
               busy={startingId === activity.id}
               style={styles.startButton}
@@ -173,7 +181,7 @@ export default function CalendarScreen() {
 
   return (
     <Screen
-      title={leads ? 'Calendar' : 'Your activities'}
+      title={leads ? t('tabs.calendar') : t('tabs.yourActivities')}
       back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] })}
       refreshing={isFetching}
@@ -181,21 +189,23 @@ export default function CalendarScreen() {
     >
       {askToClose && (
         <Card style={styles.askToClose}>
-          <Text style={text.bodyStrong}>{askToClose.title} is still running</Text>
+          <Text style={text.bodyStrong}>
+            {t('calendar.stillRunning', { title: isolate(askToClose.title) })}
+          </Text>
           <Text style={[text.secondary, styles.askToCloseBody]}>
-            It was scheduled for{' '}
-            {formatActivityWhen(askToClose.startAt, askToClose.endAt, askToClose.allDay)} and hasn't
-            been ended. Ending it stops location sharing; attendance stays editable.
+            {t('calendar.overdueBody', {
+              when: formatActivityWhen(askToClose.startAt, askToClose.endAt, askToClose.allDay, locale),
+            })}
           </Text>
           <ButtonRow>
             <Button
-              label={endingId === askToClose.id ? 'Ending…' : 'End activity'}
+              label={endingId === askToClose.id ? t('calendar.ending') : t('calendar.endActivity')}
               onPress={() => handleEnd(askToClose)}
               busy={endingId === askToClose.id}
               grow
             />
             <Button
-              label="Keep it running"
+              label={t('calendar.keepRunning')}
               variant="secondary"
               onPress={() => setDismissedOverdueId(askToClose.id)}
               grow
@@ -218,16 +228,16 @@ export default function CalendarScreen() {
 
       {buckets.length === 0 && (
         <Empty
-          headline="Nothing coming up"
-          body="Activities you're scheduled for will appear here, newest first."
+          headline={t('calendar.emptyHeadline')}
+          body={t('calendar.emptyBody')}
         />
       )}
 
       {past.length > 0 && (
-        <Section label={`Earlier (${past.length})`}>
+        <Section label={t('calendar.earlier', { count: past.length })}>
           <Pressable onPress={() => setShowPast((v) => !v)} style={styles.toggle}>
             <Text style={[text.secondary, { color: color.accentText }]}>
-              {showPast ? 'Hide past activities' : 'Show past activities'}
+              {showPast ? t('calendar.hidePast') : t('calendar.showPast')}
             </Text>
           </Pressable>
           {showPast &&
@@ -235,11 +245,10 @@ export default function CalendarScreen() {
               <Row
                 key={activity.id}
                 title={activity.title}
-                subtitle={`${activity.group.name}  ·  ${formatActivityWhen(
-                  activity.startAt,
-                  activity.endAt,
-                  activity.allDay,
-                )}`}
+                subtitle={joinDot([
+                  activity.group.name,
+                  formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+                ])}
                 onPress={() => open(activity)}
                 done
                 last={index === past.length - 1}

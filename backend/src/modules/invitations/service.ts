@@ -8,7 +8,7 @@ import type {
 } from '@meetingpnt/shared';
 import type { Invitation, Party } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { env } from '../../config/env.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { hashPassword } from '../../lib/password.js';
@@ -83,10 +83,10 @@ async function fillMissingContactDetails(userId: string, contact: { phone?: stri
 async function assertGroupLeader(groupId: string, requesterId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage invitations');
+    throw new HttpError(403, 'leader_only_manage_invitations');
   }
   return group;
 }
@@ -103,7 +103,7 @@ async function inviteOnePerson(
 > {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   const inviter = await prisma.user.findUnique({ where: { id: requesterId } });
   const existingUser = await prisma.user.findUnique({ where: { email: contact.email } });
@@ -116,7 +116,7 @@ async function inviteOnePerson(
     let memberId: string;
     if (existingMembership) {
       if (existingMembership.status === 'active') {
-        throw new HttpError(409, 'This person is already a member of the group');
+        throw new HttpError(409, 'already_member');
       }
       const updated = await prisma.groupMember.update({
         where: { id: existingMembership.id },
@@ -152,7 +152,8 @@ async function inviteOnePerson(
   await sendInvitationEmail({
     to: contact.email,
     groupName: group.name,
-    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : null,
+    locale: toLocale(inviter?.locale ?? 'en'),
     acceptUrl,
   });
 
@@ -212,7 +213,9 @@ export async function addPartyMember(
       });
       if (existingMembership) {
         if (existingMembership.status === 'active') {
-          throw new HttpError(409, `${pm.firstName} ${pm.lastName} is already a member of the group`);
+          throw new HttpError(409, 'already_member_named', {
+            name: `${pm.firstName} ${pm.lastName}`,
+          });
         }
         await prisma.groupMember.update({
           where: { id: existingMembership.id },
@@ -228,6 +231,7 @@ export async function addPartyMember(
     }
   }
 
+  const requester = await prisma.user.findUnique({ where: { id: requesterId } });
   const placeholder = await prisma.user.create({
     data: {
       email: pm.email ?? makePlaceholderEmail(),
@@ -237,6 +241,7 @@ export async function addPartyMember(
       phone: pm.phone,
       role: 'user',
       isPlaceholder: true,
+      locale: requester?.locale ?? 'en',
     },
   });
   await prisma.groupMember.create({
@@ -248,7 +253,6 @@ export async function addPartyMember(
   }
 
   const group = await prisma.group.findUnique({ where: { id: groupId } });
-  const requester = await prisma.user.findUnique({ where: { id: requesterId } });
   const rawToken = randomBytes(32).toString('hex');
   const invitation = await prisma.invitation.create({
     data: {
@@ -268,7 +272,8 @@ export async function addPartyMember(
   await sendInvitationEmail({
     to: pm.email,
     groupName: group!.name,
-    inviterName: requester ? displayName(requester) : 'A MeetingPnt leader',
+    inviterName: requester ? displayName(requester) : null,
+    locale: toLocale(requester?.locale ?? 'en'),
     acceptUrl: buildAcceptUrl(rawToken),
   });
 
@@ -283,7 +288,7 @@ export async function inviteActivityGuest(
 ) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await assertGroupLeader(activity.groupId, requesterId);
   const inviter = await prisma.user.findUnique({ where: { id: requesterId } });
@@ -295,7 +300,7 @@ export async function inviteActivityGuest(
       where: { groupId: activity.groupId, userId: existingUser.id, status: 'active' },
     });
     if (activeMembership) {
-      throw new HttpError(409, 'This person is already a member of the group');
+      throw new HttpError(409, 'already_member');
     }
 
     await prisma.activityGuest.upsert({
@@ -327,7 +332,8 @@ export async function inviteActivityGuest(
   await sendInvitationEmail({
     to: dto.email,
     groupName: `${group.name} — ${activity.title}`,
-    inviterName: inviter ? displayName(inviter) : 'A MeetingPnt leader',
+    inviterName: inviter ? displayName(inviter) : null,
+    locale: toLocale(inviter?.locale ?? 'en'),
     acceptUrl,
   });
 
@@ -337,7 +343,7 @@ export async function inviteActivityGuest(
 export async function listActivityGuests(activityId: string, requesterId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   await assertGroupLeader(activity.groupId, requesterId);
 
@@ -368,7 +374,7 @@ export async function listPendingInvitations(groupId: string, requesterId: strin
 export async function listPendingActivityInvitations(activityId: string, requesterId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   await assertGroupLeader(activity.groupId, requesterId);
   const invitations = await prisma.invitation.findMany({
@@ -381,7 +387,7 @@ export async function listPendingActivityInvitations(activityId: string, request
 export async function revokeInvitation(invitationId: string, requesterId: string) {
   const invitation = await prisma.invitation.findUnique({ where: { id: invitationId } });
   if (!invitation) {
-    throw new HttpError(404, 'Invitation not found');
+    throw new HttpError(404, 'invitation_not_found');
   }
   await assertGroupLeader(invitation.groupId, requesterId);
   await prisma.invitation.update({ where: { id: invitationId }, data: { status: 'revoked' } });
@@ -394,7 +400,7 @@ export async function previewInvitation(rawToken: string): Promise<InvitationPre
   });
 
   if (!invitation || invitation.status !== 'pending' || invitation.expiresAt < new Date()) {
-    throw new HttpError(410, 'This invitation link is invalid or has expired');
+    throw new HttpError(410, 'invitation_expired');
   }
 
   // The details the leader typed come back so the sign-up form arrives pre-filled — the invitee

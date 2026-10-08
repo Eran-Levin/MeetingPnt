@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../src/api/activitiesApi';
-import { ApiError } from '../../../../../src/api/client';
+import { apiErrorMessage, useLocale, useTranslation } from '../../../../../src/i18n';
 import {
   Button,
   Chip,
@@ -21,9 +21,14 @@ import {
 } from '../../../../../src/ui';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function NewActivityScreen() {
+  const { t } = useTranslation();
+  const locale = useLocale();
+  // 2023-01-01 was a Sunday, so day 0 lines up with the `daysOfWeek` the server expects.
+  const weekdayLabels = Array.from({ length: 7 }, (_, day) =>
+    new Date(2023, 0, 1 + day).toLocaleDateString(locale, { weekday: 'short' }),
+  );
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const [title, setTitle] = useState('');
@@ -52,7 +57,7 @@ export default function NewActivityScreen() {
   async function handleSubmit() {
     if (!title.trim()) return;
     if (repeats && daysOfWeek.length === 0) {
-      setError('Pick at least one day of the week to repeat on.');
+      setError(t('newActivity.pickDay'));
       return;
     }
     // All-day activities cover whole days; timed ones share a date and differ only by clock time.
@@ -67,9 +72,7 @@ export default function NewActivityScreen() {
 
     if (end <= start) {
       setError(
-        allDay
-          ? 'The end date must not be before the start date.'
-          : 'The end time must be after the start time.',
+        allDay ? t('newActivity.endDateBeforeStart') : t('newActivity.endTimeBeforeStart'),
       );
       return;
     }
@@ -102,56 +105,56 @@ export default function NewActivityScreen() {
         router.replace(`/(tabs)/groups/${groupId}/activities/${result.activity.id}`);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to create activity');
+      setError(apiErrorMessage(err, t('newActivity.failed')));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Screen title="New activity" bottomInset={80}>
+    <Screen title={t('newActivity.title')} bottomInset={80}>
       <TextField
-        label="Title"
-        placeholder="Sunrise walk — Old Town"
+        label={t('newActivity.fieldTitle')}
+        placeholder={t('newActivity.titlePlaceholder')}
         value={title}
         onChangeText={setTitle}
       />
       <TextField
-        label="Description (optional)"
+        label={t('newActivity.description')}
         value={description}
         onChangeText={setDescription}
       />
 
-      <Section label="When" first>
+      <Section label={t('newActivity.when')} first>
         <Toggle
-          label="Spans whole days"
-          hint="A multi-day trip. Each day is its own activity."
+          label={t('newActivity.spansDays')}
+          hint={t('newActivity.spansDaysHint')}
           value={allDay}
           onValueChange={setAllDay}
         />
 
         <PickerField
-          label={allDay ? 'Start date' : 'Date'}
-          value={startAt.toLocaleDateString()}
+          label={allDay ? t('newActivity.startDate') : t('newActivity.date')}
+          value={startAt.toLocaleDateString(locale)}
           onPress={() => setPicker('date')}
         />
 
         {allDay ? (
           <PickerField
-            label="End date"
-            value={endAt.toLocaleDateString()}
+            label={t('newActivity.endDate')}
+            value={endAt.toLocaleDateString(locale)}
             onPress={() => setPicker('endDate')}
           />
         ) : (
           <>
             <PickerField
-              label="Start time"
-              value={startAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              label={t('newActivity.startTime')}
+              value={startAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
               onPress={() => setPicker('startTime')}
             />
             <PickerField
-              label="End time"
-              value={endAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              label={t('newActivity.endTime')}
+              value={endAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })}
               onPress={() => setPicker('endTime')}
             />
           </>
@@ -171,38 +174,34 @@ export default function NewActivityScreen() {
         )}
       </Section>
 
-      <Section label="Attendance">
+      <Section label={t('newActivity.attendance')}>
         {/* Off is how a trip day works: people booked the trip, so they don't re-confirm each
             morning — but they can still decline the one day they're sitting out. */}
         <Toggle
-          label="Approve attendance"
-          hint={
-            requiresRsvp
-              ? 'Members are asked to confirm they’re coming.'
-              : 'Members count as coming as soon as this is published — they can still decline.'
-          }
+          label={t('newActivity.approve')}
+          hint={requiresRsvp ? t('newActivity.approveOn') : t('newActivity.approveOff')}
           value={requiresRsvp}
           onValueChange={setRequiresRsvp}
         />
       </Section>
 
-      <Section label="Where">
+      <Section label={t('newActivity.where')}>
         {/* One room, every week — there's no route, so the clients drop the itinerary rather than
             showing a one-item list. */}
         <Toggle
-          label="Single location"
-          hint="One place, no route — a class in the same room every week."
+          label={t('newActivity.single')}
+          hint={t('newActivity.singleHint')}
           value={singleLocation}
           onValueChange={setSingleLocation}
         />
       </Section>
 
-      <Section label="Mode of transport">
+      <Section label={t('newActivity.transport')}>
         <ChipRow>
           {TRANSPORT_MODES.map((mode) => (
             <Chip
               key={mode}
-              label={mode}
+              label={t(`newActivity.${mode}`)}
               selected={transportMode === mode}
               onPress={() => setTransportMode(mode)}
             />
@@ -210,24 +209,28 @@ export default function NewActivityScreen() {
         </ChipRow>
       </Section>
 
-      <Section label="Repeat">
-        <Toggle label="Repeat weekly" value={repeats} onValueChange={setRepeats} />
+      <Section label={t('newActivity.repeat')}>
+        <Toggle
+          label={t('newActivity.repeatWeekly')}
+          value={repeats}
+          onValueChange={setRepeats}
+        />
 
         {repeats && (
           <View style={styles.repeat}>
             <View style={styles.inlineRow}>
-              <Text style={text.body}>Every</Text>
+              <Text style={text.body}>{t('newActivity.every')}</Text>
               <TextField
                 keyboardType="number-pad"
                 value={intervalWeeks}
                 onChangeText={setIntervalWeeks}
                 containerStyle={styles.number}
               />
-              <Text style={text.body}>week(s)</Text>
+              <Text style={text.body}>{t('newActivity.weeks')}</Text>
             </View>
 
             <ChipRow>
-              {WEEKDAY_LABELS.map((label, day) => (
+              {weekdayLabels.map((label, day) => (
                 <Chip
                   key={day}
                   label={label}
@@ -238,14 +241,14 @@ export default function NewActivityScreen() {
             </ChipRow>
 
             <View style={styles.inlineRow}>
-              <Text style={text.body}>For</Text>
+              <Text style={text.body}>{t('newActivity.for')}</Text>
               <TextField
                 keyboardType="number-pad"
                 value={count}
                 onChangeText={setCount}
                 containerStyle={styles.number}
               />
-              <Text style={text.body}>occurrences</Text>
+              <Text style={text.body}>{t('newActivity.occurrences')}</Text>
             </View>
           </View>
         )}
@@ -258,7 +261,13 @@ export default function NewActivityScreen() {
       )}
 
       <Button
-        label={submitting ? 'Creating…' : repeats ? 'Create series (drafts)' : 'Create draft'}
+        label={
+          submitting
+            ? t('newActivity.creating')
+            : repeats
+              ? t('newActivity.createSeries')
+              : t('newActivity.createDraft')
+        }
         onPress={handleSubmit}
         busy={submitting}
         style={styles.submit}

@@ -2,12 +2,13 @@ import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { authApi } from '../../src/api/authApi';
-import { ApiError } from '../../src/api/client';
+import { apiErrorMessage, useTranslation } from '../../src/i18n';
 import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { establishSession } from '../../src/services/session';
 import { Button, TextField, color, space, text } from '../../src/ui';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +23,7 @@ export default function LoginScreen() {
       await establishSession(data);
       router.replace('/(tabs)/activities');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      setError(apiErrorMessage(err, t('common.somethingWentWrong')));
     } finally {
       setSubmitting(false);
     }
@@ -31,16 +32,16 @@ export default function LoginScreen() {
   return (
     <AuthLayout
       title="MeetingPnt"
-      subtitle="Sign in to see what's happening today."
+      subtitle={t('auth.login.subtitle')}
       error={error}
       footer={
         <Link href="/(auth)/register" style={[text.body, { color: color.accentText }]}>
-          Don&rsquo;t have an account? Register
+          {t('auth.login.noAccount')}
         </Link>
       }
     >
       <TextField
-        label="Email"
+        label={t('common.email')}
         placeholder="you@example.com"
         autoCapitalize="none"
         autoCorrect={false}
@@ -49,7 +50,7 @@ export default function LoginScreen() {
         onChangeText={setEmail}
       />
       <TextField
-        label="Password"
+        label={t('common.password')}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
@@ -57,7 +58,7 @@ export default function LoginScreen() {
         onChangeText={setPassword}
       />
       <Button
-        label={submitting ? 'Signing in…' : 'Sign in'}
+        label={submitting ? t('auth.login.signingIn') : t('auth.login.signIn')}
         onPress={handleSubmit}
         busy={submitting}
         style={styles.submit}

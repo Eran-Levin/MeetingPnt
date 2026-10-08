@@ -1,9 +1,10 @@
 import type { DirectMessage as SharedDirectMessage, DirectThread, SendMessageDto } from '@meetingpnt/shared';
+import { pushText } from '@meetingpnt/shared';
 import type { DirectMessage } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
-import { displayName } from '../../lib/userName.js';
+import { displayName, toLocale } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
 const THREAD_PAGE_SIZE = 50;
@@ -56,12 +57,12 @@ async function guestSharesActivity(
  */
 async function assertReachable(requesterId: string, otherId: string) {
   if (requesterId === otherId) {
-    throw new HttpError(400, "You can't message yourself");
+    throw new HttpError(400, 'dm_self');
   }
 
   const other = await prisma.user.findUnique({ where: { id: otherId } });
   if (!other) {
-    throw new HttpError(404, 'User not found');
+    throw new HttpError(404, 'user_not_found');
   }
 
   const [mine, theirs] = await Promise.all([contextOf(requesterId), contextOf(otherId)]);
@@ -73,7 +74,7 @@ async function assertReachable(requesterId: string, otherId: string) {
     (await guestSharesActivity(theirs.guestActivityIds, mine.groupIds));
 
   if (!reachable) {
-    throw new HttpError(403, "You don't share a group or an activity with this person");
+    throw new HttpError(403, 'dm_not_reachable');
   }
 
   return other;
@@ -113,13 +114,13 @@ export async function sendDirectMessage(
   const other = await assertReachable(requesterId, otherId);
 
   if (!dto.body && !file) {
-    throw new HttpError(400, 'A message needs text or an image');
+    throw new HttpError(400, 'message_empty');
   }
 
   let imageUrl: string | null = null;
   if (file) {
     if (!isSupportedImageMime(file.mimetype)) {
-      throw new HttpError(400, 'Unsupported image type — use JPEG, PNG, or WebP');
+      throw new HttpError(400, 'unsupported_image');
     }
     imageUrl = await saveImage(file.buffer, file.mimetype);
   }
@@ -130,11 +131,12 @@ export async function sendDirectMessage(
 
   const sender = await prisma.user.findUnique({ where: { id: requesterId } });
   const tokens = await prisma.pushToken.findMany({ where: { userId: other.id } });
+  const locale = toLocale(other.locale);
   await sendPushNotifications(
     tokens.map((token) => ({
       to: token.expoPushToken,
-      title: sender ? displayName(sender) : 'New message',
-      body: dto.body ?? 'Sent a photo',
+      title: sender ? displayName(sender) : pushText(locale, 'newMessage'),
+      body: dto.body ?? pushText(locale, 'sentPhoto'),
       data: { type: 'direct_message', userId: requesterId },
     })),
   );

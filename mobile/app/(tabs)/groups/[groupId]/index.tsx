@@ -1,11 +1,11 @@
 import type { Activity } from '@meetingpnt/shared';
-import { formatActivityWhen } from '@meetingpnt/shared';
+import { formatActivityWhen, isolate, joinDot } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../src/api/activitiesApi';
-import { ApiError } from '../../../../src/api/client';
+import { apiErrorMessage, useLocale, useTranslation } from '../../../../src/i18n';
 import { groupsApi } from '../../../../src/api/groupsApi';
 import { invitationsApi } from '../../../../src/api/invitationsApi';
 import { useAuthStore } from '../../../../src/store/authStore';
@@ -25,6 +25,8 @@ import {
 } from '../../../../src/ui';
 
 export default function GroupDetailScreen() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -81,14 +83,18 @@ export default function GroupDetailScreen() {
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
       const who = `${firstName} ${lastName}`.trim();
-      setMessage(result.type === 'added' ? `${who} added.` : `Invitation sent to ${who}.`);
+      setMessage(
+        result.type === 'added'
+          ? t('event.visitorAdded', { who: isolate(who) })
+          : t('event.visitorInvited', { who: isolate(who) }),
+      );
       setEmail('');
       setFirstName('');
       setLastName('');
       setPhone('');
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'members'] });
     } catch (err) {
-      setMessage(err instanceof ApiError ? err.message : 'Failed to invite');
+      setMessage(apiErrorMessage(err, t('groupDetail.inviteFailed')));
     } finally {
       setInviting(false);
     }
@@ -110,16 +116,16 @@ export default function GroupDetailScreen() {
           onPress={() => router.push(`/(tabs)/groups/${groupId}/chat`)}
           style={styles.headerLink}
         >
-          <Text style={[text.body, { color: color.accentText }]}>Chat</Text>
+          <Text style={[text.body, { color: color.accentText }]}>{t('groupDetail.chat')}</Text>
         </Pressable>
       }
     >
-      <Section label={`Roster · ${members.length}`} first>
+      <Section label={t('groupDetail.roster', { count: members.length })} first>
         {members.map((member, index) => (
           <Row
             key={member.id}
             title={member.user.name}
-            subtitle={[member.user.email, member.user.phone].filter(Boolean).join('  ·  ')}
+            subtitle={joinDot([member.user.email, member.user.phone])}
             leading={<Avatar name={member.user.name} uri={member.user.avatarUrl} />}
             /* A leader reaching one person — "you're the only one who hasn't replied". The group
                thread is the wrong place for that. */
@@ -129,21 +135,21 @@ export default function GroupDetailScreen() {
             last={index === members.length - 1}
           />
         ))}
-        {members.length === 0 && <Empty headline="No members yet" />}
+        {members.length === 0 && <Empty headline={t('groupDetail.noMembers')} />}
 
         {isLeader &&
           (invitingOpen ? (
             <Card style={styles.invite}>
-              <TextField label="First name" value={firstName} onChangeText={setFirstName} />
-              <TextField label="Last name" value={lastName} onChangeText={setLastName} />
+              <TextField label={t('common.firstName')} value={firstName} onChangeText={setFirstName} />
+              <TextField label={t('common.lastName')} value={lastName} onChangeText={setLastName} />
               <TextField
-                label="Phone (optional)"
+                label={t('common.phoneOptional')}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
               />
               <TextField
-                label="Email"
+                label={t('common.email')}
                 placeholder="member@example.com"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -153,13 +159,13 @@ export default function GroupDetailScreen() {
               />
               <View style={styles.inviteActions}>
                 <Button
-                  label={inviting ? 'Sending…' : 'Invite'}
+                  label={inviting ? t('groupDetail.sending') : t('groupDetail.invite')}
                   onPress={handleInvite}
                   busy={inviting}
                   grow
                 />
                 <Button
-                  label="Close"
+                  label={t('common.close')}
                   onPress={() => setInvitingOpen(false)}
                   variant="secondary"
                   grow
@@ -169,7 +175,7 @@ export default function GroupDetailScreen() {
             </Card>
           ) : (
             <Button
-              label="Invite a member"
+              label={t('groupDetail.inviteMember')}
               onPress={() => setInvitingOpen(true)}
               variant="secondary"
               style={styles.invite}
@@ -177,10 +183,10 @@ export default function GroupDetailScreen() {
           ))}
       </Section>
 
-      <Section label="Activities">
+      <Section label={t('groupDetail.activities')}>
         {isLeader && (
           <Button
-            label="New activity"
+            label={t('groupDetail.newActivity')}
             onPress={() => router.push(`/(tabs)/groups/${groupId}/activities/new`)}
             variant="secondary"
             style={styles.newEvent}
@@ -191,7 +197,7 @@ export default function GroupDetailScreen() {
           <Row
             key={activity.id}
             title={activity.title}
-            subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+            subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
             trailing={<Badge status={activity.status} />}
             onPress={() => openActivity(activity.id)}
             last={index === standaloneActivities.length - 1 && seriesGroups.size === 0}
@@ -206,11 +212,11 @@ export default function GroupDetailScreen() {
                 <Text style={[text.bodyStrong, styles.seriesTitle]} numberOfLines={1}>
                   {occurrences[0]!.title}
                 </Text>
-                <Text style={text.secondary}>recurring · {occurrences.length}</Text>
+                <Text style={text.secondary}>{t('groupDetail.recurring', { count: occurrences.length })}</Text>
               </View>
               {isLeader && draftCount > 0 && (
                 <Button
-                  label={`Publish all (${draftCount})`}
+                  label={t('groupDetail.publishAll', { count: draftCount })}
                   onPress={() => handlePublishSeries(seriesId)}
                   variant="secondary"
                   style={styles.publishAll}
@@ -219,7 +225,7 @@ export default function GroupDetailScreen() {
               {occurrences.map((activity, index) => (
                 <Row
                   key={activity.id}
-                  title={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay)}
+                  title={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
                   trailing={<Badge status={activity.status} />}
                   onPress={() => openActivity(activity.id)}
                   last={index === occurrences.length - 1}
@@ -231,8 +237,8 @@ export default function GroupDetailScreen() {
 
         {activities.length === 0 && (
           <Empty
-            headline="Nothing scheduled yet"
-            body={isLeader ? 'Add an activity and the group will see it once published.' : undefined}
+            headline={t('groupDetail.nothingScheduledYet')}
+            body={isLeader ? t('groupDetail.addActivityBody') : undefined}
           />
         )}
       </Section>
@@ -241,7 +247,7 @@ export default function GroupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerLink: { paddingVertical: space.sm, paddingLeft: space.sm },
+  headerLink: { paddingVertical: space.sm, paddingStart: space.sm },
   invite: { marginTop: space.md },
   inviteActions: { flexDirection: 'row', gap: space.sm },
   newEvent: { marginBottom: space.md },

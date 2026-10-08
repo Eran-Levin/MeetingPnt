@@ -1,11 +1,14 @@
 import type { ActivityWithGroup } from '@meetingpnt/shared';
+import { joinDot } from '@meetingpnt/shared';
 import { useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { usePathname, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { I18nManager, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { activitiesApi } from '../api/activitiesApi';
 import { attendanceApi } from '../api/attendanceApi';
 import { meetingPointsApi } from '../api/meetingPointsApi';
+import { useTranslation } from '../i18n';
 import { color, fontSize, fontWeight, radius, space, toneTint } from '../ui/theme';
 
 /** How often the bar's summary catches up while an event is running. */
@@ -19,6 +22,7 @@ const REFRESH_MS = 30_000;
  * they happen to be standing in the app, not only on the tab they last left selected.
  */
 export function LiveActivityBar() {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -58,7 +62,7 @@ export function LiveActivityBar() {
     <View style={[styles.dock, { paddingBottom: insets.bottom ? 0 : space.sm }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open the running activity, ${live.title}`}
+        accessibilityLabel={t('live.openA11y', { title: live.title })}
         onPress={() => router.push(`/(tabs)/groups/${live.groupId}/activities/${live.id}`)}
         style={({ pressed }) => [styles.bar, pressed && styles.pressed]}
       >
@@ -68,10 +72,10 @@ export function LiveActivityBar() {
             {live.title}
           </Text>
           <Text style={styles.summary} numberOfLines={1}>
-            {summarise(live, currentIndex, points.length, rollCallData?.entries)}
+            {summarise(t, live, currentIndex, points.length, rollCallData?.entries)}
           </Text>
         </View>
-        <Text style={styles.chevron}>›</Text>
+        <Text style={styles.chevron}>{I18nManager.isRTL ? '‹' : '›'}</Text>
       </Pressable>
     </View>
   );
@@ -82,19 +86,20 @@ export function LiveActivityBar() {
  * up", the member's is "where am I going".
  */
 function summarise(
+  t: TFunction,
   live: ActivityWithGroup,
   currentIndex: number,
   total: number,
   rollCall?: { attendance: string | null }[],
 ): string {
-  const stop = currentIndex >= 0 && total > 0 ? `Stop ${currentIndex + 1} of ${total}` : null;
+  const stop = currentIndex >= 0 && total > 0 ? t('live.stop', { n: currentIndex + 1, total }) : null;
 
   if (live.isLeader && rollCall && rollCall.length > 0) {
     const here = rollCall.filter((e) => e.attendance === 'present').length;
-    return [stop, `${here} of ${rollCall.length} here`].filter(Boolean).join('  ·  ');
+    return joinDot([stop, t('live.hereCount', { here, total: rollCall.length })]);
   }
 
-  return [stop, live.group.name].filter(Boolean).join('  ·  ');
+  return joinDot([stop, live.group.name]);
 }
 
 const styles = StyleSheet.create({
