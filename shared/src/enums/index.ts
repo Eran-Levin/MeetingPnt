@@ -70,3 +70,21 @@ export const AttendanceStatus = {
   Absent: 'absent',
 } as const;
 export type AttendanceStatus = (typeof AttendanceStatus)[keyof typeof AttendanceStatus];
+
+/**
+ * UI languages. A person's locale is set by the leader who brought them in — a Hebrew-speaking
+ * guide's roster reads Hebrew — and each person can change their own. It governs the app's own
+ * words and the dates; what leaders type (group, event and place names) is never translated.
+ */
+export const Locale = {
+  English: 'en',
+  Hebrew: 'he',
+} as const;
+export type Locale = (typeof Locale)[keyof typeof Locale];
+export const DEFAULT_LOCALE: Locale = Locale.English;
+export const LOCALES: readonly Locale[] = Object.values(Locale);
+
+const RTL_LOCALES: readonly Locale[] = [Locale.Hebrew];
+export function isRtlLocale(locale: string | null | undefined): boolean {
+  return RTL_LOCALES.includes(locale as Locale);
+}

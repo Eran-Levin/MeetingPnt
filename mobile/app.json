@@ -35,6 +35,7 @@
     },
     "plugins": [
       "expo-router",
+      ["expo-localization", { "supportsRTL": true }],
       [
         "expo-notifications",
         {

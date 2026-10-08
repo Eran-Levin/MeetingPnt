@@ -1,4 +1,5 @@
 import type { RsvpWithUser } from '@meetingpnt/shared';
+import { useTranslation } from '../i18n/index.js';
 import { Badge } from './ui/Badge.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
@@ -20,6 +21,7 @@ interface Props {
  * which is what a leader actually wants: build the route while watching the replies come in.
  */
 export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Props) {
+  const { t } = useTranslation();
   const going = rsvps.filter((r) => r.status === 'approved').length;
   const declined = rsvps.filter((r) => r.status === 'declined').length;
   const waiting = rsvps.length - going - declined;
@@ -33,16 +35,16 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
       )}
 
       <div className="mt-3 grid grid-cols-3 gap-3">
-        <Tally value={going} label="going" />
-        <Tally value={waiting} label="no reply" />
-        <Tally value={declined} label="declined" />
+        <Tally value={going} label={t('attendance.going')} />
+        <Tally value={waiting} label={t('attendance.noReply')} />
+        <Tally value={declined} label={t('attendance.declined')} />
       </div>
 
       {loading ? null : rsvps.length === 0 ? (
         <div className="mt-3">
           <EmptyState
-            headline="No replies yet"
-            body="Members appear here as soon as they answer — you can also record a reply for them."
+            headline={t('attendance.emptyHeadline')}
+            body={t('attendance.emptyBody')}
           />
         </div>
       ) : (
@@ -53,8 +55,8 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
                 <span className="min-w-0 flex-1">
                   <span className="text-sm text-ink">{rsvp.user.name}</span>
                   {rsvp.isVisitor && (
-                    <span className="ml-2 rounded-full bg-tone-info-bg px-2 py-0.5 text-xs font-medium text-tone-info-fg">
-                      Visitor
+                    <span className="ms-2 rounded-full bg-tone-info-bg px-2 py-0.5 text-xs font-medium text-tone-info-fg">
+                      {t('event.visitor')}
                     </span>
                   )}
                   <span className="block truncate text-xs text-ink-muted">{rsvp.user.email}</span>
@@ -74,7 +76,7 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
                   disabled={savingFor === rsvp.userId || rsvp.status === 'approved'}
                   onClick={() => onSet(rsvp.userId, 'approved')}
                 >
-                  Confirm
+                  {t('rollCall.confirm')}
                 </Button>
                 <Button
                   size="sm"
@@ -82,7 +84,7 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
                   disabled={savingFor === rsvp.userId || rsvp.status === 'declined'}
                   onClick={() => onSet(rsvp.userId, 'declined')}
                 >
-                  Won&apos;t arrive
+                  {t('rollCall.wontArrive')}
                 </Button>
               </div>
             </div>

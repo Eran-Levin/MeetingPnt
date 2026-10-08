@@ -7,6 +7,9 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Which refusal this is — the key into the catalog's `errors`. Absent on a bare HTTP failure. */
+    public code?: string,
+    public params?: Record<string, string | number>,
   ) {
     super(message);
   }
@@ -80,7 +83,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       useAuthStore.getState().clearSession();
       await secureStore.clearRefreshToken();
     }
-    throw new ApiError(res.status, body.error ?? 'Request failed');
+    throw new ApiError(res.status, body.error ?? 'Request failed', body.code, body.params);
   }
 
   if (res.status === 204) {

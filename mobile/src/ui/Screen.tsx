@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
+  I18nManager,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from '../i18n';
 import { useAuthStore } from '../store/authStore';
 import { Avatar } from './Avatar';
 import { color, minTouchTarget, sectionLabel, space, text } from './theme';
@@ -31,6 +33,7 @@ interface ScreenHeaderProps {
  * pushed screen named itself twice — once in the navigation bar, once in the page.
  */
 export function ScreenHeader({ title, subtitle, right, back, account = true }: ScreenHeaderProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const showBack = back ?? router.canGoBack();
@@ -43,10 +46,10 @@ export function ScreenHeader({ title, subtitle, right, back, account = true }: S
             onPress={() => router.back()}
             style={styles.back}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('common.goBack')}
             hitSlop={space.sm}
           >
-            <Ionicons name="chevron-back" size={26} color={color.accentText} />
+            <Ionicons name={I18nManager.isRTL ? 'chevron-forward' : 'chevron-back'} size={26} color={color.accentText} />
           </Pressable>
         )}
         <Text style={[text.title, styles.headerTitle]} numberOfLines={2}>
@@ -58,7 +61,7 @@ export function ScreenHeader({ title, subtitle, right, back, account = true }: S
             onPress={() => router.push('/account')}
             style={styles.account}
             accessibilityRole="button"
-            accessibilityLabel={`Account — signed in as ${user.name}`}
+            accessibilityLabel={t('common.accountA11y', { name: user.name })}
           >
             <Avatar name={user.name} uri={user.avatarUrl} size={36} />
           </Pressable>
@@ -165,7 +168,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: space.lg },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   headerTitle: { flex: 1 },
-  back: { marginLeft: -space.sm, justifyContent: 'center' },
+  back: { marginStart: -space.sm, justifyContent: 'center' },
   /** The account button carries a face, so it's already past 44 — the padding keeps it reachable
    * without pushing the title off the row. */
   account: {
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   },
   subtitle: { marginTop: space.xs },
   section: { marginTop: space.xl },
-  sectionLabel: { marginBottom: space.sm, marginLeft: space.xs },
+  sectionLabel: { marginBottom: space.sm, marginStart: space.xs },
   empty: {
     paddingVertical: space.xl,
     paddingHorizontal: space.lg,

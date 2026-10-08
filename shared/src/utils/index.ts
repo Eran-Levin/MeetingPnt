@@ -60,3 +60,32 @@ export function formatActivityWhen(
     ? `${startDate}, ${startTime} – ${endTime}`
     : `${startDate}, ${startTime} – ${endDate}, ${endTime}`;
 }
+
+const FSI = '⁨'; // first-strong isolate
+const PDI = '⁩'; // pop directional isolate
+
+/**
+ * Wraps text someone typed — a group, event or place name — so it keeps its own direction inside
+ * a sentence built by us. Without it, an English place name in a Hebrew line drags the "·"
+ * separators and any numbers beside it to the wrong side. Names are stored and shown verbatim;
+ * this only fences them off. In JSX on the web, `<bdi>` does the same job.
+ */
+export function isolate(text: string): string {
+  return text ? `${FSI}${text}${PDI}` : text;
+}
+
+/** Joins display fragments with a middle dot, isolating each so mixed-language parts can't
+ * reorder the separators. Empty parts are dropped. */
+export function joinDot(parts: Array<string | null | undefined | false>): string {
+  return parts.filter((p): p is string => Boolean(p)).map(isolate).join('  ·  ');
+}
+
+/**
+ * The weekday on a calendar block: "THU" in English, "ה׳" in Hebrew. Hebrew's short form is two
+ * words ("יום ה׳"), which doesn't fit a block that is meant to be glanced at, so it uses the
+ * narrow one.
+ */
+export function formatWeekdayShort(date: Date, locale?: string): string {
+  const width = locale?.startsWith('he') ? 'narrow' : 'short';
+  return date.toLocaleDateString(locale, { weekday: width }).toUpperCase();
+}

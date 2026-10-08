@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chatApi } from '../../../../src/api/chatApi';
 import { groupsApi } from '../../../../src/api/groupsApi';
+import { useTranslation } from '../../../../src/i18n';
 import { useAuthStore } from '../../../../src/store/authStore';
 import {
   Avatar,
@@ -34,6 +35,7 @@ export default function GroupChatScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [body, setBody] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export default function GroupChatScreen() {
       setImageUri(null);
       queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'messages'] });
     } catch {
-      setError('Failed to send message.');
+      setError(t('chat.failed'));
     } finally {
       setSending(false);
     }
@@ -96,7 +98,7 @@ export default function GroupChatScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.headerPad, { paddingTop: insets.top + space.lg }]}>
-        <ScreenHeader title="Group chat" subtitle={groupQuery.data?.group.name} />
+        <ScreenHeader title={t('chat.title')} subtitle={groupQuery.data?.group.name} />
       </View>
 
       <ScrollView
@@ -112,9 +114,7 @@ export default function GroupChatScreen() {
         }
       >
         <Text style={[text.secondary, styles.mode]}>
-          {chatMode === 'announcements'
-            ? 'Announcements only — members can read but not reply.'
-            : 'Two-way chat — anyone in the group can post.'}
+          {chatMode === 'announcements' ? t('chat.announcements') : t('chat.twoWay')}
         </Text>
 
         {messages.map((message) => {
@@ -141,8 +141,8 @@ export default function GroupChatScreen() {
 
         {messages.length === 0 && (
           <Empty
-            headline="No messages yet"
-            body={canPost ? 'Say where you are, or what to bring.' : undefined}
+            headline={t('chat.emptyHeadline')}
+            body={canPost ? t('chat.emptyBody') : undefined}
           />
         )}
       </ScrollView>
@@ -153,26 +153,26 @@ export default function GroupChatScreen() {
           <View style={styles.composerRow}>
             <TextInput
               style={styles.input}
-              placeholder="Write a message…"
+              placeholder={t('common.writeMessage')}
               placeholderTextColor={color.textMuted}
               value={body}
               onChangeText={setBody}
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Attach a photo"
+              accessibilityLabel={t('common.attachPhoto')}
               onPress={handlePickImage}
               style={styles.attach}
             >
               <Text style={styles.attachIcon}>+</Text>
             </Pressable>
-            <Button label={sending ? '…' : 'Send'} onPress={handleSend} busy={sending} />
+            <Button label={sending ? '…' : t('common.send')} onPress={handleSend} busy={sending} />
           </View>
           {error && <Text style={styles.error}>{error}</Text>}
         </View>
       ) : (
         <Text style={[text.secondary, styles.readOnly, { paddingBottom: space.md + insets.bottom }]}>
-          Only the leader can post in this group.
+          {t('chat.onlyLeader')}
         </Text>
       )}
     </View>

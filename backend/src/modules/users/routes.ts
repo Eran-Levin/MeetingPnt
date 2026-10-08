@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { pushTokenSchema } from '@meetingpnt/shared';
+import { pushTokenSchema, updateLocaleSchema } from '@meetingpnt/shared';
 import { prisma } from '../../db/prisma.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
 import { toSharedUser } from '../../lib/userName.js';
@@ -24,10 +24,10 @@ usersRouter.use(authenticate);
 usersRouter.put('/me/avatar', upload.single('image'), async (req, res, next) => {
   try {
     if (!req.file) {
-      throw new HttpError(400, 'No image uploaded');
+      throw new HttpError(400, 'no_image');
     }
     if (!isSupportedImageMime(req.file.mimetype)) {
-      throw new HttpError(400, 'Unsupported image type — use JPEG, PNG, or WebP');
+      throw new HttpError(400, 'unsupported_image');
     }
     const avatarUrl = await saveImage(req.file.buffer, req.file.mimetype);
     const user = await prisma.user.update({ where: { id: req.user!.id }, data: { avatarUrl } });
@@ -44,6 +44,18 @@ usersRouter.delete('/me/avatar', async (req, res, next) => {
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: { avatarUrl: null },
+    });
+    res.json({ user: toSharedUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+usersRouter.put('/me/locale', validate(updateLocaleSchema), async (req, res, next) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { locale: req.body.locale },
     });
     res.json({ user: toSharedUser(user) });
   } catch (err) {

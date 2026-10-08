@@ -54,7 +54,7 @@ authRouter.post('/refresh', async (req, res, next) => {
   try {
     const token = extractRefreshToken(req);
     if (!token) {
-      throw new HttpError(401, 'Missing refresh token');
+      throw new HttpError(401, 'missing_refresh_token');
     }
     const { user, accessToken, refreshToken } = await authService.refresh(token);
     setRefreshCookie(res, refreshToken);

@@ -36,11 +36,11 @@ function withUser(record: Attendance & { user: User }): AttendanceWithUser {
 async function assertActivityLeader(activityId: string, requesterId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
   if (!group || group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage attendance');
+    throw new HttpError(403, 'leader_only_attendance');
   }
   return activity;
 }
@@ -49,7 +49,7 @@ async function assertActivityLeader(activityId: string, requesterId: string) {
 async function assertMeetingPointLeader(meetingPointId: string, requesterId: string) {
   const meetingPoint = await getMeetingPointById(meetingPointId);
   if (!meetingPoint || !meetingPoint.activityId) {
-    throw new HttpError(404, 'Meeting point not found');
+    throw new HttpError(404, 'meeting_point_not_found');
   }
   await assertActivityLeader(meetingPoint.activityId, requesterId);
   return meetingPoint;

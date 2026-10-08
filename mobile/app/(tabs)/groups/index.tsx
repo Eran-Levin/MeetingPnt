@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { groupsApi } from '../../../src/api/groupsApi';
+import { useLocale, useTranslation } from '../../../src/i18n';
 import { useAuthStore } from '../../../src/store/authStore';
 import {
   Badge,
@@ -19,6 +20,8 @@ import {
 } from '../../../src/ui';
 
 export default function GroupsScreen() {
+  const { t } = useTranslation();
+  const locale = useLocale();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
@@ -54,7 +57,7 @@ export default function GroupsScreen() {
 
   return (
     <Screen
-      title="Groups"
+      title={t('tabs.groups')}
       back={false}
       onRefresh={() => queryClient.invalidateQueries({ queryKey: ['groups'] })}
       refreshing={isFetching}
@@ -64,21 +67,21 @@ export default function GroupsScreen() {
         (composing ? (
           <Card>
             <TextField
-              label="Group name"
-              placeholder="Tuesday Flow"
+              label={t('groups.groupName')}
+              placeholder={t('groups.groupNamePlaceholder')}
               value={name}
               onChangeText={setName}
               autoFocus
             />
             <View style={styles.createActions}>
               <Button
-                label={creating ? 'Creating…' : 'Create group'}
+                label={creating ? t('groups.creating') : t('groups.createGroup')}
                 onPress={handleCreate}
                 busy={creating}
                 grow
               />
               <Button
-                label="Cancel"
+                label={t('common.cancel')}
                 onPress={() => setComposing(false)}
                 variant="secondary"
                 grow
@@ -86,24 +89,30 @@ export default function GroupsScreen() {
             </View>
           </Card>
         ) : (
-          <Button label="New group" onPress={() => setComposing(true)} variant="secondary" />
+          <Button
+            label={t('groups.newGroup')}
+            onPress={() => setComposing(true)}
+            variant="secondary"
+          />
         ))}
 
       {active.length > 0 && (
-        <Section label={`Active · ${active.length}`}>
+        <Section label={t('groups.active', { count: active.length })}>
           {active.map((group, index) => (
             <Row
               key={group.id}
               title={group.name}
               subtitle={
                 group.nextActivityAt
-                  ? `Next: ${new Date(group.nextActivityAt).toLocaleString(undefined, {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}`
-                  : 'Nothing scheduled'
+                  ? t('groups.nextAt', {
+                      when: new Date(group.nextActivityAt).toLocaleString(locale, {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      }),
+                    })
+                  : t('groups.nothingScheduled')
               }
               trailing={<Badge status={group.status} />}
               onPress={() => router.push(`/(tabs)/groups/${group.id}`)}
@@ -114,7 +123,7 @@ export default function GroupsScreen() {
       )}
 
       {closed.length > 0 && (
-        <Section label={`Closed · ${closed.length}`}>
+        <Section label={t('groups.closed', { count: closed.length })}>
           {closed.map((group, index) => (
             <Row
               key={group.id}
@@ -130,11 +139,9 @@ export default function GroupsScreen() {
 
       {!isLoading && groups.length === 0 && (
         <Empty
-          headline={isLeaderOrAdmin ? 'Start your first group' : 'No groups yet'}
+          headline={isLeaderOrAdmin ? t('groups.startFirst') : t('groups.noGroupsYet')}
           body={
-            isLeaderOrAdmin
-              ? 'A group holds a roster and the activities that run inside it.'
-              : "You'll see a group here once a leader adds you."
+            isLeaderOrAdmin ? t('groups.startBody') : t('groups.memberBody')
           }
         />
       )}

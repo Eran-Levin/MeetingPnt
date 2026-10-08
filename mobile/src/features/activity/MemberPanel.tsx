@@ -1,5 +1,6 @@
-import type { LocationSnapshotWithUser, RsvpStatus } from '@meetingpnt/shared';
+import { isolate, type LocationSnapshotWithUser, type RsvpStatus } from '@meetingpnt/shared';
 import { Linking, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../../i18n';
 import { Button, ButtonRow, Card, Section, TextField, color, space, text } from '../../ui';
 
 interface Props {
@@ -37,25 +38,26 @@ export function MemberPanel({
   describeAge,
   mapsLinkFor,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <>
-      <Section label="Are you coming?">
+      <Section label={t('memberPanel.areYouComing')}>
         <ButtonRow>
           <Button
-            label="Going"
+            label={t('memberPanel.going')}
             onPress={() => onRsvp('approved')}
             variant={status === 'approved' ? 'primary' : 'secondary'}
             grow
           />
           <Button
-            label="Not going"
+            label={t('memberPanel.notGoing')}
             onPress={() => onRsvp('declined')}
             variant={status === 'declined' ? 'danger' : 'secondary'}
             grow
           />
         </ButtonRow>
         <TextField
-          placeholder="Add a note — running 15 mins late…"
+          placeholder={t('memberPanel.notePlaceholder')}
           value={note}
           onChangeText={onNoteChange}
           style={styles.note}
@@ -64,32 +66,34 @@ export function MemberPanel({
       </Section>
 
       {running && status === 'approved' && (
-        <Section label="Your leader">
+        <Section label={t('memberPanel.yourLeader')}>
           {/* A live broadcast answers the question before it's asked, so it replaces the button
               rather than sitting next to it. */}
           {broadcasting ? (
             <Card>
               <Text style={text.bodyStrong}>
-                {liveLeaderLocation?.user?.name ?? 'Your leader'} is sharing their position
+                {t('memberPanel.leaderSharing', {
+                  name: isolate(liveLeaderLocation?.user?.name ?? t('memberPanel.yourLeader')),
+                })}
               </Text>
               {liveLeaderLocation ? (
                 <>
                   <Text style={[text.secondary, styles.age]}>
-                    Updated {describeAge(liveLeaderLocation.capturedAt)}.
+                    {t('memberPanel.updated', { age: describeAge(liveLeaderLocation.capturedAt) })}
                   </Text>
                   <Button
-                    label="Follow them in Maps"
+                    label={t('memberPanel.followInMaps')}
                     onPress={() => Linking.openURL(mapsLinkFor(liveLeaderLocation.location))}
                   />
                 </>
               ) : (
-                <Text style={[text.secondary, styles.age]}>Waiting for their first position…</Text>
+                <Text style={[text.secondary, styles.age]}>{t('memberPanel.waiting')}</Text>
               )}
             </Card>
           ) : (
             <View>
               <Button
-                label={askBusy ? 'Asking…' : "Where's the leader?"}
+                label={askBusy ? t('memberPanel.asking') : t('memberPanel.whereIsLeader')}
                 onPress={onAskLeader}
                 busy={askBusy}
                 variant="secondary"
@@ -97,7 +101,9 @@ export function MemberPanel({
               {askMessage && <Text style={[text.secondary, styles.age]}>{askMessage}</Text>}
               {askedLeaderLocation && (
                 <Button
-                  label={`Open ${askedLeaderLocation.user?.name ?? 'the leader'}'s position in Maps`}
+                  label={t('memberPanel.openPosition', {
+                    name: isolate(askedLeaderLocation.user?.name ?? t('memberPanel.yourLeader')),
+                  })}
                   onPress={() => Linking.openURL(mapsLinkFor(askedLeaderLocation.location))}
                   variant="quiet"
                 />

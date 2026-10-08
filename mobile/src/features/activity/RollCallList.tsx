@@ -1,5 +1,6 @@
-import type { RollCallEntry } from '@meetingpnt/shared';
+import { joinDot, type RollCallEntry } from '@meetingpnt/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from '../../i18n';
 import {
   Avatar,
   Empty,
@@ -31,19 +32,20 @@ interface Props {
  * that show their state, not text links you have to aim at.
  */
 export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, onMessage }: Props) {
+  const { t } = useTranslation();
   const present = entries.filter((e) => e.attendance === 'present').length;
   const marked = entries.filter((e) => e.attendance !== null).length;
 
   return (
-    <Section label="Who's here">
+    <Section label={t('rollCall.title')}>
       <View style={styles.tally}>
-        <Tally value={String(present)} label="present" />
-        <Tally value={`${marked}/${entries.length}`} label="checked" />
+        <Tally value={String(present)} label={t('rollCall.present')} />
+        <Tally value={`${marked}/${entries.length}`} label={t('rollCall.checked')} />
       </View>
 
       {narrowed && (
         <Text style={[text.secondary, styles.hint]}>
-          Showing whoever made the previous stop. People who declined aren&rsquo;t listed.
+          {t('rollCall.narrowedHint')}
         </Text>
       )}
 
@@ -54,23 +56,22 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
             <Avatar name={entry.user.name} uri={entry.user.avatarUrl} size={40} />
             <View style={styles.personText}>
               <Text style={text.bodyStrong} numberOfLines={1}>
-                {entry.user.name}
-                {entry.isVisitor ? '  ·  visitor' : ''}
+                {joinDot([entry.user.name, entry.isVisitor ? t('rollCall.visitor') : null])}
               </Text>
               <Text style={text.secondary}>
-                {entry.rsvpStatus === 'approved' ? 'Coming' : 'No reply yet'}
+                {entry.rsvpStatus === 'approved' ? t('rollCall.coming') : t('rollCall.noReply')}
               </Text>
             </View>
 
             <View style={styles.marks}>
               <Mark
-                label="Here"
+                label={t('rollCall.here')}
                 tone="success"
                 active={entry.attendance === 'present'}
                 onPress={() => onMark(entry.user.id, 'present')}
               />
               <Mark
-                label="Missing"
+                label={t('rollCall.missing')}
                 tone="danger"
                 active={entry.attendance === 'absent'}
                 onPress={() => onMark(entry.user.id, 'absent')}
@@ -79,18 +80,18 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
           </View>
 
           <View style={styles.secondary}>
-            <Quiet label="Locate" onPress={() => onLocate(entry.user.id)} />
-            <Quiet label="Message" onPress={() => onMessage(entry.user.id)} />
+            <Quiet label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
+            <Quiet label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
             {/* Answer for them if they replied by phone rather than in the app. */}
             {entry.rsvpStatus !== 'approved' && (
-              <Quiet label="Confirm" onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+              <Quiet label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
             )}
-            <Quiet label="Won't arrive" onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
+            <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
           </View>
         </View>
       ))}
 
-      {entries.length === 0 && <Empty headline="Nobody expected at this meeting point" />}
+      {entries.length === 0 && <Empty headline={t('rollCall.emptyHeadline')} />}
     </Section>
   );
 }

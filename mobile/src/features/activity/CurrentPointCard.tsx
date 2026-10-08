@@ -1,5 +1,6 @@
 import type { MeetingPoint } from '@meetingpnt/shared';
 import { Linking, StyleSheet, Text, View } from 'react-native';
+import { useLocale, useTranslation } from '../../i18n';
 import { Button, ButtonRow, Card, space, text } from '../../ui';
 
 interface Props {
@@ -27,13 +28,14 @@ export function CurrentPointCard({
   onEdit,
   message,
 }: Props) {
+  const { t } = useTranslation();
+  const locale = useLocale();
+
   if (!point) {
     return (
       <Card>
         <Text style={text.secondary}>
-          {plannedCount > 0
-            ? "The activity hasn't started — the route is below."
-            : 'No meeting point set yet.'}
+          {plannedCount > 0 ? t('currentPoint.notStarted') : t('currentPoint.none')}
         </Text>
       </Card>
     );
@@ -41,15 +43,15 @@ export function CurrentPointCard({
 
   return (
     <Card accent>
-      <Text style={styles.label}>{point.label || 'Meeting point'}</Text>
-      <Text style={[text.secondary, styles.time]}>{new Date(point.time).toLocaleString()}</Text>
+      <Text style={styles.label}>{point.label || t('common.meetingPoint')}</Text>
+      <Text style={[text.secondary, styles.time]}>{new Date(point.time).toLocaleString(locale)}</Text>
 
       <ButtonRow>
-        <Button label="Directions" onPress={() => Linking.openURL(point.googleMapsUrl)} grow />
-        {isLeader && onEdit && <Button label="Edit" onPress={onEdit} variant="secondary" grow />}
+        <Button label={t('common.directions')} onPress={() => Linking.openURL(point.googleMapsUrl)} grow />
+        {isLeader && onEdit && <Button label={t('currentPoint.edit')} onPress={onEdit} variant="secondary" grow />}
         {!isLeader && onOnMyWay && (
           <Button
-            label={omwBusy ? 'Sharing…' : 'On my way'}
+            label={omwBusy ? t('currentPoint.sharing') : t('currentPoint.onMyWay')}
             onPress={onOnMyWay}
             busy={omwBusy}
             variant="secondary"

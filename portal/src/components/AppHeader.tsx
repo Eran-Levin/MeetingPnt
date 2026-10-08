@@ -1,12 +1,25 @@
 import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
+import { LOCALES, type Locale } from '@meetingpnt/shared';
+import { usersApi } from '../api/usersApi.js';
+import { useTranslation } from '../i18n/index.js';
 import { useAuthStore } from '../store/authStore.js';
 import { AppLogo } from './AppLogo.js';
 
+/** Each language is named in itself — someone who can't read the current UI language can still find theirs. */
+const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', he: 'עברית' };
+
 export function AppHeader() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const setUser = useAuthStore((s) => s.setUser);
   const { pathname } = useLocation();
+
+  async function handleLocale(locale: Locale) {
+    const { user: updated } = await usersApi.setLocale(locale);
+    setUser(updated);
+  }
 
   async function handleLogout() {
     await authApi.logout();
@@ -25,32 +38,46 @@ export function AppHeader() {
           {(user?.role === 'leader' || user?.role === 'admin') && (
             <>
               <NavLink to="/groups" active={pathname.startsWith('/groups')}>
-                Groups
+                {t('tabs.groups')}
               </NavLink>
               {/* The list is /activities and a single one is /activities/:id, so one prefix
                   lights the tab from either. */}
               <NavLink to="/activities" active={pathname.startsWith('/activities')}>
-                Activities
+                {t('groupDetail.activities')}
               </NavLink>
               <NavLink to="/analysis" active={pathname.startsWith('/analysis')}>
-                Analysis
+                {t('portal.nav.analysis')}
               </NavLink>
             </>
           )}
           {user?.role === 'admin' && (
             <NavLink to="/admin/users" active={pathname.startsWith('/admin')}>
-              Users
+              {t('portal.nav.users')}
             </NavLink>
           )}
         </nav>
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ms-auto flex items-center gap-4">
+          {user && (
+            <select
+              aria-label={t('account.language')}
+              value={user.locale}
+              onChange={(e) => handleLocale(e.target.value as Locale)}
+              className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink-secondary"
+            >
+              {LOCALES.map((l) => (
+                <option key={l} value={l}>
+                  {LANGUAGE_NAMES[l]}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-sm text-ink-secondary">{user?.name}</span>
           <button
             onClick={handleLogout}
             className="text-sm font-medium text-ink-secondary hover:text-ink"
           >
-            Log out
+            {t('account.logOut')}
           </button>
         </div>
       </div>

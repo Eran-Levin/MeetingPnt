@@ -6,13 +6,13 @@ import * as invitationsService from '../invitations/service.js';
 async function assertPartyRep(partyId: string, requesterId: string) {
   const party = await prisma.party.findUnique({ where: { id: partyId } });
   if (!party) {
-    throw new HttpError(404, 'Party not found');
+    throw new HttpError(404, 'party_not_found');
   }
   const requesterMembership = await prisma.groupMember.findFirst({
     where: { groupId: party.groupId, userId: requesterId, status: 'active' },
   });
   if (!requesterMembership || party.repMemberId !== requesterMembership.id) {
-    throw new HttpError(403, 'Only the party representative can add party members');
+    throw new HttpError(403, 'party_rep_only');
   }
   return party;
 }
@@ -24,13 +24,10 @@ export async function addPartyMembers(partyId: string, requesterId: string, dto:
 
   const currentCount = await prisma.groupMember.count({ where: { partyId } });
   if (currentCount >= party.size) {
-    throw new HttpError(409, 'This party is already complete');
+    throw new HttpError(409, 'party_complete');
   }
   if (currentCount + dto.members.length !== party.size) {
-    throw new HttpError(
-      400,
-      `This party needs exactly ${party.size - currentCount} more member(s)`,
-    );
+    throw new HttpError(400, 'party_needs_members', { count: party.size - currentCount });
   }
 
   const members = [];

@@ -5,6 +5,7 @@ import type {
   CreateActivityDto,
   UpdateActivityDto,
 } from '@meetingpnt/shared';
+import { isolate, pushText } from '@meetingpnt/shared';
 import type { Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
@@ -17,6 +18,7 @@ import {
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { buildIcsEvent } from '../../lib/ics.js';
+import { toLocale } from '../../lib/userName.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
 import { assertMembership } from '../groups/service.js';
 
@@ -45,10 +47,10 @@ function toSharedActivity(activity: Activity): SharedActivity {
 async function assertGroupLeader(groupId: string, requesterId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can manage activities');
+    throw new HttpError(403, 'leader_only_manage_activities');
   }
   return group;
 }
@@ -56,7 +58,7 @@ async function assertGroupLeader(groupId: string, requesterId: string) {
 async function getActivityOrThrow(activityId: string) {
   const activity = await prisma.activity.findUnique({ where: { id: activityId } });
   if (!activity) {
-    throw new HttpError(404, 'Activity not found');
+    throw new HttpError(404, 'activity_not_found');
   }
   return activity;
 }
@@ -82,7 +84,7 @@ export async function assertActivityParticipant(activityId: string, userId: stri
     return activity;
   }
 
-  throw new HttpError(403, 'Not a participant of this activity');
+  throw new HttpError(403, 'not_activity_participant');
 }
 
 export async function createActivity(groupId: string, requesterId: string, dto: CreateActivityDto) {
@@ -125,10 +127,7 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
       dto.meetingPoints.map(async (template) => {
         const location = await parseGoogleMapsUrl(template.googleMapsUrl);
         if (!location) {
-          throw new HttpError(
-            400,
-            `Couldn't read coordinates from the meeting point link "${template.googleMapsUrl}" — please use a link that includes coordinates.`,
-          );
+          throw new HttpError(400, 'maps_coordinates_for_link', { url: template.googleMapsUrl });
         }
         return { ...template, location };
       }),
@@ -157,13 +156,13 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
 export async function publishSeries(seriesId: string, requesterId: string) {
   const occurrences = await prisma.activity.findMany({ where: { seriesId } });
   if (occurrences.length === 0) {
-    throw new HttpError(404, 'Series not found');
+    throw new HttpError(404, 'series_not_found');
   }
   const group = await assertGroupLeader(occurrences[0]!.groupId, requesterId);
 
   const draftIds = occurrences.filter((a) => a.status === 'draft').map((a) => a.id);
   if (draftIds.length === 0) {
-    throw new HttpError(409, 'All occurrences in this series are already published');
+    throw new HttpError(409, 'series_all_published');
   }
 
   const members = await prisma.groupMember.findMany({
@@ -188,14 +187,22 @@ export async function publishSeries(seriesId: string, requesterId: string) {
     return tx.activity.findMany({ where: { seriesId }, orderBy: { startAt: 'asc' } });
   });
 
-  const recipients = members.filter((m) => m.userId !== requesterId).flatMap((m) => m.user.pushTokens);
+  // Each member is told in their own language.
   await sendPushNotifications(
-    recipients.map((token) => ({
-      to: token.expoPushToken,
-      title: `New recurring activity in ${group.name}`,
-      body: `${occurrences[0]!.title} — ${draftIds.length} session${draftIds.length > 1 ? 's' : ''} scheduled. RSVP now`,
-      data: { type: 'activity_series_published', seriesId },
-    })),
+    members
+      .filter((m) => m.userId !== requesterId)
+      .flatMap((m) => {
+        const locale = toLocale(m.user.locale);
+        return m.user.pushTokens.map((token) => ({
+          to: token.expoPushToken,
+          title: pushText(locale, 'seriesPublishedTitle', { group: isolate(group.name) }),
+          body: pushText(locale, 'seriesPublishedBody', {
+            title: isolate(occurrences[0]!.title),
+            count: draftIds.length,
+          }),
+          data: { type: 'activity_series_published', seriesId },
+        }));
+      }),
   );
 
   return updated.map(toSharedActivity);
@@ -210,14 +217,14 @@ export async function updateActivity(activityId: string, requesterId: string, dt
   const nextStartAt = dto.startAt !== undefined ? new Date(dto.startAt) : activity.startAt;
   const nextEndAt = dto.endAt !== undefined ? new Date(dto.endAt) : activity.endAt;
   if (nextEndAt <= nextStartAt) {
-    throw new HttpError(400, 'The end must be after the start');
+    throw new HttpError(400, 'end_before_start');
   }
 
   // An event that hasn't run yet can't be scheduled into the past. Once it has started or
   // finished, back-dating is allowed — that's a leader correcting the record, not planning.
   const notYetRun = activity.status === 'draft' || activity.status === 'published';
   if (notYetRun && dto.startAt !== undefined && nextStartAt.getTime() < Date.now()) {
-    throw new HttpError(400, "You can't schedule an event in the past");
+    throw new HttpError(400, 'schedule_in_past');
   }
 
   const updated = await prisma.activity.update({
@@ -276,7 +283,7 @@ export async function publishActivity(activityId: string, requesterId: string) {
   const group = await assertGroupLeader(activity.groupId, requesterId);
 
   if (activity.status !== 'draft') {
-    throw new HttpError(409, 'Only draft activities can be published');
+    throw new HttpError(409, 'publish_draft_only');
   }
 
   const members = await prisma.groupMember.findMany({
@@ -302,14 +309,18 @@ export async function publishActivity(activityId: string, requesterId: string) {
     return publishedActivity;
   });
 
-  const recipients = members.filter((m) => m.userId !== requesterId).flatMap((m) => m.user.pushTokens);
   await sendPushNotifications(
-    recipients.map((token) => ({
-      to: token.expoPushToken,
-      title: `New activity in ${group.name}`,
-      body: `${activity.title} — RSVP now`,
-      data: { type: 'activity_published', activityId },
-    })),
+    members
+      .filter((m) => m.userId !== requesterId)
+      .flatMap((m) => {
+        const locale = toLocale(m.user.locale);
+        return m.user.pushTokens.map((token) => ({
+          to: token.expoPushToken,
+          title: pushText(locale, 'activityPublishedTitle', { group: isolate(group.name) }),
+          body: pushText(locale, 'activityPublishedBody', { title: isolate(activity.title) }),
+          data: { type: 'activity_published', activityId },
+        }));
+      }),
   );
 
   return toSharedActivity(updated);
@@ -322,7 +333,7 @@ export async function startActivity(activityId: string, requesterId: string) {
   await assertGroupLeader(activity.groupId, requesterId);
 
   if (activity.status !== 'published') {
-    throw new HttpError(409, 'Only a published activity can be started');
+    throw new HttpError(409, 'start_published_only');
   }
 
   // Within a group, starting is a handover: day 3 of a trek takes over from day 2, which is what
@@ -346,10 +357,7 @@ export async function startActivity(activityId: string, requesterId: string) {
     where: { status: 'in_progress', group: { leaderId: requesterId } },
   });
   if (runningElsewhere) {
-    throw new HttpError(
-      409,
-      `You're already running "${runningElsewhere.title}" in another group. End it before starting this one.`,
-    );
+    throw new HttpError(409, 'already_running_elsewhere', { title: runningElsewhere.title });
   }
 
   // Starting the event puts the group at the first stop on the plan — that's what "we're meeting
@@ -377,7 +385,7 @@ export async function endActivity(activityId: string, requesterId: string) {
   await assertGroupLeader(activity.groupId, requesterId);
 
   if (activity.status !== 'published' && activity.status !== 'in_progress') {
-    throw new HttpError(409, 'Only a published or in-progress activity can be ended');
+    throw new HttpError(409, 'end_published_or_running_only');
   }
 
   // Ending closes location sharing, and a live broadcast is the loudest form of it. The lease

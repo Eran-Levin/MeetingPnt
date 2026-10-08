@@ -1,9 +1,9 @@
-import type { PartyMemberDto } from '@meetingpnt/shared';
+import { isolate, type PartyMemberDto } from '@meetingpnt/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { partiesApi } from '../../src/api/partiesApi';
-import { ApiError } from '../../src/api/client';
+import { apiErrorMessage, useTranslation } from '../../src/i18n';
 import { AuthLayout } from '../../src/features/auth/AuthLayout';
 import { Button, TextField, color, radius, space, text } from '../../src/ui';
 
@@ -19,6 +19,7 @@ function emptyMember(): DraftMember {
  * the party. Every member needs a name; email and phone are optional per member.
  */
 export default function PartyMembersScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { partyId, partySize, partyName } = useLocalSearchParams<{
     partyId: string;
@@ -40,7 +41,7 @@ export default function PartyMembersScreen() {
 
   async function handleSubmit() {
     if (!canSubmit) {
-      setError('Every party member needs a first and last name.');
+      setError(t('auth.party.needNames'));
       return;
     }
     setError(null);
@@ -55,7 +56,7 @@ export default function PartyMembersScreen() {
       await partiesApi.addMembers(partyId, { members: dto });
       router.replace('/(tabs)/activities');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong');
+      setError(apiErrorMessage(err, t('common.somethingWentWrong')));
     } finally {
       setSubmitting(false);
     }
@@ -63,16 +64,16 @@ export default function PartyMembersScreen() {
 
   return (
     <AuthLayout
-      title="Name your party"
+      title={t('auth.party.title')}
       subtitle={
         partyName
-          ? `Who else is in ${partyName}? A name is all we need — email and phone are optional.`
-          : 'Who else is joining with you? A name is all we need — email and phone are optional.'
+          ? t('auth.party.subtitleNamed', { party: isolate(partyName) })
+          : t('auth.party.subtitle')
       }
       error={error}
       footer={
         <Button
-          label={submitting ? 'Saving…' : 'Continue'}
+          label={submitting ? t('auth.party.saving') : t('auth.party.continue')}
           onPress={handleSubmit}
           busy={submitting}
           disabled={!canSubmit}
@@ -81,23 +82,25 @@ export default function PartyMembersScreen() {
     >
       {members.map((member, index) => (
         <View key={index} style={styles.member}>
-          <Text style={[text.caption, styles.memberLabel]}>Party member {index + 2}</Text>
+          <Text style={[text.caption, styles.memberLabel]}>
+            {t('auth.party.memberN', { n: index + 2 })}
+          </Text>
           <View style={styles.row}>
             <TextField
-              label="First name"
+              label={t('common.firstName')}
               value={member.firstName}
               onChangeText={(v) => updateMember(index, { firstName: v })}
               containerStyle={styles.half}
             />
             <TextField
-              label="Last name"
+              label={t('common.lastName')}
               value={member.lastName}
               onChangeText={(v) => updateMember(index, { lastName: v })}
               containerStyle={styles.half}
             />
           </View>
           <TextField
-            label="Email (optional)"
+            label={t('common.emailOptional')}
             placeholder="them@example.com"
             autoCapitalize="none"
             autoCorrect={false}
@@ -106,7 +109,7 @@ export default function PartyMembersScreen() {
             onChangeText={(v) => updateMember(index, { email: v })}
           />
           <TextField
-            label="Phone (optional)"
+            label={t('common.phoneOptional')}
             keyboardType="phone-pad"
             value={member.phone}
             onChangeText={(v) => updateMember(index, { phone: v })}

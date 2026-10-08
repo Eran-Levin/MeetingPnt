@@ -5,6 +5,7 @@ import type {
   GroupMemberStatus,
   GroupStatus,
   InvitationStatus,
+  Locale,
   LocationSource,
   Role,
   RsvpStatus,
@@ -27,6 +28,8 @@ export interface User {
   /** Absolute URL of the photo they took of themselves, or null. Everywhere a person is listed
    * shows a face when there is one and their initials when there isn't. */
   avatarUrl: string | null;
+  /** UI language — see `Locale`. */
+  locale: Locale;
   role: Role;
   createdAt: string;
   updatedAt: string;

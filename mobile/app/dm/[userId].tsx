@@ -1,3 +1,4 @@
+import { isolate } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../src/api/client';
 import { directMessagesApi } from '../../src/api/directMessagesApi';
+import { apiErrorMessage, useTranslation } from '../../src/i18n';
 import { useAuthStore } from '../../src/store/authStore';
 import {
   Avatar,
@@ -39,6 +41,7 @@ export default function DirectChatScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const me = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [body, setBody] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export default function DirectChatScreen() {
       setImageUri(null);
       queryClient.invalidateQueries({ queryKey: ['direct-messages', userId] });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to send message.');
+      setError(apiErrorMessage(err, t('chat.failed')));
     } finally {
       setSending(false);
     }
@@ -98,7 +101,7 @@ export default function DirectChatScreen() {
       <View style={[styles.headerPad, { paddingTop: insets.top + space.lg }]}>
         <ScreenHeader
           title={thread?.withUser.name ?? '…'}
-          subtitle="Direct message"
+          subtitle={t('dm.subtitle')}
           right={
             thread ? (
               <Avatar name={thread.withUser.name} uri={thread.withUser.avatarUrl} size={36} />
@@ -135,15 +138,15 @@ export default function DirectChatScreen() {
 
         {blocked && (
           <Empty
-            headline="You can't message this person"
-            body="Direct messages only reach people you share a group or an activity with."
+            headline={t('dm.cantHeadline')}
+            body={t('dm.cantBody')}
           />
         )}
 
         {!blocked && messages.length === 0 && !threadQuery.isLoading && (
           <Empty
-            headline={`Nothing yet with ${thread?.withUser.name ?? 'them'}`}
-            body="Sort a lift, swap a phone number, say you're running late — just the two of you."
+            headline={t('dm.nothingYet', { name: isolate(thread?.withUser.name ?? t('dm.them')) })}
+            body={t('dm.nothingBody')}
           />
         )}
       </ScrollView>
@@ -154,20 +157,20 @@ export default function DirectChatScreen() {
           <View style={styles.composerRow}>
             <TextInput
               style={styles.input}
-              placeholder="Write a message…"
+              placeholder={t('common.writeMessage')}
               placeholderTextColor={color.textMuted}
               value={body}
               onChangeText={setBody}
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Attach a photo"
+              accessibilityLabel={t('common.attachPhoto')}
               onPress={handlePickImage}
               style={styles.attach}
             >
               <Text style={styles.attachIcon}>+</Text>
             </Pressable>
-            <Button label={sending ? '…' : 'Send'} onPress={handleSend} busy={sending} />
+            <Button label={sending ? '…' : t('common.send')} onPress={handleSend} busy={sending} />
           </View>
           {error && <Text style={styles.error}>{error}</Text>}
         </View>

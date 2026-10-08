@@ -77,7 +77,7 @@ function toSharedMember(
 export async function assertMembership(groupId: string, userId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId === userId) {
     return group;
@@ -86,7 +86,7 @@ export async function assertMembership(groupId: string, userId: string) {
     where: { groupId, userId, status: 'active' },
   });
   if (!membership) {
-    throw new HttpError(403, 'Not a member of this group');
+    throw new HttpError(403, 'not_group_member');
   }
   return group;
 }
@@ -144,10 +144,10 @@ export async function getGroup(groupId: string, requesterId: string) {
 export async function updateGroup(groupId: string, requesterId: string, dto: UpdateGroupDto) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can update this group');
+    throw new HttpError(403, 'leader_only_update_group');
   }
   const updated = await prisma.group.update({ where: { id: groupId }, data: dto });
   const ranEvents = await groupIdsWithRunEvents([groupId]);
@@ -157,10 +157,10 @@ export async function updateGroup(groupId: string, requesterId: string, dto: Upd
 export async function deleteGroup(groupId: string, requesterId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can delete this group');
+    throw new HttpError(403, 'leader_only_delete_group');
   }
   await prisma.group.delete({ where: { id: groupId } });
 }
@@ -178,20 +178,20 @@ export async function listMembers(groupId: string, requesterId: string) {
 export async function removeMember(groupId: string, targetUserId: string, requesterId: string) {
   const group = await prisma.group.findUnique({ where: { id: groupId } });
   if (!group) {
-    throw new HttpError(404, 'Group not found');
+    throw new HttpError(404, 'group_not_found');
   }
   if (group.leaderId !== requesterId) {
-    throw new HttpError(403, 'Only the group leader can remove members');
+    throw new HttpError(403, 'leader_only_remove_members');
   }
   if (targetUserId === group.leaderId) {
-    throw new HttpError(400, 'The group leader cannot be removed');
+    throw new HttpError(400, 'leader_cannot_be_removed');
   }
 
   const membership = await prisma.groupMember.findFirst({
     where: { groupId, userId: targetUserId },
   });
   if (!membership) {
-    throw new HttpError(404, 'Member not found');
+    throw new HttpError(404, 'member_not_found');
   }
 
   await prisma.groupMember.update({ where: { id: membership.id }, data: { status: 'removed' } });
