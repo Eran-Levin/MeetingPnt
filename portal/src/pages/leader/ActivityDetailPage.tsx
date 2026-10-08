@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
+import { API_BASE_URL } from '../../lib/env.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { ActivityEditor } from '../../components/ActivityEditor.js';
@@ -179,7 +180,7 @@ export function ActivityDetailPage() {
       <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
         <p className="max-w-2xl text-sm text-ink">{activity.description}</p>
         <a
-          href={`${import.meta.env.VITE_API_BASE_URL}/api/activities/${activity.id}/ics`}
+          href={`${API_BASE_URL}/api/activities/${activity.id}/ics`}
           className="text-sm text-accent-text hover:underline"
         >
           {t('activityPage.download')}
