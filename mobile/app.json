@@ -4,6 +4,8 @@
     "slug": "meetingpnt",
     "scheme": "meetingpnt",
     "version": "0.0.1",
+    "runtimeVersion": { "policy": "appVersion" },
+    "updates": { "url": "https://u.expo.dev/e68e7c42-2254-4870-818c-4b8c9cc20ada" },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
