@@ -2,6 +2,8 @@ import { Navigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card.js';
 import { useTranslation } from '../i18n/index.js';
 import { useAuthStore } from '../store/authStore.js';
+import { marketingUrl } from '../lib/site.js';
+import { LandingPage } from './LandingPage.js';
 
 export function HomeRedirect() {
   const { t } = useTranslation();
@@ -9,7 +11,12 @@ export function HomeRedirect() {
   const user = useAuthStore((s) => s.user);
 
   if (status !== 'authenticated' || !user) {
-    return <Navigate to="/login" replace />;
+    const site = marketingUrl();
+    if (site) {
+      window.location.replace(site);
+      return null;
+    }
+    return <LandingPage />;
   }
 
   if (user.role === 'admin') {

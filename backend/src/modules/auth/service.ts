@@ -77,8 +77,8 @@ export async function register(input: RegisterDto) {
       firstName: input.firstName,
       lastName: input.lastName,
       phone: input.phone,
-      locale: inviter?.locale ?? 'en',
-      role: 'user',
+      locale: inviter?.locale ?? input.locale ?? 'en',
+      role: input.asLeader && !input.invitationToken ? 'leader' : 'user',
     },
   });
 

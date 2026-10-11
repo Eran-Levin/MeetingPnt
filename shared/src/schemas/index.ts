@@ -22,6 +22,10 @@ export const registerSchema = z.object({
   lastName: z.string({ required_error: 'last_name_required' }).trim().min(1, 'last_name_required'),
   phone: phoneSchema.optional(),
   invitationToken: z.string().optional(),
+  // The portal's "start leading" sign-up. Ignored when an invitation token is present: an invited
+  // person is a member of someone's group, not a new leader.
+  asLeader: z.boolean().optional(),
+  locale: z.enum(LOCALES as [Locale, ...Locale[]]).optional(),
 });
 
 export const loginSchema = z.object({
