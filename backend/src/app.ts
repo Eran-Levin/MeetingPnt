@@ -3,7 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { corsOrigins } from './config/env.js';
-import { UPLOADS_DIR } from './lib/storage.js';
+import { uploadsRouter } from './lib/uploads.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { adminRouter } from './modules/admin/routes.js';
 import {
@@ -45,13 +45,8 @@ export function createApp() {
     res.json({ status: 'ok' });
   });
 
-  // Portal/mobile run on different origins than the API, so uploaded images need CORP relaxed.
-  app.use(
-    '/uploads',
-    express.static(UPLOADS_DIR, {
-      setHeaders: (res) => res.set('Cross-Origin-Resource-Policy', 'cross-origin'),
-    }),
-  );
+  // Local disk or, for a private bucket, fetched from it — see lib/uploads.ts.
+  app.use('/uploads', uploadsRouter());
 
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminRouter);
