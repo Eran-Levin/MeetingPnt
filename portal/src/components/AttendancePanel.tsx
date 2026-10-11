@@ -1,5 +1,6 @@
 import type { RsvpWithUser } from '@meetingpnt/shared';
 import { useTranslation } from '../i18n/index.js';
+import { Avatar } from './ui/Avatar.js';
 import { Badge } from './ui/Badge.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
@@ -52,6 +53,7 @@ export function AttendancePanel({ rsvps, loading, savingFor, error, onSet }: Pro
           {rsvps.map((rsvp) => (
             <div key={rsvp.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
+                <Avatar name={rsvp.user.name} uri={rsvp.user.avatarUrl} size={36} />
                 <span className="min-w-0 flex-1">
                   <span className="text-sm text-ink">{rsvp.user.name}</span>
                   {rsvp.isVisitor && (

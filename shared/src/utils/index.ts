@@ -63,15 +63,25 @@ export function formatActivityWhen(
 
 const FSI = '⁨'; // first-strong isolate
 const PDI = '⁩'; // pop directional isolate
+const LRI = '\u2066'; // left-to-right isolate
+
+/** Any Hebrew or Arabic letter. */
+const RTL_LETTER = /[\u0590-\u08FF]/;
 
 /**
- * Wraps text someone typed — a group, event or place name — so it keeps its own direction inside
- * a sentence built by us. Without it, an English place name in a Hebrew line drags the "·"
- * separators and any numbers beside it to the wrong side. Names are stored and shown verbatim;
- * this only fences them off. In JSX on the web, `<bdi>` does the same job.
+ * Wraps text someone typed — a group, event or place name, a phone number — so it keeps its own
+ * direction inside a sentence built by us. Without it, an English place name in a Hebrew line drags
+ * the "·" separators and any numbers beside it to the wrong side. Names are stored and shown
+ * verbatim; this only fences them off. In JSX on the web, `<bdi>` does the same job.
+ *
+ * Text with a Hebrew or Arabic letter lets its first strong letter decide. Text with none — a phone
+ * number, an email, plain digits — is forced left-to-right: with no letter to go by it would
+ * otherwise take the line's direction, and in Hebrew "+972 53-593-8593" is drawn as
+ * "972 53-593-8593+", with the plus stranded at the end.
  */
 export function isolate(text: string): string {
-  return text ? `${FSI}${text}${PDI}` : text;
+  if (!text) return text;
+  return `${RTL_LETTER.test(text) ? FSI : LRI}${text}${PDI}`;
 }
 
 /** Joins display fragments with a middle dot, isolating each so mixed-language parts can't

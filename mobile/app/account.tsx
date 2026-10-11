@@ -1,4 +1,4 @@
-import { LOCALES, type Locale } from '@meetingpnt/shared';
+import { LOCALES, isolate, type Locale } from '@meetingpnt/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -119,7 +119,7 @@ export default function AccountScreen() {
           <View style={styles.identityText}>
             <Text style={text.heading}>{user.name}</Text>
             <Text style={text.secondary}>{user.email}</Text>
-            {user.phone && <Text style={text.secondary}>{user.phone}</Text>}
+            {user.phone && <Text style={text.secondary}>{isolate(user.phone)}</Text>}
           </View>
         </View>
       </Card>

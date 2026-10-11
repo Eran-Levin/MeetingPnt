@@ -6,6 +6,7 @@ import { chatApi } from '../api/chatApi.js';
 import { apiErrorMessage, useTranslation } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { useAuthStore } from '../store/authStore.js';
+import { Avatar } from './ui/Avatar.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
 
@@ -81,7 +82,14 @@ export function GroupChatPanel({ groupId, chatMode, isLeader }: Props) {
         <div ref={listRef} className="flex max-h-96 flex-col gap-3 overflow-y-auto p-4">
           {messages.map((message) => (
             <div key={message.id} className={message.authorId === currentUser?.id ? 'self-end text-end' : ''}>
-              <p className="text-xs text-ink-muted">{message.author.name}</p>
+              <div
+                className={`flex items-center gap-2 ${
+                  message.authorId === currentUser?.id ? 'justify-end' : ''
+                }`}
+              >
+                <Avatar name={message.author.name} uri={message.author.avatarUrl} size={20} />
+                <p className="text-xs text-ink-muted">{message.author.name}</p>
+              </div>
               {message.body && (
                 <p className="mt-0.5 inline-block rounded-lg bg-surface-raised px-3 py-2 text-sm text-ink">
                   {message.body}
