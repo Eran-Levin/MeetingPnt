@@ -15,7 +15,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from '../i18n';
 import { useAuthStore } from '../store/authStore';
 import { Avatar } from './Avatar';
-import { color, minTouchTarget, sectionLabel, space, text } from './theme';
+import {
+  color,
+  fontSize,
+  fontWeight,
+  minTouchTarget,
+  radius,
+  sectionLabel,
+  space,
+  text,
+} from './theme';
 
 interface ScreenHeaderProps {
   title: string;
@@ -63,7 +72,11 @@ export function ScreenHeader({ title, subtitle, right, back, account = true }: S
             accessibilityRole="button"
             accessibilityLabel={t('common.accountA11y', { name: user.name })}
           >
-            <Avatar name={user.name} uri={user.avatarUrl} size={36} />
+            <Avatar name={user.name} uri={user.avatarUrl} size={32} />
+            <Text style={styles.accountName} numberOfLines={1}>
+              {user.firstName}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={color.textSecondary} />
           </Pressable>
         )}
       </View>
@@ -169,13 +182,28 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   headerTitle: { flex: 1 },
   back: { marginStart: -space.sm, justifyContent: 'center' },
-  /** The account button carries a face, so it's already past 44 — the padding keeps it reachable
-   * without pushing the title off the row. */
+  /** A bordered pill — face, first name, arrow — not a bare circle. On a member's screen this is the
+   * only way to Account and Log out (there is no tab bar), and a small grey circle with initials
+   * was not recognised as a button. Neutral border, not accent: accent is reserved for "where the
+   * group is now". */
   account: {
-    minWidth: minTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
     minHeight: minTouchTarget,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+    maxWidth: 150,
+    paddingStart: space.xs,
+    paddingEnd: space.sm,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+  },
+  accountName: {
+    flexShrink: 1,
+    fontSize: fontSize.footnote,
+    fontWeight: fontWeight.medium,
+    color: color.text,
   },
   subtitle: { marginTop: space.xs },
   section: { marginTop: space.xl },

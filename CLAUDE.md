@@ -126,8 +126,9 @@ ordinary events in the same group, and they *do* take RSVPs.
   the page header is the one carrying the subtitle and the actions. It also owns the top safe-area
   inset: the screen scrolls under the notch, so without `insets.top` the title sits under the
   hardware and can't be read.
-- **The account button is on every screen**, not just the one you land on. It's the avatar at the
-  top right; it opens `app/account.tsx`, which is where the photo and Log out live. Signed-in
+- **The account button is on every screen**, not just the one you land on. It's a bordered pill at
+  the top right — face, first name, a small arrow — not a bare avatar: for a member it is the only
+  way to Log out, and the bare circle wasn't seen as a button. It opens `app/account.tsx`, which is where the photo and Log out live. Signed-in
   identity used to be the calendar's top-right corner only, so a leader two screens into a group
   had no way to see who they were, let alone sign out.
 - **Mobile composes from `mobile/src/ui`** (`Screen`, `Card`, `Button`, `Row`, `Chip`, `Badge`,
