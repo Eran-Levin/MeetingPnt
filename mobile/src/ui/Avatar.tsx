@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -31,12 +32,17 @@ interface AvatarProps {
  */
 export function Avatar({ name, uri, size = 36, style }: AvatarProps) {
   const shape = { width: size, height: size, borderRadius: radius.pill };
+  // A photo that won't load (a bad address, a server asleep) falls back to initials; left alone it
+  // is a blank grey circle, which is the one thing this component promises never to show.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [uri]);
 
-  if (uri) {
+  if (uri && !failed) {
     return (
       <Image
         source={{ uri }}
         style={[styles.base, shape, style]}
+        onError={() => setFailed(true)}
         accessibilityIgnoresInvertColors
       />
     );

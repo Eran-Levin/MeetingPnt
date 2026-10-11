@@ -30,7 +30,9 @@ const envSchema = z.object({
   S3_BUCKET: z.string().default(''),
   S3_ACCESS_KEY_ID: z.string().default(''),
   S3_SECRET_ACCESS_KEY: z.string().default(''),
-  // Where a browser or phone loads an uploaded file from, e.g. https://f004.backblazeb2.com/file/<bucket>
+  // Only for a PUBLIC bucket: where a browser or phone loads an uploaded file from, e.g.
+  // https://f004.backblazeb2.com/file/<bucket>. Leave it unset for a private bucket and the server
+  // serves photos itself from BACKEND_PUBLIC_URL/uploads — which must then be its real public address.
   S3_PUBLIC_BASE_URL: z.string().default(''),
 });
 
@@ -40,9 +42,9 @@ if (!parsed.success) {
 }
 if (parsed.data.STORAGE_DRIVER === 's3') {
   // Fail at boot, naming what is missing, rather than on the first photo someone uploads.
-  const missing = (
-    ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_PUBLIC_BASE_URL'] as const
-  ).filter((key) => !parsed.data[key]);
+  const missing = (['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const).filter(
+    (key) => !parsed.data[key],
+  );
   if (missing.length > 0) {
     throw new Error(`STORAGE_DRIVER=s3 needs ${missing.join(', ')} to be set`);
   }

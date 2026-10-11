@@ -185,11 +185,13 @@ Render's free disk is wiped on every restart, so without this uploaded photos di
 
 | # | Action | Who |
 |---|---|---|
-| 1 | backblaze.com → sign up → Buckets → Create a bucket, name `meetingpnt-uploads`, **Public** | Me |
-| 2 | On the bucket page note the **S3 endpoint** (`s3.<region>.backblazeb2.com`) and the **friendly URL** base (`https://fNNN.backblazeb2.com/file/meetingpnt-uploads`) | Me |
+| 1 | backblaze.com → sign up → Buckets → Create a bucket, name `meetingpnt-uploads`, **Private**. Leave it private: making a bucket public needs a card on file, and the server hands photos out itself | Me |
+| 2 | On the bucket page note the **S3 endpoint** (`s3.<region>.backblazeb2.com`) | Me |
 | 3 | Application Keys → Add a new key, limited to that bucket, read + write. The secret is shown once | Me |
-| 4 | Render → service → Environment, on **both** services: `STORAGE_DRIVER=s3`, `S3_ENDPOINT`, `S3_REGION` (the `<region>` part), `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL` (the friendly URL, no trailing slash needed) | Me |
+| 4 | Render → service → Environment, on **both** services: `STORAGE_DRIVER=s3`, `S3_ENDPOINT`, `S3_REGION` (the `<region>` part), `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. **Do not set `S3_PUBLIC_BASE_URL`** (delete it if it's there) — with it unset the server serves each photo itself. Check `BACKEND_PUBLIC_URL` is the API's real public address, `https://api.meetingpnt.com` | Me |
 | 5 | Upload a profile photo; confirm it loads and survives a redeploy | Claude + Me |
+
+`S3_PUBLIC_BASE_URL` is only for a **public** bucket; set it and photos load from that address directly, bypassing the server.
 
 The key goes only into Render's dashboard — never into chat, a commit or `.env` in git. The
 server refuses to boot with `STORAGE_DRIVER=s3` if any value is missing, naming it. Photos already
