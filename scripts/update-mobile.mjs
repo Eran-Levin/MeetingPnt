@@ -33,9 +33,12 @@ if (spawnSync('npm', ['run', 'typecheck', '-w', 'mobile'], { stdio: 'inherit', s
 }
 
 console.log(`Publishing to phones on the "preview" build: ${message}`);
+// One command string, with the message quoted. Passing an argument array together with `shell: true`
+// joins it with plain spaces on Windows, so a message with spaces arrived as separate arguments and
+// EAS rejected it. (Messages with a double quote in them are not supported.)
+const quoted = JSON.stringify(message.replace(/"/g, "'"));
 const result = spawnSync(
-  'npx',
-  ['--yes', 'eas-cli@latest', 'update', '--branch', 'preview', '--platform', 'android', '--message', message, '--non-interactive'],
+  `npx --yes eas-cli@latest update --branch preview --platform android --message ${quoted} --non-interactive`,
   { cwd: 'mobile', stdio: 'inherit', shell: true },
 );
 process.exit(result.status ?? 1);
