@@ -131,6 +131,23 @@ governs the thing. It previously held a LAN address that had long since gone sta
 | 2 | Trigger **Retry deployment** on the latest build — values are baked at build time | Me |
 | 3 | Verify the portal picks up the new value | Claude |
 
+## Public site on `www.meetingpnt.com`
+
+One build serves both: on a host starting `www.` the portal shows only the landing page (and
+sends a signed-in visitor on to the app); anywhere else it is the app, and a signed-out visitor
+at `/` is sent to the public site. Set once, in this order:
+
+| # | Action | Who |
+|---|---|---|
+| 1 | Cloudflare → Worker → Settings → Domains: add `www.meetingpnt.com` as a second custom domain next to `app.` | Me |
+| 2 | Same page: redirect the bare `meetingpnt.com` to `https://www.meetingpnt.com` (Redirect Rule) | Me |
+| 3 | Build variables: `VITE_APP_URL` = `https://app.meetingpnt.com`, `VITE_MARKETING_URL` = `https://www.meetingpnt.com` | Me |
+| 4 | Render → API → Environment: append `https://www.meetingpnt.com` to `CORS_ORIGINS` (comma-separated). Without it the "already signed in?" check from `www.` is blocked and everyone sees the landing page | Me |
+| 5 | Retry the Cloudflare build (variables are baked in), then verify: signed out, `www.` shows the landing page and its buttons open `app.`; signed in, `www.` lands on `/groups` | Claude |
+
+Leave `PORTAL_URL` alone — invitation links stay on `app.`. Until step 3 is done, nothing
+redirects and the app still shows the landing page itself at `/`.
+
 ## Reseed the database
 
 | # | Action | Who |

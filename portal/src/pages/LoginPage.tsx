@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { AppLogo } from '../components/AppLogo.js';
 import { Button } from '../components/ui/Button.js';
@@ -59,6 +59,12 @@ export function LoginPage() {
             {submitting ? t('auth.login.signingIn') : t('auth.login.signIn')}
           </Button>
         </form>
+
+        <p className="mt-4 text-center text-sm">
+          <Link to="/register" className="text-accent-text hover:underline">
+            {t('portal.loginNew')}
+          </Link>
+        </p>
       </Card>
     </div>
   );

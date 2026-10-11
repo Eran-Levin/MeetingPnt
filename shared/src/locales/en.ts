@@ -554,6 +554,51 @@ export const en = {
   portal: {
     nav: { analysis: 'Analysis', users: 'Users' },
     loginSubtitle: 'Leader & Admin console',
+    loginNew: 'New here? Start leading',
+    landing: {
+      signIn: 'Sign in',
+      cta: 'Start leading — free',
+      heroTitle: 'Plan on the web. Run it from your phone.',
+      heroBody:
+        'MeetingPnt is for people who bring a group together — a photo walk, a yoga class, a week on the trail. Set up the route and the roster at your desk; on the day, everyone knows where to be and you know who’s there.',
+      seeHow: 'See how it works',
+      howTitle: 'Two screens, one job each',
+      planTitle: 'Web: plan',
+      planBody:
+        'Build groups and rosters, schedule one-off or recurring events, map the whole itinerary of meeting points, and publish when it’s ready. Drafts stay private until you say so.',
+      runTitle: 'Mobile: run',
+      runBody:
+        'Take roll call at each stop, move the group on to the next one, see who’s on their way and where, and ping anyone who’s wandered off. Built for one hand and bright sun.',
+      forTitle: 'Whatever you lead',
+      forClubTitle: 'Clubs & classes',
+      forClubBody:
+        'A photo-walk club or a weekly yoga class is a standing community. The group stays; events recur inside it, and members RSVP with a tap.',
+      forTripTitle: 'Tours & treks',
+      forTripBody:
+        'For a guide the group is the trip. Each day is its own event with a fresh roll call every morning, so one missed afternoon never drops someone from the rest of the week.',
+      forVisitorTitle: 'Guests too',
+      forVisitorBody:
+        'Invite a friend to a single event without adding them to the group. They show up in your RSVP list, tagged as a visitor.',
+      featuresTitle: 'What you get',
+      f1Title: 'Meeting points that move with the group',
+      f1Body: 'Roll call at every stop. Only the people still with you are expected at the next one.',
+      f2Title: 'Location only when it matters',
+      f2Body: 'Sharing is limited to a running event and closes the moment you end it.',
+      f3Title: 'Chat on the event',
+      f3Body: 'Group chat, and one-to-one threads between people who share an event — handy for lifts.',
+      f4Title: 'English and Hebrew',
+      f4Body: 'The whole app, right-to-left included, in the language each person chooses.',
+      closingTitle: 'Your first group takes a few minutes',
+      closingBody: 'Create an account, add your people, and put the first event on the calendar.',
+      footer: '© MeetingPnt',
+    },
+    register: {
+      title: 'Start leading',
+      subtitle: 'Create your leader account. It’s free, and you can add your first group straight away.',
+      submit: 'Create leader account',
+      haveAccount: 'Already have an account? Sign in',
+      backHome: 'Back to home',
+    },
     noAccess:
       "This account doesn’t have Leader or Admin access. Group members use the MeetingPnt mobile app instead.",
     invite: {

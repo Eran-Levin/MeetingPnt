@@ -1,4 +1,7 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, type RouteObject } from 'react-router-dom';
+import { isMarketingHost } from '../lib/site.js';
+import { MarketingGate } from '../pages/MarketingGate.js';
+import { ToApp } from '../pages/ToApp.js';
 import { AuthenticatedLayout } from '../components/AuthenticatedLayout.js';
 import { RequireRole } from '../components/RequireRole.js';
 import { UsersPage } from '../pages/admin/UsersPage.js';
@@ -11,10 +14,12 @@ import { GroupsPage } from '../pages/leader/GroupsPage.js';
 import { HomeRedirect } from '../pages/HomeRedirect.js';
 import { InvitePage } from '../pages/InvitePage.js';
 import { LoginPage } from '../pages/LoginPage.js';
+import { RegisterPage } from '../pages/RegisterPage.js';
 
-export const router = createBrowserRouter([
+const appRoutes: RouteObject[] = [
   { path: '/', element: <HomeRedirect /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
   // Public: an invitation link is opened by someone who has no account yet.
   { path: '/invite', element: <InvitePage /> },
   {
@@ -37,4 +42,12 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+];
+
+// `www.` is the landing page and nothing else; any other path there is really an app path.
+const marketingRoutes: RouteObject[] = [
+  { path: '/', element: <MarketingGate /> },
+  { path: '*', element: <ToApp /> },
+];
+
+export const router = createBrowserRouter(isMarketingHost ? marketingRoutes : appRoutes);
