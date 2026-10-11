@@ -35,11 +35,16 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState(prefilledPhone ?? '');
   const [email, setEmail] = useState(prefilledEmail ?? '');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     setError(null);
+    if (password !== confirm) {
+      setError(t('auth.register.passwordsDiffer'));
+      return;
+    }
     setSubmitting(true);
     try {
       const data = await authApi.register({
@@ -103,6 +108,14 @@ export default function RegisterScreen() {
         autoCorrect={false}
         value={password}
         onChangeText={setPassword}
+      />
+      <TextField
+        label={t('auth.register.confirmPassword')}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+        value={confirm}
+        onChangeText={setConfirm}
       />
       <Button
         label={submitting ? t('auth.register.submitting') : t('auth.register.submit')}

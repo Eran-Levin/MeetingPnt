@@ -26,7 +26,7 @@ export function RegisterPage() {
     e.preventDefault();
     setError(null);
     if (password !== confirm) {
-      setError(t('portal.register.passwordsDiffer'));
+      setError(t('auth.register.passwordsDiffer'));
       return;
     }
     setSubmitting(true);
@@ -91,7 +91,7 @@ export function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
           <TextField
-            label={t('portal.register.confirmPassword')}
+            label={t('auth.register.confirmPassword')}
             type="password"
             required
             minLength={8}

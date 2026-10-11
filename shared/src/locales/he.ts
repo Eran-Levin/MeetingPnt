@@ -151,6 +151,8 @@ export const he: Catalog = {
       subtitle: 'אשרו את הפרטים ובחרו סיסמה.',
       haveAccount: 'כבר יש לכם חשבון? התחברות',
       passwordPlaceholder: 'לפחות 8 תווים',
+      confirmPassword: 'אימות סיסמה',
+      passwordsDiffer: 'שתי הסיסמאות אינן זהות.',
       submit: 'הרשמה',
       submitting: 'יוצרים חשבון…',
     },
@@ -585,8 +587,6 @@ export const he: Catalog = {
       footer: '© MeetingPnt',
     },
     register: {
-      confirmPassword: 'אימות סיסמה',
-      passwordsDiffer: 'שתי הסיסמאות אינן זהות.',
       title: 'מתחילים להוביל',
       subtitle: 'פותחים חשבון מוביל. זה בחינם, ואפשר ליצור את הקבוצה הראשונה מיד.',
       submit: 'פתיחת חשבון מוביל',
