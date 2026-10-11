@@ -154,6 +154,8 @@ export const en = {
       subtitle: 'Confirm your details and pick a password.',
       haveAccount: 'Already have an account? Sign in',
       passwordPlaceholder: 'At least 8 characters',
+      confirmPassword: 'Confirm password',
+      passwordsDiffer: 'The two passwords don’t match.',
       submit: 'Register',
       submitting: 'Creating account…',
     },

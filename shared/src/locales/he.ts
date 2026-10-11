@@ -151,6 +151,8 @@ export const he: Catalog = {
       subtitle: 'אשרו את הפרטים ובחרו סיסמה.',
       haveAccount: 'כבר יש לכם חשבון? התחברות',
       passwordPlaceholder: 'לפחות 8 תווים',
+      confirmPassword: 'אימות סיסמה',
+      passwordsDiffer: 'שתי הסיסמאות אינן זהות.',
       submit: 'הרשמה',
       submitting: 'יוצרים חשבון…',
     },
