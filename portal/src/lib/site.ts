@@ -22,5 +22,7 @@ export function appUrl(path: string): string {
 
 /** The public site, or null when there isn't a separate one to send people to. */
 export function marketingUrl(): string | null {
+  // A marketing URL on this very origin (a mistyped variable) would redirect to itself forever.
+  if (typeof location !== 'undefined' && MARKETING_URL.startsWith(location.origin)) return null;
   return MARKETING_URL || null;
 }
