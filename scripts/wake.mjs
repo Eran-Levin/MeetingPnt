@@ -4,9 +4,9 @@
 // Pinging on a schedule would avoid that, but the free plan is one pool of 750 hours a month shared
 // by every service, and one service kept awake around the clock uses ~720 of them -- leaving none
 // for staging, and when the pool runs out Render suspends *all* of them, production included.
-// So wake on demand instead:  npm run wake            (both)
+// So wake on demand instead:  npm run wake            (production)
 //                             npm run wake -- <url>…  (specific servers)
-const DEFAULTS = ['https://api.meetingpnt.com', 'https://meetingpnt-api-staging.onrender.com'];
+const DEFAULTS = ['https://api.meetingpnt.com'];
 const urls = process.argv.length > 2 ? process.argv.slice(2) : DEFAULTS;
 
 async function wake(base) {
