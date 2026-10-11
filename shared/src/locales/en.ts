@@ -593,6 +593,8 @@ export const en = {
       footer: '© MeetingPnt',
     },
     register: {
+      confirmPassword: 'Confirm password',
+      passwordsDiffer: 'The two passwords don’t match.',
       title: 'Start leading',
       subtitle: 'Create your leader account. It’s free, and you can add your first group straight away.',
       submit: 'Create leader account',

@@ -585,6 +585,8 @@ export const he: Catalog = {
       footer: '© MeetingPnt',
     },
     register: {
+      confirmPassword: 'אימות סיסמה',
+      passwordsDiffer: 'שתי הסיסמאות אינן זהות.',
       title: 'מתחילים להוביל',
       subtitle: 'פותחים חשבון מוביל. זה בחינם, ואפשר ליצור את הקבוצה הראשונה מיד.',
       submit: 'פתיחת חשבון מוביל',

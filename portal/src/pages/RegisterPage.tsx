@@ -18,12 +18,17 @@ export function RegisterPage() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password !== confirm) {
+      setError(t('portal.register.passwordsDiffer'));
+      return;
+    }
     setSubmitting(true);
     try {
       const data = await authApi.register({
@@ -84,6 +89,15 @@ export function RegisterPage() {
             placeholder={t('auth.register.passwordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+          />
+          <TextField
+            label={t('portal.register.confirmPassword')}
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
           />
           {error && <p className="text-sm text-tone-danger-fg">{error}</p>}
           <Button type="submit" disabled={submitting} className="mt-1 w-full">
