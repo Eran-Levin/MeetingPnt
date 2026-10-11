@@ -25,7 +25,10 @@ Then: bump `version` in `mobile/app.json` and run
 `cd mobile && npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`.
 
 `update:mobile` refuses to run from any branch but `master`, with uncommitted changes, or when the
-phone app doesn't typecheck — phones should only ever get what is deployed.
+phone app doesn't typecheck — phones should only ever get what is deployed. It always uses the server
+address from the `preview` profile in `mobile/eas.json`, never `mobile/.env` (an update is compiled on
+this machine and would otherwise carry the local `http://192.168…` address, which a release build
+refuses to call), and it refuses to publish if the bundle doesn't contain that address.
 
 The `preview` build and the `development` build share one app identity, so only one can be on a
 phone at a time. Use `preview`. The development build is for editing the app with instant reload
