@@ -256,7 +256,7 @@ export interface Rsvp {
 }
 
 export interface RsvpWithUser extends Rsvp {
-  user: Pick<User, 'id' | 'name' | 'email'>;
+  user: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>;
   /** True for an activity guest ("visitor") rather than a member of the group. */
   isVisitor: boolean;
 }

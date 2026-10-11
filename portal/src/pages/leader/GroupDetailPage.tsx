@@ -8,6 +8,7 @@ import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js'
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
 import { GroupChatPanel } from '../../components/GroupChatPanel.js';
+import { Avatar } from '../../components/ui/Avatar.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
@@ -472,7 +473,9 @@ function MemberRow({
     <div
       className={`flex items-center justify-between gap-3 px-4 py-3 ${indented ? 'ps-8' : ''}`}
     >
-      <div className="min-w-0 text-sm">
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar name={member.user.name} uri={member.user.avatarUrl} size={36} />
+        <div className="min-w-0 text-sm">
         <p className="flex items-center gap-2 truncate text-ink">
           {member.user.name}
           {isRep && (
@@ -492,6 +495,7 @@ function MemberRow({
                   {' · '}
                   <a
                     href={`tel:${member.user.phone}`}
+                    dir="ltr"
                     className="text-ink-secondary hover:text-accent-text hover:underline"
                   >
                     {member.user.phone}
@@ -501,6 +505,7 @@ function MemberRow({
             </>
           )}
         </p>
+        </div>
       </div>
       {isLeader && !isGroupLeader && (
         <Button variant="ghost" size="sm" onClick={onRemove}>

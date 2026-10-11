@@ -2,6 +2,7 @@ import { isolate, type Role, type User } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { adminApi } from '../../api/adminApi.js';
+import { Avatar } from '../../components/ui/Avatar.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -100,7 +101,12 @@ export function UsersPage() {
             <tbody>
               {sortedUsers.map((user) => (
                 <tr key={user.id} className="border-b border-line last:border-0">
-                  <td className="px-4 py-3 text-ink">{user.name}</td>
+                  <td className="px-4 py-3 text-ink">
+                    <span className="flex items-center gap-2">
+                      <Avatar name={user.name} uri={user.avatarUrl} size={28} />
+                      {user.name}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-ink-secondary">{user.email}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

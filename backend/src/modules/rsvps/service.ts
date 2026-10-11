@@ -135,7 +135,12 @@ export async function listRsvps(activityId: string, requesterId: string): Promis
 
   const fromRsvps = rsvps.map((rsvp: Rsvp & { user: User }) => ({
     ...toSharedRsvp(rsvp),
-    user: { id: rsvp.user.id, name: displayName(rsvp.user), email: rsvp.user.email },
+    user: {
+      id: rsvp.user.id,
+      name: displayName(rsvp.user),
+      email: rsvp.user.email,
+      avatarUrl: rsvp.user.avatarUrl,
+    },
     isVisitor: guestUserIds.has(rsvp.userId),
   }));
 
@@ -152,7 +157,12 @@ export async function listRsvps(activityId: string, requesterId: string): Promis
       note: null,
       respondedAt: null,
       updatedAt: guest.createdAt.toISOString(),
-      user: { id: guest.user.id, name: displayName(guest.user), email: guest.user.email },
+      user: {
+        id: guest.user.id,
+        name: displayName(guest.user),
+        email: guest.user.email,
+        avatarUrl: guest.user.avatarUrl,
+      },
       isVisitor: true,
     }));
 
