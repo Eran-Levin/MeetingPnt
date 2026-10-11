@@ -7,6 +7,32 @@ verification).
 
 ---
 
+## Testing day to day — start here
+
+Everything runs in the cloud. Your phone needs nothing on your laptop: no backend, no Metro, no
+Wi-Fi address, no Docker.
+
+| Step | What | Who |
+|---|---|---|
+| 1 | Install the **`preview`** app on the phone — once. The link is on the build page at expo.dev (Builds → the latest `preview` build → Install). Anyone you send it to can install it too | Me |
+| 2 | Open the app and test. It talks to `api.meetingpnt.com`, which stays up by itself. The first request after a quiet spell takes up to a minute (free tier) — `npm run wake` wakes it | Me |
+| 3 | Tell Claude what's wrong | Me |
+| 4 | **Server or portal fix:** merged to `master`, live in ~5 minutes on its own | Claude |
+| 5 | **Phone-app fix:** `npm run update:mobile -- "what changed"`, from `master`. Reopen the app **twice** on the phone | Claude + Me |
+
+A new APK is only needed when a native dependency, a config plugin or native settings change — rare.
+Then: bump `version` in `mobile/app.json` and run
+`cd mobile && npx eas-cli@latest build -p android --profile preview --non-interactive --no-wait`.
+
+`update:mobile` refuses to run from any branch but `master`, with uncommitted changes, or when the
+phone app doesn't typecheck — phones should only ever get what is deployed.
+
+The `preview` build and the `development` build share one app identity, so only one can be on a
+phone at a time. Use `preview`. The development build is for editing the app with instant reload
+(Metro, a local backend and a Wi-Fi address kept up to date) and is not part of testing.
+
+---
+
 ## Before any push
 
 | # | Action | Who |
@@ -123,6 +149,10 @@ governs the thing. It previously held a LAN address that had long since gone sta
 ---
 
 ## Environments (free plan)
+
+> **Staging is postponed.** There are no real users yet, so the cloud setup above is the test system and
+> testing needs none of this. Do it before real people's data goes into production. The photo storage
+> below (Backblaze B2) is **not** postponed — production uses it.
 
 | | Production | Staging |
 |---|---|---|
