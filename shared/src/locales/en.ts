@@ -628,7 +628,7 @@ export const en = {
       planNote: 'while we’re getting started',
       plan1: 'Everything on this page',
       plan2: 'Web planner and phone app',
-      plan3: 'English and Hebrew',
+      plan3: 'Multiple language support',
       pricingTbd: 'Pricing is still being decided. We’ll tell you before anything changes.',
       faqTitle: 'Questions',
       q1: 'Who is MeetingPnt for?',

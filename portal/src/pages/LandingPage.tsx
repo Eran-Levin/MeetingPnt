@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { LOCALES, type Locale } from '@meetingpnt/shared';
+import { LOCALES, isRtlLocale, type Locale } from '@meetingpnt/shared';
 import { AppLogo } from '../components/AppLogo.js';
 import { Icon, IconTile, PhoneMock, SectionTitle, type IconName } from '../components/landing/art.js';
 import { i18n, useLocale, useTranslation } from '../i18n/index.js';
@@ -23,30 +23,34 @@ function CtaLink({ children, variant = 'primary' }: { children: ReactNode; varia
 }
 
 /** Signed out, so there's no profile to store the choice on — the page just switches. */
-function LanguageToggle() {
+function LanguageSelect() {
+  const { t } = useTranslation();
   const current = useLocale();
+
+  function choose(l: Locale) {
+    void i18n.changeLanguage(l);
+    document.documentElement.lang = l;
+    document.documentElement.dir = isRtlLocale(l) ? 'rtl' : 'ltr';
+    try {
+      localStorage.setItem('mp-locale', l);
+    } catch {
+      /* private mode — the switch still applies for this visit */
+    }
+  }
+
   return (
-    <div className="flex gap-1 text-sm">
+    <select
+      aria-label={t('account.language')}
+      value={current}
+      onChange={(e) => choose(e.target.value as Locale)}
+      className="rounded border border-line bg-surface px-2 py-1 text-sm text-ink-secondary"
+    >
       {LOCALES.map((l) => (
-        <button
-          key={l}
-          type="button"
-          onClick={() => {
-            void i18n.changeLanguage(l);
-            document.documentElement.lang = l;
-            document.documentElement.dir = l === 'he' ? 'rtl' : 'ltr';
-            try {
-              localStorage.setItem('mp-locale', l);
-            } catch {
-              /* private mode — the switch still applies for this visit */
-            }
-          }}
-          className={`rounded px-2 py-1 ${l === current ? 'font-semibold text-ink' : 'text-ink-secondary hover:text-ink'}`}
-        >
+        <option key={l} value={l}>
           {LANGUAGE_NAMES[l]}
-        </button>
+        </option>
       ))}
-    </div>
+    </select>
   );
 }
 
@@ -101,7 +105,7 @@ export function LandingPage() {
             <a href="#pricing" className="hover:text-ink">{t('portal.landing.navPricing')}</a>
           </nav>
           <div className="flex items-center gap-3">
-            <LanguageToggle />
+            <LanguageSelect />
             <a
               href={appUrl('/login')}
               className="hidden text-sm font-medium text-accent-text hover:underline sm:inline"
