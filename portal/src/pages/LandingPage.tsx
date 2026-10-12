@@ -81,6 +81,19 @@ export function LandingPage() {
     { title: t('portal.landing.forTripTitle'), body: t('portal.landing.forTripBody') },
     { title: t('portal.landing.forVisitorTitle'), body: t('portal.landing.forVisitorBody') },
   ];
+  const compare = [
+    { name: t('portal.landing.cmp1Name'), body: t('portal.landing.cmp1Body') },
+    { name: t('portal.landing.cmp2Name'), body: t('portal.landing.cmp2Body') },
+    { name: t('portal.landing.cmp3Name'), body: t('portal.landing.cmp3Body') },
+  ];
+  const useCases = [
+    t('portal.landing.uc1'),
+    t('portal.landing.uc2'),
+    t('portal.landing.uc3'),
+    t('portal.landing.uc4'),
+    t('portal.landing.uc5'),
+    t('portal.landing.uc6'),
+  ];
   const privacy = [t('portal.landing.privacy1'), t('portal.landing.privacy2'), t('portal.landing.privacy3')];
   const plan = [t('portal.landing.plan1'), t('portal.landing.plan2'), t('portal.landing.plan3')];
   const faq = [
@@ -160,6 +173,23 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* The pain, in the leader's own words — recognition comes before the pitch. */}
+        <section className="bg-surface-sunken">
+          <div className="mx-auto max-w-4xl px-6 py-14 text-center">
+            <h2 className="text-2xl font-bold tracking-tight">{t('portal.landing.painTitle')}</h2>
+            <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+              {pains.map((p) => (
+                <li
+                  key={p}
+                  className="rounded-xl border border-line bg-surface px-4 py-5 text-ink-secondary"
+                >
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         {/* The three things a leader is actually buying. */}
         <section className="mx-auto max-w-6xl px-6 py-16">
           <SectionTitle>{t('portal.landing.valueTitle')}</SectionTitle>
@@ -174,20 +204,29 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* The pain, in the leader's own words. */}
+        {/* "Is this for me?" — answered before the how, with the trip leader first. */}
         <section className="bg-surface-sunken">
-          <div className="mx-auto max-w-4xl px-6 py-14 text-center">
-            <h2 className="text-2xl font-bold tracking-tight">{t('portal.landing.painTitle')}</h2>
-            <ul className="mt-6 grid gap-3 sm:grid-cols-3">
-              {pains.map((p) => (
-                <li
-                  key={p}
-                  className="rounded-xl border border-line bg-surface px-4 py-5 text-ink-secondary"
-                >
-                  {p}
-                </li>
+          <div className="mx-auto max-w-6xl px-6 py-16">
+            <SectionTitle>{t('portal.landing.forTitle')}</SectionTitle>
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
+              {audiences.map((a) => (
+                <div key={a.title} className="rounded-2xl border border-line bg-surface p-6">
+                  <h3 className="font-semibold">{a.title}</h3>
+                  <p className="mt-2 text-sm text-ink-secondary">{a.body}</p>
+                </div>
               ))}
-            </ul>
+            </div>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              <span className="text-sm font-medium text-ink-muted">{t('portal.landing.useCasesLabel')}</span>
+              {useCases.map((u) => (
+                <span
+                  key={u}
+                  className="rounded-full bg-tone-neutral-bg px-3 py-1 text-xs font-medium text-tone-neutral-fg"
+                >
+                  {u}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -207,28 +246,33 @@ export function LandingPage() {
           </ol>
         </section>
 
-        <section id="features" className="scroll-mt-16 bg-surface-sunken">
-          <div className="mx-auto max-w-6xl px-6 py-16">
-            <SectionTitle>{t('portal.landing.featuresTitle')}</SectionTitle>
-            <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {features.map((f) => (
-                <div key={f.title} className="rounded-2xl border border-line bg-surface p-6">
-                  <IconTile name={f.icon} tone="neutral" />
-                  <h3 className="mt-4 font-semibold">{f.title}</h3>
-                  <p className="mt-2 text-sm text-ink-secondary">{f.body}</p>
+        {/* Versus the tools a leader already stitches together — categories, never named products. */}
+        <section className="bg-surface-sunken">
+          <div className="mx-auto max-w-5xl px-6 py-16">
+            <SectionTitle>{t('portal.landing.compareTitle')}</SectionTitle>
+            <p className="mt-3 text-center text-ink-secondary">{t('portal.landing.compareLead')}</p>
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
+              {compare.map((c) => (
+                <div key={c.name} className="rounded-2xl border border-line bg-surface p-6">
+                  <h3 className="font-semibold">{c.name}</h3>
+                  <p className="mt-2 text-sm text-ink-secondary">{c.body}</p>
                 </div>
               ))}
             </div>
+            <p className="mx-auto mt-8 max-w-2xl text-center text-lg font-semibold text-accent-text">
+              {t('portal.landing.compareWrap')}
+            </p>
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 py-16">
-          <SectionTitle>{t('portal.landing.forTitle')}</SectionTitle>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {audiences.map((a) => (
-              <div key={a.title} className="rounded-2xl border border-line bg-surface p-6">
-                <h3 className="font-semibold">{a.title}</h3>
-                <p className="mt-2 text-sm text-ink-secondary">{a.body}</p>
+        <section id="features" className="mx-auto max-w-6xl scroll-mt-16 px-6 py-16">
+          <SectionTitle>{t('portal.landing.featuresTitle')}</SectionTitle>
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((f) => (
+              <div key={f.title} className="rounded-2xl border border-line bg-surface p-6">
+                <IconTile name={f.icon} tone="neutral" />
+                <h3 className="mt-4 font-semibold">{f.title}</h3>
+                <p className="mt-2 text-sm text-ink-secondary">{f.body}</p>
               </div>
             ))}
           </div>
