@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, LOCALES, type Locale, type User as SharedUser } from '@meetingpnt/shared';
+import { DEFAULT_LOCALE, DEFAULT_NAV_APP, LOCALES, NAV_APPS, type Locale, type NavApp, type User as SharedUser } from '@meetingpnt/shared';
 import type { User } from '@prisma/client';
 
 /**
@@ -15,6 +15,10 @@ export function toLocale(value: string): Locale {
   return LOCALES.includes(value as Locale) ? (value as Locale) : DEFAULT_LOCALE;
 }
 
+export function toNavApp(value: string): NavApp {
+  return NAV_APPS.includes(value as NavApp) ? (value as NavApp) : DEFAULT_NAV_APP;
+}
+
 /** The full user as the clients receive it. Auth returns it on sign-in; the avatar upload returns
  * the updated one, so a client never has to guess what changed. */
 export function toSharedUser(user: User): SharedUser {
@@ -27,6 +31,7 @@ export function toSharedUser(user: User): SharedUser {
     phone: user.phone,
     avatarUrl: user.avatarUrl,
     locale: toLocale(user.locale),
+    navApp: toNavApp(user.navApp),
     role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),

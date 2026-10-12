@@ -1,4 +1,4 @@
-import { LOCALES, isolate, type Locale } from '@meetingpnt/shared';
+import { LOCALES, NAV_APPS, NavApp, isolate, type Locale } from '@meetingpnt/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -104,6 +104,18 @@ export default function AccountScreen() {
     }
   }
 
+  /** Personal, so it lives on the account and follows them between phones. */
+  async function handleNavApp(navApp: NavApp) {
+    if (navApp === user!.navApp) return;
+    setError(null);
+    try {
+      const { user: updated } = await usersApi.setNavApp(navApp);
+      setUser(updated);
+    } catch (err) {
+      setError(apiErrorMessage(err, t('account.navAppFailed')));
+    }
+  }
+
   async function handleLogout() {
     const refreshToken = await secureStore.getRefreshToken();
     await endSession();
@@ -170,6 +182,20 @@ export default function AccountScreen() {
         </ChipRow>
       </Section>
 
+      <Section label={t('account.navApp')}>
+        <Text style={[text.secondary, styles.blurb]}>{t('account.navAppBlurb')}</Text>
+        <ChipRow>
+          {NAV_APPS.map((app) => (
+            <Chip
+              key={app}
+              label={NAV_APP_NAMES[app]}
+              selected={user.navApp === app}
+              onPress={() => handleNavApp(app)}
+            />
+          ))}
+        </ChipRow>
+      </Section>
+
       <Section label={t('account.session')}>
         <Button label={t('account.logOut')} variant="secondary" onPress={handleLogout} />
       </Section>
@@ -178,6 +204,8 @@ export default function AccountScreen() {
 }
 
 const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', he: 'עברית' };
+// Brand names, so not translated.
+const NAV_APP_NAMES: Record<NavApp, string> = { google_maps: 'Google Maps', waze: 'Waze' };
 
 const styles = StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', gap: space.lg },

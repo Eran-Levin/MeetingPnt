@@ -7,6 +7,7 @@ import type {
   InvitationStatus,
   Locale,
   LocationSource,
+  NavApp,
   Role,
   RsvpStatus,
   TransportMode,
@@ -30,6 +31,8 @@ export interface User {
   avatarUrl: string | null;
   /** UI language — see `Locale`. */
   locale: Locale;
+  /** Which app "Directions" opens for this person — see `NavApp`. */
+  navApp: NavApp;
   role: Role;
   createdAt: string;
   updatedAt: string;

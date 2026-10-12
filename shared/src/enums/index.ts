@@ -84,6 +84,19 @@ export type Locale = (typeof Locale)[keyof typeof Locale];
 export const DEFAULT_LOCALE: Locale = Locale.English;
 export const LOCALES: readonly Locale[] = Object.values(Locale);
 
+/**
+ * The app a person navigates with when they tap "Directions". A personal preference: it changes
+ * only where *they* are sent. Everything else (planning, the leader's live position) stays on
+ * Google Maps, which is also what the ETA is computed with.
+ */
+export const NavApp = {
+  GoogleMaps: 'google_maps',
+  Waze: 'waze',
+} as const;
+export type NavApp = (typeof NavApp)[keyof typeof NavApp];
+export const DEFAULT_NAV_APP: NavApp = NavApp.GoogleMaps;
+export const NAV_APPS: readonly NavApp[] = Object.values(NavApp);
+
 const RTL_LOCALES: readonly Locale[] = [Locale.Hebrew];
 export function isRtlLocale(locale: string | null | undefined): boolean {
   return RTL_LOCALES.includes(locale as Locale);

@@ -1,3 +1,5 @@
+import { NavApp } from '../enums/index.js';
+
 export function isBeforeStartTime(startAt: string, now: Date = new Date()): boolean {
   return now.getTime() < new Date(startAt).getTime();
 }
@@ -98,4 +100,20 @@ export function joinDot(parts: Array<string | null | undefined | false>): string
 export function formatWeekdayShort(date: Date, locale?: string): string {
   const width = locale?.startsWith('he') ? 'narrow' : 'short';
   return date.toLocaleDateString(locale, { weekday: width }).toUpperCase();
+}
+
+/**
+ * Where "Directions" sends someone. Google Maps uses the link the leader saved with the stop;
+ * Waze is built from the stored coordinates, so it works however the leader created the point.
+ * `navigate=yes` starts routing at once, and the link opens the Waze app when it's installed
+ * and its web page when it isn't.
+ */
+export function navigationUrl(
+  point: { googleMapsUrl: string; location: { lat: number; lng: number } },
+  app: NavApp,
+): string {
+  if (app === NavApp.Waze) {
+    return `https://waze.com/ul?ll=${point.location.lat},${point.location.lng}&navigate=yes`;
+  }
+  return point.googleMapsUrl;
 }

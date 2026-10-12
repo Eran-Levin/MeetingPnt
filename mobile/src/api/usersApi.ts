@@ -1,4 +1,4 @@
-import type { Locale, User } from '@meetingpnt/shared';
+import type { Locale, NavApp, User } from '@meetingpnt/shared';
 import { apiFetch } from './client';
 
 export const usersApi = {
@@ -12,4 +12,6 @@ export const usersApi = {
   removeAvatar: () => apiFetch<{ user: User }>('/api/users/me/avatar', { method: 'DELETE' }),
   setLocale: (locale: Locale) =>
     apiFetch<{ user: User }>('/api/users/me/locale', { method: 'PUT', body: { locale } }),
+  setNavApp: (navApp: NavApp) =>
+    apiFetch<{ user: User }>('/api/users/me/nav-app', { method: 'PUT', body: { navApp } }),
 };
