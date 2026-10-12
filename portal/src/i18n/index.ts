@@ -24,6 +24,13 @@ declare module 'i18next' {
 
 /** Signed out — the login page, an invitation link — the browser decides. */
 function browserLocale(): Locale {
+  try {
+    const chosen = localStorage.getItem('mp-locale');
+    const hit = LOCALES.find((l) => l === chosen);
+    if (hit) return hit;
+  } catch {
+    /* storage blocked — fall through to the browser's language */
+  }
   const code = navigator.language?.split('-')[0];
   // The legacy code for Hebrew.
   const normalised = code === 'iw' ? 'he' : code;

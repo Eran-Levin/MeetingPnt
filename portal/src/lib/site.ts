@@ -9,8 +9,12 @@
  */
 const trim = (url?: string) => (url ? url.replace(/\/+$/, '') : '');
 
-const APP_URL = trim(import.meta.env.VITE_APP_URL as string | undefined);
-const MARKETING_URL = trim(import.meta.env.VITE_MARKETING_URL as string | undefined);
+// A branch or commit preview lives on a *.workers.dev host and must stay there: the variables are
+// baked into every build, so without this a preview would bounce to the live site.
+const isPreview = typeof location !== 'undefined' && location.hostname.endsWith('.workers.dev');
+
+const APP_URL = isPreview ? '' : trim(import.meta.env.VITE_APP_URL as string | undefined);
+const MARKETING_URL = isPreview ? '' : trim(import.meta.env.VITE_MARKETING_URL as string | undefined);
 
 export const isMarketingHost =
   typeof location !== 'undefined' && location.hostname.startsWith('www.');
