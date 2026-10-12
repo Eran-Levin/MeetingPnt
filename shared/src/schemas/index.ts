@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AttendanceStatus, GroupChatMode, GroupStatus, LOCALES, RsvpStatus, TransportMode, type Locale } from '../enums/index.js';
+import { AttendanceStatus, GroupChatMode, GroupStatus, LOCALES, NAV_APPS, RsvpStatus, TransportMode, type Locale, type NavApp } from '../enums/index.js';
 
 export const geoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -151,6 +151,10 @@ export const pushTokenSchema = z.object({
 
 export const updateLocaleSchema = z.object({
   locale: z.enum(LOCALES as [Locale, ...Locale[]]),
+});
+
+export const updateNavAppSchema = z.object({
+  navApp: z.enum(NAV_APPS as [NavApp, ...NavApp[]]),
 });
 
 // ---- meeting points ----

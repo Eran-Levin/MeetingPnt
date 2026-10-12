@@ -1,6 +1,7 @@
-import type { MeetingPoint } from '@meetingpnt/shared';
+import { navigationUrl, type MeetingPoint } from '@meetingpnt/shared';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useLocale, useTranslation } from '../../i18n';
+import { useAuthStore } from '../../store/authStore';
 import { Button, ButtonRow, Card, space, text } from '../../ui';
 
 interface Props {
@@ -30,6 +31,7 @@ export function CurrentPointCard({
 }: Props) {
   const { t } = useTranslation();
   const locale = useLocale();
+  const navApp = useAuthStore((s) => s.user?.navApp);
 
   if (!point) {
     return (
@@ -47,7 +49,7 @@ export function CurrentPointCard({
       <Text style={[text.secondary, styles.time]}>{new Date(point.time).toLocaleString(locale)}</Text>
 
       <ButtonRow>
-        <Button label={t('common.directions')} onPress={() => Linking.openURL(point.googleMapsUrl)} grow />
+        <Button label={t('common.directions')} onPress={() => Linking.openURL(navigationUrl(point, navApp ?? 'google_maps'))} grow />
         {isLeader && onEdit && <Button label={t('currentPoint.edit')} onPress={onEdit} variant="secondary" grow />}
         {!isLeader && onOnMyWay && (
           <Button

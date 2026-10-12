@@ -97,6 +97,7 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **A face, or their initials — never a silhouette.** `User.avatarUrl` is a photo the user takes of
   themselves in Account; `Avatar` falls back to initials, because a roster of identical grey heads
   distinguishes people worse than the names already did.
+- **Waze is a way to navigate, nothing more.** `User.navApp` (Account screen) picks what "Directions" opens; `navigationUrl` in `shared/src/utils` builds the link — Google uses the leader's saved URL, Waze is built from the stored coordinates. Planning, the leader's live position and the ETA stay on Google Maps (Waze has no routing API), so leaders still paste Google links.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
 - **A member has one destination.** Their read-only view of a roster didn't earn a permanent tab,

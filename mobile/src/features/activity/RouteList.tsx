@@ -1,7 +1,8 @@
 import type { MeetingPoint } from '@meetingpnt/shared';
-import { joinDot } from '@meetingpnt/shared';
+import { joinDot, navigationUrl } from '@meetingpnt/shared';
 import { Linking, Text } from 'react-native';
 import { useLocale, useTranslation } from '../../i18n';
+import { useAuthStore } from '../../store/authStore';
 import { Row, Section, StepMarker, color, text } from '../../ui';
 
 /**
@@ -18,6 +19,7 @@ export function RouteList({
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
+  const navApp = useAuthStore((s) => s.user?.navApp);
 
   if (points.length <= 1) return null;
 
@@ -40,7 +42,7 @@ export function RouteList({
                 {t('common.directions')}
               </Text>
             }
-            onPress={() => Linking.openURL(point.googleMapsUrl)}
+            onPress={() => Linking.openURL(navigationUrl(point, navApp ?? 'google_maps'))}
             active={isCurrent}
             done={visited}
             last={index === points.length - 1}

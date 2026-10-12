@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { pushTokenSchema, updateLocaleSchema } from '@meetingpnt/shared';
+import { pushTokenSchema, updateLocaleSchema, updateNavAppSchema } from '@meetingpnt/shared';
 import { prisma } from '../../db/prisma.js';
 import { isSupportedImageMime, saveImage } from '../../lib/storage.js';
 import { toSharedUser } from '../../lib/userName.js';
@@ -56,6 +56,18 @@ usersRouter.put('/me/locale', validate(updateLocaleSchema), async (req, res, nex
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: { locale: req.body.locale },
+    });
+    res.json({ user: toSharedUser(user) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+usersRouter.put('/me/nav-app', validate(updateNavAppSchema), async (req, res, next) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { navApp: req.body.navApp },
     });
     res.json({ user: toSharedUser(user) });
   } catch (err) {
