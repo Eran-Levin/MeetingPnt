@@ -563,7 +563,7 @@ export const en = {
       navPricing: 'Pricing',
       signIn: 'Sign in',
       cta: 'Try for free',
-      eyebrow: 'For people who lead groups',
+      eyebrow: 'For tour guides, trek leaders and club organisers',
       heroTitle1: 'Know where everyone is.',
       heroTitle2: 'Never wait for the missing.',
       heroBody:

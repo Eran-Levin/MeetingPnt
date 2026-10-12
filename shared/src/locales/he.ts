@@ -555,7 +555,7 @@ export const he: Catalog = {
       navPricing: 'תמחור',
       signIn: 'התחברות',
       cta: 'נסו בחינם',
-      eyebrow: 'לכל מי שמוביל קבוצות',
+      eyebrow: 'למדריכי טיולים, מובילי טרקים ומארגני מועדונים',
       heroTitle1: 'יודעים איפה כולם.',
       heroTitle2: 'לא מחכים למי שחסר.',
       heroBody:
