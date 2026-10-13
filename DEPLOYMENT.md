@@ -178,7 +178,7 @@ redirects and the app still shows the landing page itself at `/`.
 |---|---|---|
 | Branch | `master` | `staging` |
 | Portal | `app.meetingpnt.com` | Cloudflare branch preview of `staging` |
-| API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) |
+| API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) — not created yet |
 | Database | Neon `main` branch | Neon `staging` branch — starts as a copy of production, then diverges |
 | Photos | Backblaze B2 bucket | the same bucket, or a second one |
 | Phone app | EAS channel `production` | EAS channel `staging` (build profile `staging`) |
