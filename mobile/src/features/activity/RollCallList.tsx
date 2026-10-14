@@ -53,16 +53,15 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
       )}
 
       {entries.map((entry) => {
-        // Someone who's here has nothing left to do: no locating, no RSVP, no chasing.
-        const expandable = entry.attendance !== 'present';
-        const open = expandable && openId === entry.user.id;
+        // Someone who's here has nothing to chase; Missing stays so a mistaken Here can be undone.
+        const here = entry.attendance === 'present';
+        const open = openId === entry.user.id;
         return (
           <View key={entry.user.id} style={styles.person}>
             <View style={styles.personHeader}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ expanded: open }}
-                disabled={!expandable}
                 onPress={() => setOpenId(open ? null : entry.user.id)}
                 style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
               >
@@ -102,11 +101,11 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
                     active={entry.attendance === 'absent'}
                     onPress={() => onMark(entry.user.id, 'absent')}
                   />
-                  <Quiet fill label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
-                  <Quiet fill label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
+                  {!here && <Quiet fill label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />}
+                  {!here && <Quiet fill label={t('event.message')} onPress={() => onMessage(entry.user.id)} />}
                 </View>
                 {/* Their RSVP, which only shapes the first stop's roster; later stops expect whoever was present. */}
-                {!narrowed && (
+                {!narrowed && !here && (
                   <View style={styles.optionRow}>
                     {/* Answer for them if they replied by phone rather than in the app. */}
                     {entry.rsvpStatus !== 'approved' && (
