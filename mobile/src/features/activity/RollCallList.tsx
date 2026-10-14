@@ -1,4 +1,5 @@
 import { joinDot, type RollCallEntry } from '@meetingpnt/shared';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from '../../i18n';
 import {
@@ -33,6 +34,8 @@ interface Props {
  */
 export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, onMessage }: Props) {
   const { t } = useTranslation();
+  // One person's options open at a time: opening another closes the last.
+  const [openId, setOpenId] = useState<string | null>(null);
   const present = entries.filter((e) => e.attendance === 'present').length;
   const marked = entries.filter((e) => e.attendance !== null).length;
 
@@ -49,47 +52,62 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
         </Text>
       )}
 
-      {entries.map((entry) => (
-        <View key={entry.user.id} style={styles.person}>
-          <View style={styles.personHeader}>
-            {/* The face is the point of the photo: matching a name to someone you've met once. */}
-            <Avatar name={entry.user.name} uri={entry.user.avatarUrl} size={40} />
-            <View style={styles.personText}>
-              <Text style={text.bodyStrong} numberOfLines={1}>
-                {joinDot([entry.user.name, entry.isVisitor ? t('rollCall.visitor') : null])}
-              </Text>
-              <Text style={text.secondary}>
-                {entry.rsvpStatus === 'approved' ? t('rollCall.coming') : t('rollCall.noReply')}
-              </Text>
-            </View>
+      {entries.map((entry) => {
+        const open = openId === entry.user.id;
+        return (
+          <View key={entry.user.id} style={styles.person}>
+            <View style={styles.personHeader}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                onPress={() => setOpenId(open ? null : entry.user.id)}
+                style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
+              >
+                {/* The face is the point of the photo: matching a name to someone you've met once. */}
+                <Avatar name={entry.user.name} uri={entry.user.avatarUrl} size={40} />
+                <View style={styles.personText}>
+                  <Text style={text.bodyStrong} numberOfLines={1}>
+                    {joinDot([entry.user.name, entry.isVisitor ? t('rollCall.visitor') : null])}
+                  </Text>
+                  {/* Missing now lives in the options, so the collapsed row still has to say it. */}
+                  {entry.attendance === 'absent' ? (
+                    <Text style={[text.secondary, { color: toneTint.danger.fg }]}>{t('rollCall.missing')}</Text>
+                  ) : (
+                    <Text style={text.secondary}>
+                      {entry.rsvpStatus === 'approved' ? t('rollCall.coming') : t('rollCall.noReply')}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
 
-            <View style={styles.marks}>
               <Mark
                 label={t('rollCall.here')}
                 tone="success"
                 active={entry.attendance === 'present'}
                 onPress={() => onMark(entry.user.id, 'present')}
               />
-              <Mark
-                label={t('rollCall.missing')}
-                tone="danger"
-                active={entry.attendance === 'absent'}
-                onPress={() => onMark(entry.user.id, 'absent')}
-              />
             </View>
-          </View>
 
-          <View style={styles.secondary}>
-            <Quiet label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
-            <Quiet label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
-            {/* Answer for them if they replied by phone rather than in the app. */}
-            {entry.rsvpStatus !== 'approved' && (
-              <Quiet label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+            {open && (
+              <View style={styles.secondary}>
+                <Mark
+                  label={t('rollCall.missing')}
+                  tone="danger"
+                  active={entry.attendance === 'absent'}
+                  onPress={() => onMark(entry.user.id, 'absent')}
+                />
+                <Quiet label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
+                <Quiet label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
+                {/* Answer for them if they replied by phone rather than in the app. */}
+                {entry.rsvpStatus !== 'approved' && (
+                  <Quiet label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+                )}
+                <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
+              </View>
             )}
-            <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
           </View>
-        </View>
-      ))}
+        );
+      })}
 
       {entries.length === 0 && <Empty headline={t('rollCall.emptyHeadline')} />}
     </Section>
@@ -165,8 +183,15 @@ const styles = StyleSheet.create({
   hint: { marginBottom: space.md },
   person: { paddingVertical: space.md, borderBottomWidth: 1, borderBottomColor: color.border },
   personHeader: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  identity: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: minTouchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
   personText: { flex: 1, minWidth: 0 },
-  marks: { flexDirection: 'row', gap: space.sm },
   mark: {
     minHeight: minTouchTarget,
     minWidth: 76,
