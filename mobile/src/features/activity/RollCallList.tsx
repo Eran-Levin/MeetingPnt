@@ -53,6 +53,8 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
       )}
 
       {entries.map((entry) => {
+        // Someone who's here has nothing to chase; Missing stays so a mistaken Here can be undone.
+        const here = entry.attendance === 'present';
         const open = openId === entry.user.id;
         return (
           <View key={entry.user.id} style={styles.person}>
@@ -89,20 +91,29 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
             </View>
 
             {open && (
-              <View style={styles.secondary}>
-                <Mark
-                  label={t('rollCall.missing')}
-                  tone="danger"
-                  active={entry.attendance === 'absent'}
-                  onPress={() => onMark(entry.user.id, 'absent')}
-                />
-                <Quiet label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
-                <Quiet label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
-                {/* Answer for them if they replied by phone rather than in the app. */}
-                {entry.rsvpStatus !== 'approved' && (
-                  <Quiet label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+              <View style={styles.options}>
+                {/* The person, now: attendance and reaching them. */}
+                <View style={styles.optionRow}>
+                  <Mark
+                    fill
+                    label={t('rollCall.missing')}
+                    tone="danger"
+                    active={entry.attendance === 'absent'}
+                    onPress={() => onMark(entry.user.id, 'absent')}
+                  />
+                  {!here && <Quiet fill label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />}
+                  {!here && <Quiet fill label={t('event.message')} onPress={() => onMessage(entry.user.id)} />}
+                </View>
+                {/* Their RSVP, which only shapes the first stop's roster; later stops expect whoever was present. */}
+                {!narrowed && !here && (
+                  <View style={styles.optionRow}>
+                    {/* Answer for them if they replied by phone rather than in the app. */}
+                    {entry.rsvpStatus !== 'approved' && (
+                      <Quiet fill label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+                    )}
+                    <Quiet fill label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
+                  </View>
                 )}
-                <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
               </View>
             )}
           </View>
@@ -128,11 +139,13 @@ function Mark({
   tone,
   active,
   onPress,
+  fill = false,
 }: {
   label: string;
   tone: 'success' | 'danger';
   active: boolean;
   onPress: () => void;
+  fill?: boolean;
 }) {
   return (
     <Pressable
@@ -141,6 +154,7 @@ function Mark({
       onPress={onPress}
       style={({ pressed }) => [
         styles.mark,
+        fill && styles.fill,
         active && { backgroundColor: toneSolid[tone].bg, borderColor: toneSolid[tone].bg },
         pressed && styles.pressed,
       ]}
@@ -154,16 +168,18 @@ function Quiet({
   label,
   onPress,
   muted = false,
+  fill = false,
 }: {
   label: string;
   onPress: () => void;
   muted?: boolean;
+  fill?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.quiet, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.quiet, fill && styles.fill, pressed && styles.pressed]}
     >
       <Text style={[styles.quietLabel, muted && { color: color.textSecondary }]}>{label}</Text>
     </Pressable>
@@ -203,7 +219,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
   },
   markLabel: { fontSize: fontSize.footnote, fontWeight: fontWeight.medium, color: color.text },
-  secondary: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
+  options: { gap: space.sm, marginTop: space.sm },
+  optionRow: { flexDirection: 'row', gap: space.sm },
+  fill: { flex: 1, alignItems: 'center' },
   quiet: {
     minHeight: minTouchTarget,
     justifyContent: 'center',
