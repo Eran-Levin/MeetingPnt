@@ -98,7 +98,16 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
                 />
                 <Quiet label={t('rollCall.locate')} onPress={() => onLocate(entry.user.id)} />
                 <Quiet label={t('event.message')} onPress={() => onMessage(entry.user.id)} />
-                <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
+                {/* RSVP only shapes the first stop's roster; later stops expect whoever was present. */}
+                {!narrowed && (
+                  <>
+                    {/* Answer for them if they replied by phone rather than in the app. */}
+                    {entry.rsvpStatus !== 'approved' && (
+                      <Quiet label={t('rollCall.confirm')} onPress={() => onRsvpFor(entry.user.id, 'approved')} />
+                    )}
+                    <Quiet label={t('rollCall.wontArrive')} onPress={() => onRsvpFor(entry.user.id, 'declined')} muted />
+                  </>
+                )}
               </View>
             )}
           </View>
