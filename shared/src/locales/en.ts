@@ -308,7 +308,7 @@ export const en = {
     coming: 'Coming',
     noReply: 'No reply yet',
     here: 'Here',
-    missing: 'Missing',
+    left: 'Left',
     locate: 'Locate',
     confirm: 'Confirm',
     wontArrive: "Won't arrive",

@@ -73,7 +73,7 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
                   </Text>
                   {/* Missing now lives in the options, so the collapsed row still has to say it. */}
                   {entry.attendance === 'absent' ? (
-                    <Text style={[text.secondary, { color: toneTint.danger.fg }]}>{t('rollCall.missing')}</Text>
+                    <Text style={[text.secondary, { color: toneTint.danger.fg }]}>{t('rollCall.left')}</Text>
                   ) : (
                     <Text style={text.secondary}>
                       {entry.rsvpStatus === 'approved' ? t('rollCall.coming') : t('rollCall.noReply')}
@@ -96,7 +96,7 @@ export function RollCallList({ entries, narrowed, onMark, onLocate, onRsvpFor, o
                 <View style={styles.optionRow}>
                   <Mark
                     fill
-                    label={t('rollCall.missing')}
+                    label={t('rollCall.left')}
                     tone="danger"
                     active={entry.attendance === 'absent'}
                     onPress={() => onMark(entry.user.id, 'absent')}
