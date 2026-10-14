@@ -303,7 +303,7 @@ export const he: Catalog = {
     coming: 'מגיע',
     noReply: 'עדיין לא ענה',
     here: 'כאן',
-    missing: 'חסר',
+    left: 'עזב',
     locate: 'איתור',
     confirm: 'אישור',
     wontArrive: 'לא יגיע',
