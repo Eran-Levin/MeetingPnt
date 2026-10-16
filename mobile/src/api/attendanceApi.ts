@@ -27,4 +27,10 @@ export const attendanceApi = {
       `/api/meeting-points/${meetingPointId}/attendance`,
       { method: 'PUT', body: { entries: [{ userId, status }] } },
     ),
+  /** A member or visitor leaving an event that is under way. */
+  leave: (activityId: string) =>
+    apiFetch<{ left: true }>(`/api/activities/${activityId}/leave`, { method: 'POST' }),
+  /** Whether I've already left the stop the group is at. */
+  haveILeft: (activityId: string) =>
+    apiFetch<{ left: boolean }>(`/api/activities/${activityId}/attendance/me`),
 };

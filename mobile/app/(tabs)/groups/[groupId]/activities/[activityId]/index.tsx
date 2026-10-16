@@ -65,6 +65,8 @@ export default function ActivityDetailScreen() {
   const [rsvpMessage, setRsvpMessage] = useState<string | null>(null);
   const [omwMessage, setOmwMessage] = useState<string | null>(null);
   const [omwSubmitting, setOmwSubmitting] = useState(false);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveMessage, setLeaveMessage] = useState<string | null>(null);
 
   // "Where are you?" — the member's side of it.
   const [leaderLocation, setLeaderLocation] = useState<LocationSnapshotWithUser | null>(null);
@@ -158,6 +160,12 @@ export default function ActivityDetailScreen() {
     queryFn: () => rsvpsApi.attendees(activityId),
     enabled: !isLeader,
   });
+  // Re-asked whenever the group moves on: leaving is per stop, so a new stop starts me as present.
+  const haveILeftQuery = useQuery({
+    queryKey: ['activities', activityId, 'left', activity?.currentMeetingPointId],
+    queryFn: () => attendanceApi.haveILeft(activityId),
+    enabled: !isLeader && running,
+  });
   useEffect(() => {
     if (myRsvpQuery.data?.rsvp) setMyStatus(myRsvpQuery.data.rsvp.status);
   }, [myRsvpQuery.data]);
@@ -178,6 +186,19 @@ export default function ActivityDetailScreen() {
     );
     queryClient.invalidateQueries({ queryKey: ['activities', activityId, 'attendees'] });
     queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
+  }
+
+  async function handleLeave() {
+    setLeaveMessage(null);
+    setLeaveBusy(true);
+    try {
+      await attendanceApi.leave(activityId);
+      await haveILeftQuery.refetch();
+    } catch (err) {
+      setLeaveMessage(apiErrorMessage(err, t('memberPanel.leaveFailed')));
+    } finally {
+      setLeaveBusy(false);
+    }
   }
 
   async function handleStart() {
@@ -571,6 +592,10 @@ export default function ActivityDetailScreen() {
           onAskLeader={handleAskLeader}
           askBusy={askSubmitting}
           askMessage={askMessage}
+          hasLeft={haveILeftQuery.data?.left ?? false}
+          onLeave={handleLeave}
+          leaveBusy={leaveBusy}
+          leaveMessage={leaveMessage}
           describeAge={age}
           mapsLinkFor={mapsLinkFor}
         />

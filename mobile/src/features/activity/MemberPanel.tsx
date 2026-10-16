@@ -1,5 +1,5 @@
 import { isolate, type LocationSnapshotWithUser, type RsvpStatus } from '@meetingpnt/shared';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from '../../i18n';
 import { Button, ButtonRow, Card, Section, TextField, color, space, text } from '../../ui';
 
@@ -17,6 +17,11 @@ interface Props {
   onAskLeader: () => void;
   askBusy: boolean;
   askMessage: string | null;
+  /** Leaving mid-event: the member's own roll-call mark at the stop the group is at. */
+  hasLeft: boolean;
+  onLeave: () => void;
+  leaveBusy: boolean;
+  leaveMessage: string | null;
   describeAge: (capturedAt: string) => string;
   mapsLinkFor: (location: { lat: number; lng: number }) => string;
 }
@@ -35,6 +40,10 @@ export function MemberPanel({
   onAskLeader,
   askBusy,
   askMessage,
+  hasLeft,
+  onLeave,
+  leaveBusy,
+  leaveMessage,
   describeAge,
   mapsLinkFor,
 }: Props) {
@@ -112,11 +121,36 @@ export function MemberPanel({
           )}
         </Section>
       )}
+
+      {/* Leaving is a decision on a screen people tap one-handed outdoors, so it asks once. */}
+      {running && status === 'approved' && (
+        <View style={styles.leave}>
+          {hasLeft ? (
+            <Text style={text.secondary}>{t('memberPanel.youLeft')}</Text>
+          ) : (
+            <View>
+              <Button
+                label={leaveBusy ? t('memberPanel.leaving') : t('memberPanel.leave')}
+                variant="secondary"
+                busy={leaveBusy}
+                onPress={() =>
+                  Alert.alert(t('memberPanel.leaveConfirm'), undefined, [
+                    { text: t('memberPanel.leaveStay'), style: 'cancel' },
+                    { text: t('memberPanel.leave'), style: 'destructive', onPress: onLeave },
+                  ])
+                }
+              />
+              {leaveMessage && <Text style={[text.secondary, styles.age]}>{leaveMessage}</Text>}
+            </View>
+          )}
+        </View>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  leave: { marginTop: space.lg },
   note: { marginTop: space.md },
   age: { marginTop: space.xs, marginBottom: space.sm, color: color.textSecondary },
 });
