@@ -79,8 +79,11 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **A member can leave an event that is under way.** It is a self-marked `absent` at the stop the
   group is at (`leaveActivity` in the attendance service, `markedBy` = themselves), so the roster
   narrowing needs no new rule: they drop off every later stop, keep credit for earlier ones, and
-  the leader sees "Left" in the roll call. No rejoin button — the leader re-marking them Here is
-  the undo. Leaders can't leave; they end the event.
+  the leader sees "Left" in the roll call. **Leaving also stops their location sharing** — OMW,
+  ping replies and leader pings return 409 once `hasLeft` (absent at some stop, not present at the
+  current one). No rejoin button; the leader re-marking them Here at the current stop is the undo,
+  which stops being possible once the group moves on (they're off that roster). Leaders can't
+  leave; they end the event.
 - **Ending an event closes location sharing.** OMW and pings return 409 once an activity is
   `completed`, and the socket room refuses joins. Attendance stays editable — leaders reconcile
   after the fact.

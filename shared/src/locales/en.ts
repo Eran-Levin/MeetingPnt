@@ -120,6 +120,7 @@ export const en = {
     leader_cannot_leave: 'The leader runs the event — end it instead of leaving it',
     leave_only_while_running: 'You can only leave an event that is under way',
     not_attending: "You aren't attending this event",
+    location_sharing_left: 'You left this event, so your location is no longer shared',
     location_sharing_closed: 'This activity has ended; location sharing is closed',
     no_meeting_point_yet: 'No meeting point has been set for this activity yet',
     start_before_sharing: 'Start the event before sharing a live position',

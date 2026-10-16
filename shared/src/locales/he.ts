@@ -118,6 +118,7 @@ export const he: Catalog = {
     leader_cannot_leave: 'המדריך/ה מנהל/ת את האירוע — אפשר לסיים אותו במקום לעזוב',
     leave_only_while_running: 'אפשר לעזוב רק אירוע שמתנהל כעת',
     not_attending: 'אינכם משתתפים באירוע הזה',
+    location_sharing_left: 'עזבתם את האירוע, ולכן המיקום שלכם כבר לא משותף',
     location_sharing_closed: 'הפעילות הסתיימה; שיתוף המיקום סגור',
     no_meeting_point_yet: 'עוד לא נקבעה נקודת מפגש לפעילות הזו',
     start_before_sharing: 'התחילו את הפעילות לפני שמשתפים מיקום בזמן אמת',

@@ -246,12 +246,20 @@ export async function leaveActivity(activityId: string, userId: string): Promise
   });
 }
 
-/** Whether the caller has left the stop the group is at now — the member's side of "Leave". */
+/**
+ * Whether someone has left this event: marked absent at some stop and not present at the stop the
+ * group is at now. Not just "absent here" — the roster narrows as the group moves, so the person
+ * who left at stop 1 has no row at stop 2 and must still count as gone. Location sharing keys off
+ * this, so a member who leaves stops being findable.
+ */
 export async function hasLeft(activityId: string, userId: string): Promise<boolean> {
+  const points = await listMeetingPoints(activityId);
+  if (points.length === 0) return false;
   const current = await getCurrentMeetingPoint(activityId);
-  if (!current) return false;
-  const record = await prisma.attendance.findUnique({
-    where: { meetingPointId_userId: { meetingPointId: current.id, userId } },
+  const records = await prisma.attendance.findMany({
+    where: { userId, meetingPointId: { in: points.map((p) => p.id) } },
+    select: { meetingPointId: true, status: true },
   });
-  return record?.status === 'absent';
+  if (records.some((r) => r.meetingPointId === current?.id && r.status === 'present')) return false;
+  return records.some((r) => r.status === 'absent');
 }

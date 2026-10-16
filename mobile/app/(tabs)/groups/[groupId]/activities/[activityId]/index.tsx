@@ -160,7 +160,7 @@ export default function ActivityDetailScreen() {
     queryFn: () => rsvpsApi.attendees(activityId),
     enabled: !isLeader,
   });
-  // Re-asked whenever the group moves on: leaving is per stop, so a new stop starts me as present.
+  // Re-asked whenever the group moves on, since the leader can re-mark me Here at a stop.
   const haveILeftQuery = useQuery({
     queryKey: ['activities', activityId, 'left', activity?.currentMeetingPointId],
     queryFn: () => attendanceApi.haveILeft(activityId),
@@ -539,7 +539,7 @@ export default function ActivityDetailScreen() {
           plannedCount={meetingPoints.length}
           isLeader={!!isLeader}
           onEdit={() => openEditor('edit')}
-          onOnMyWay={myStatus === 'approved' ? handleOnMyWay : undefined}
+          onOnMyWay={myStatus === 'approved' && !haveILeftQuery.data?.left ? handleOnMyWay : undefined}
           omwBusy={omwSubmitting}
           message={omwMessage}
         />
