@@ -22,6 +22,7 @@ import {
 import { prisma } from '../../db/prisma.js';
 import { displayName, toLocale } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { hasLeft } from '../attendance/service.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { getEta } from '../../lib/googleMapsClient.js';
 import { activityLeaderRoom, activityRoom, getIO } from '../../realtime/index.js';
@@ -80,6 +81,11 @@ function assertActivityLive(activity: { status: string }) {
   }
 }
 
+/** Someone who has left the event is no longer findable: their position stops being shared. */
+async function assertHasNotLeft(activityId: string, userId: string) {
+  if (await hasLeft(activityId, userId)) throw new HttpError(409, 'location_sharing_left');
+}
+
 async function recordSnapshot(
   activityId: string,
   userId: string,
@@ -89,6 +95,7 @@ async function recordSnapshot(
   const { activity, group } = await getActivityWithLeader(activityId);
   assertActivityLive(activity);
   await assertLeaderOrApproved(activityId, userId, group.leaderId);
+  if (userId !== group.leaderId) await assertHasNotLeft(activityId, userId);
 
   const meetingPoint = await getCurrentMeetingPoint(activityId);
   if (!meetingPoint) {
@@ -268,6 +275,7 @@ export async function requestPing(activityId: string, requesterId: string, dto: 
   assertActivityLive(activity);
 
   await assertApprovedRsvp(activityId, dto.userId);
+  await assertHasNotLeft(activityId, dto.userId);
 
   const [pushTokens, target] = await Promise.all([
     prisma.pushToken.findMany({ where: { userId: dto.userId } }),

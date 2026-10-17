@@ -75,3 +75,21 @@ activityAttendanceRouter.get('/:id/participation', async (req, res, next) => {
     next(err);
   }
 });
+
+// The caller's own side: leave an event under way, and whether they already have.
+activityAttendanceRouter.post('/:id/leave', async (req, res, next) => {
+  try {
+    await attendanceService.leaveActivity(req.params.id as string, req.user!.id);
+    res.json({ left: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+activityAttendanceRouter.get('/:id/attendance/me', async (req, res, next) => {
+  try {
+    res.json({ left: await attendanceService.hasLeft(req.params.id as string, req.user!.id) });
+  } catch (err) {
+    next(err);
+  }
+});

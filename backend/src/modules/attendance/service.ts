@@ -7,6 +7,7 @@ import type {
 } from '@meetingpnt/shared';
 import type { Attendance, User } from '@prisma/client';
 import {
+  getCurrentMeetingPoint,
   getMeetingPointById,
   listArrivedMeetingPoints,
   listMeetingPoints,
@@ -211,4 +212,54 @@ export async function listActivityParticipation(
       totalMeetingPoints: meetingPoints.length,
     }))
     .sort((a, b) => a.user.name.localeCompare(b.user.name));
+}
+
+/**
+ * A member or visitor leaving an event that is under way. Recorded as `absent` at the stop the
+ * group is at, marked by the person themselves — which is all the roll call needs: the roster
+ * only carries forward people who were present at the previous stop, so they drop off every later
+ * one without any other bookkeeping, and the leader sees "Left" instead of chasing them.
+ * Attendance at earlier stops is untouched, so they still count as having attended.
+ */
+export async function leaveActivity(activityId: string, userId: string): Promise<void> {
+  const activity = await prisma.activity.findUnique({
+    where: { id: activityId },
+    include: { group: true },
+  });
+  if (!activity) throw new HttpError(404, 'activity_not_found');
+  if (activity.group.leaderId === userId) throw new HttpError(403, 'leader_cannot_leave');
+  if (activity.status !== 'in_progress') throw new HttpError(409, 'leave_only_while_running');
+
+  const [rsvp, guest] = await Promise.all([
+    prisma.rsvp.findUnique({ where: { activityId_userId: { activityId, userId } } }),
+    prisma.activityGuest.findFirst({ where: { activityId, userId } }),
+  ]);
+  if (rsvp?.status !== 'approved' && !guest) throw new HttpError(403, 'not_attending');
+
+  const current = await getCurrentMeetingPoint(activityId);
+  if (!current) throw new HttpError(409, 'no_meeting_point_yet');
+
+  await prisma.attendance.upsert({
+    where: { meetingPointId_userId: { meetingPointId: current.id, userId } },
+    create: { meetingPointId: current.id, userId, status: 'absent', markedBy: userId },
+    update: { status: 'absent', markedBy: userId, markedAt: new Date() },
+  });
+}
+
+/**
+ * Whether someone has left this event: marked absent at some stop and not present at the stop the
+ * group is at now. Not just "absent here" — the roster narrows as the group moves, so the person
+ * who left at stop 1 has no row at stop 2 and must still count as gone. Location sharing keys off
+ * this, so a member who leaves stops being findable.
+ */
+export async function hasLeft(activityId: string, userId: string): Promise<boolean> {
+  const points = await listMeetingPoints(activityId);
+  if (points.length === 0) return false;
+  const current = await getCurrentMeetingPoint(activityId);
+  const records = await prisma.attendance.findMany({
+    where: { userId, meetingPointId: { in: points.map((p) => p.id) } },
+    select: { meetingPointId: true, status: true },
+  });
+  if (records.some((r) => r.meetingPointId === current?.id && r.status === 'present')) return false;
+  return records.some((r) => r.status === 'absent');
 }
