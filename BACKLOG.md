@@ -67,6 +67,11 @@ September and November creates two groups and re-invites the same people by hand
 deferred until someone has actually run a second trip and felt it; the shortcut is obvious
 ("start from the roster of…") but the right shape isn't obvious until then.
 
+**Copy from existing is web-only.** The portal's create form can start from any activity in any
+group the leader runs (`copyActivity` in `portal/src/lib`). Mobile's create form has no
+meeting points to copy into, and planning belongs on the web anyway; revisit only if leaders ask for it
+on the phone.
+
 **Audit log only records role changes.** `auditLog.create` is called in exactly one
 place (`admin/service.ts`). Group deletion, activity cancellation, and attendance edits
 — the actions a leader would most plausibly need to account for — leave no trace.

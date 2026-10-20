@@ -73,6 +73,12 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Every activity has a start and an end.** `allDay` activities are date-only (multi-day trips);
   timed ones are one date plus two clock times. Render both via `formatActivityWhen` in
   `shared/src/utils` so the two clients can't drift.
+- **Copying an activity carries its shape, not its history.** The portal's "Copy from existing" fills
+  the create form from any activity the leader runs, in any group, moved to a new date. Title,
+  description, transport, RSVP and single-location settings and every stop come across; each stop keeps
+  its distance from the start (stored as absolute times, created from offsets), a trip keeps its length.
+  RSVPs, attendance, status and any recurrence stay behind — copying one occurrence of a series gives
+  one draft. It's a prefill, not a clone: the leader still reviews the form and creates it as a draft.
 - **A leader runs one event at a time.** `startActivity` refuses (409) if that leader already has
   an activity `in_progress` — they can't be in two places at once. Scoped per leader, so other
   leaders are unaffected. Ending one frees them to start the next.
