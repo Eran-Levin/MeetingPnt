@@ -1,10 +1,13 @@
-import type { Activity } from '@meetingpnt/shared';
+import type { Activity, TransportMode } from '@meetingpnt/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
 import { apiErrorMessage, useTranslation } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
-import { TextField } from './ui/TextField.js';
+import { Select } from './ui/Select.js';
+import { TextArea, TextField } from './ui/TextField.js';
+
+const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
 
 interface Props {
   activity: Activity;
@@ -31,6 +34,9 @@ function toTimeInput(iso: string): string {
 export function ActivityEditor({ activity, onDone }: Props) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [title, setTitle] = useState(activity.title);
+  const [description, setDescription] = useState(activity.description ?? '');
+  const [transportMode, setTransportMode] = useState<TransportMode>(activity.transportMode);
   const [allDay, setAllDay] = useState(activity.allDay);
   const [date, setDate] = useState(toDateInput(activity.startAt));
   const [endDate, setEndDate] = useState(toDateInput(activity.endAt));
@@ -66,6 +72,9 @@ export function ActivityEditor({ activity, onDone }: Props) {
     setSaving(true);
     try {
       await activitiesApi.update(activity.id, {
+        title: title.trim(),
+        description,
+        transportMode,
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
@@ -84,7 +93,31 @@ export function ActivityEditor({ activity, onDone }: Props) {
 
   return (
     <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3 rounded-lg bg-surface-sunken p-4">
-      <label className="flex items-center gap-2 text-sm font-medium text-ink">
+      <TextField
+        label={t('newActivity.fieldTitle')}
+        required
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+      <TextArea
+        label={t('activityForm.description')}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+      />
+      <Select
+        label={t('newActivity.transport')}
+        value={transportMode}
+        onChange={(e) => setTransportMode(e.target.value as TransportMode)}
+      >
+        {TRANSPORT_MODES.map((mode) => (
+          <option key={mode} value={mode}>
+            {t(`newActivity.${mode}`)}
+          </option>
+        ))}
+      </Select>
+
+      <label className="flex items-center gap-2 border-t border-line pt-3 text-sm font-medium text-ink">
         <input
           type="checkbox"
           checked={allDay}
