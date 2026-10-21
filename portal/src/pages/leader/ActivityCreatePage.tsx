@@ -3,6 +3,8 @@ import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
+import { CopyFromExisting } from '../../components/CopyFromExisting.js';
+import type { ActivityCopy } from '../../lib/copyActivity.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
@@ -45,6 +47,7 @@ export function ActivityCreatePage() {
   const [meetingPoints, setMeetingPoints] = useState<MeetingPointTemplateDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState<{ title: string; trimmed: boolean } | null>(null);
 
   function toggleDay(day: number) {
     setDaysOfWeek((prev) =>
@@ -54,6 +57,23 @@ export function ActivityCreatePage() {
 
   function updateMeetingPoint(index: number, patch: Partial<MeetingPointTemplateDto>) {
     setMeetingPoints((prev) => prev.map((mp, i) => (i === index ? { ...mp, ...patch } : mp)));
+  }
+
+  /** Everything the form holds comes from the copy; a recurrence is the one thing it doesn't carry. */
+  function applyCopy(copy: ActivityCopy) {
+    setTitle(copy.title);
+    setDescription(copy.description);
+    setAllDay(copy.allDay);
+    setDate(copy.date);
+    setStartTime(copy.startTime);
+    setEndTime(copy.endTime);
+    setEndDate(copy.endDate);
+    setTransportMode(copy.transportMode);
+    setRequiresRsvp(copy.requiresRsvp);
+    setSingleLocation(copy.singleLocation);
+    setMeetingPoints(copy.meetingPoints);
+    setRepeats(false);
+    setCopied({ title: copy.title, trimmed: copy.trimmed });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -120,6 +140,16 @@ export function ActivityCreatePage() {
       </Link>
       <h1 className="mt-2 text-2xl font-semibold text-ink">{t('newActivity.title')}</h1>
       <p className="mt-1 text-sm text-ink-secondary">{t('activityForm.subtitle')}</p>
+
+      <div className="mt-6">
+        <CopyFromExisting onApply={applyCopy} />
+        {copied && (
+          <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2 text-sm text-ink-secondary">
+            {t('activityForm.copy.applied', { title: copied.title })}
+            {copied.trimmed && ` ${t('activityForm.copy.trimmed')}`}
+          </p>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
         <FormSection title={t('activityForm.what')}>
