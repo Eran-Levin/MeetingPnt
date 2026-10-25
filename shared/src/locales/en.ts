@@ -77,6 +77,8 @@ export const en = {
     leader_only_post: 'Only the group leader can post in this group',
     leader_only_update_group: 'Only the group leader can update this group',
     leader_only_delete_group: 'Only the group leader can delete this group',
+    leader_only_duplicate_group: 'Only the group leader can duplicate this group',
+    invalid_time_zone: 'Unknown time zone',
     leader_only_remove_members: 'Only the group leader can remove members',
     leader_only_manage_invitations: 'Only the group leader can manage invitations',
     leader_only_share_position: 'Only the group leader can share a live position',
@@ -416,6 +418,24 @@ export const en = {
     deleting: 'Deleting…',
     confirmDelete:
       'Delete "{{name}}"? This removes the group, its roster, activities, and meeting points. This cannot be undone.',
+    duplicate: {
+      open: 'Duplicate group',
+      title: 'New group from "{{name}}"',
+      hint: 'Start a new group from this one. You can change everything about it afterwards.',
+      nameSuffix: '(copy)',
+      copyRoster: 'Copy the roster',
+      copyRosterHint:
+        'The current members are added straight away, parties included. Pending invitations are not copied.',
+      copyEvents: 'Copy the events',
+      copyEventsHint:
+        'Every event comes across as a draft, with its stops. Replies and attendance stay behind, and nobody is told until you publish.',
+      noEvents: 'This group has no events to copy.',
+      firstEventOn: 'First event on',
+      firstEventHint: 'It is on {{when}} now. The other events move by the same number of days.',
+      submit: 'Create group',
+      creating: 'Creating…',
+      failed: 'Failed to duplicate the group',
+    },
     roster: 'Roster',
     partyOf: 'Party of {{count}}',
     emptyHeadline: 'Nobody on the roster yet',

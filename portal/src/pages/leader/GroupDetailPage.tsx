@@ -7,6 +7,7 @@ import { activitiesApi } from '../../api/activitiesApi.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
 import { invitationsApi } from '../../api/invitationsApi.js';
+import { DuplicateGroupForm } from '../../components/DuplicateGroupForm.js';
 import { GroupChatPanel } from '../../components/GroupChatPanel.js';
 import { Avatar } from '../../components/ui/Avatar.js';
 import { Badge } from '../../components/ui/Badge.js';
@@ -29,6 +30,7 @@ export function GroupDetailPage() {
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
   const [deleting, setDeleting] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -217,6 +219,11 @@ export function GroupDetailPage() {
                 ))}
               </Select>
             )}
+            {isLeader && !duplicating && (
+              <Button variant="secondary" size="sm" onClick={() => setDuplicating(true)}>
+                {t('groupPage.duplicate.open')}
+              </Button>
+            )}
             {isLeader && (
               <Button variant="danger" size="sm" disabled={deleting} onClick={handleDeleteGroup}>
                 {deleting ? t('groupPage.deleting') : t('groupPage.delete')}
@@ -225,6 +232,16 @@ export function GroupDetailPage() {
           </div>
         )}
       </div>
+
+      {isLeader && duplicating && groupQuery.data && (
+        <Card className="mt-4">
+          <DuplicateGroupForm
+            group={groupQuery.data.group}
+            activities={activities}
+            onDone={() => setDuplicating(false)}
+          />
+        </Card>
+      )}
 
       {/* Who's in the group and what they're booked onto are the two halves of planning, and on a
           browser there's room to hold both in view at once. */}

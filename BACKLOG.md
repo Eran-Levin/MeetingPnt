@@ -62,10 +62,11 @@ snapshots, "open forever because nobody pressed End" is the wrong resting state.
 time-based sweep closing anything still running well past its `endAt`, which belongs with the
 BullMQ jobs below — the two should land together.
 
-**Copying a roster between trips.** A trip is a group, so a guide running the same route in
-September and November creates two groups and re-invites the same people by hand. Deliberately
-deferred until someone has actually run a second trip and felt it; the shortcut is obvious
-("start from the roster of…") but the right shape isn't obvious until then.
+**Duplicate group is web-only, and copies no one's replies.** The portal's "Duplicate group"
+(`duplicateGroup` in the groups service) copies the roster and/or the events. Copied members are
+added directly with no notice, and copied events are drafts, so nobody hears anything until the
+leader publishes. Not copied, on purpose: pending invitations, visitors, RSVPs, attendance, chat.
+Revisit if leaders want to be asked before being carried into the next year's group.
 
 **Copy from existing is web-only.** The portal's create form can start from any activity in any
 group the leader runs (`copyActivity` in `portal/src/lib`). Mobile's create form has no

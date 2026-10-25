@@ -75,6 +75,8 @@ export const he: Catalog = {
     leader_only_post: 'רק מוביל הקבוצה יכול לכתוב בקבוצה הזו',
     leader_only_update_group: 'רק מוביל הקבוצה יכול לעדכן אותה',
     leader_only_delete_group: 'רק מוביל הקבוצה יכול למחוק אותה',
+    leader_only_duplicate_group: 'רק מוביל הקבוצה יכול לשכפל אותה',
+    invalid_time_zone: 'אזור זמן לא מוכר',
     leader_only_remove_members: 'רק מוביל הקבוצה יכול להסיר חברים',
     leader_only_manage_invitations: 'רק מוביל הקבוצה יכול לנהל הזמנות',
     leader_only_share_position: 'רק מוביל הקבוצה יכול לשתף מיקום בזמן אמת',
@@ -411,6 +413,24 @@ export const he: Catalog = {
     deleting: 'מוחקים…',
     confirmDelete:
       'למחוק את "{{name}}"? הפעולה מסירה את הקבוצה, רשימת המשתתפים, הפעילויות ונקודות המפגש, ואי אפשר לבטל אותה.',
+    duplicate: {
+      open: 'שכפול הקבוצה',
+      title: 'קבוצה חדשה מתוך "{{name}}"',
+      hint: 'פותחים קבוצה חדשה על בסיס הקבוצה הזו. אפשר לשנות בה הכול גם אחר כך.',
+      nameSuffix: '(עותק)',
+      copyRoster: 'העתקת רשימת המשתתפים',
+      copyRosterHint:
+        'המשתתפים הנוכחיים מתווספים מיד, כולל החבורות. הזמנות ממתינות לא מועתקות.',
+      copyEvents: 'העתקת האירועים',
+      copyEventsHint:
+        'כל אירוע מועתק כטיוטה, עם נקודות המפגש שלו. אישורי הגעה ונוכחות לא מועתקים, ואף אחד לא מקבל הודעה עד שתפרסמו.',
+      noEvents: 'בקבוצה הזו אין אירועים להעתקה.',
+      firstEventOn: 'האירוע הראשון ב־',
+      firstEventHint: 'כרגע הוא ב־{{when}}. שאר האירועים יוזזו במספר הימים הזה.',
+      submit: 'יצירת הקבוצה',
+      creating: 'יוצרים…',
+      failed: 'שכפול הקבוצה נכשל',
+    },
     roster: 'משתתפים',
     partyOf: 'חבורה של {{count}}',
     emptyHeadline: 'עדיין אין משתתפים',

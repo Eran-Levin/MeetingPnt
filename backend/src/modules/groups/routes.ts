@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createGroupSchema, updateGroupSchema } from '@meetingpnt/shared';
+import { createGroupSchema, duplicateGroupSchema, updateGroupSchema } from '@meetingpnt/shared';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/requireRole.js';
 import { validate } from '../../middleware/validate.js';
@@ -17,6 +17,24 @@ groupsRouter.post('/', requireRole('leader', 'admin'), validate(createGroupSchem
     next(err);
   }
 });
+
+groupsRouter.post(
+  '/:id/duplicate',
+  requireRole('leader', 'admin'),
+  validate(duplicateGroupSchema),
+  async (req, res, next) => {
+    try {
+      const group = await groupsService.duplicateGroup(
+        req.params.id as string,
+        req.user!.id,
+        req.body,
+      );
+      res.status(201).json({ group });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 groupsRouter.get('/', async (req, res, next) => {
   try {

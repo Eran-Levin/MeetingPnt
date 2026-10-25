@@ -181,6 +181,30 @@ export async function shiftMeetingPointTimes(activityId: string, deltaMs: number
   `;
 }
 
+/**
+ * Gives one activity the itinerary of another: same stops, same order, none of them reached yet.
+ * Copied inside the database because the location column is `Unsupported` and the stops already
+ * hold resolved coordinates. Creation order is the route, so each row gets a created_at a
+ * millisecond after the previous one — a bare now() would tie them all.
+ */
+export async function copyMeetingPoints(input: {
+  fromActivityId: string;
+  toActivityId: string;
+  toGroupId: string;
+  createdBy: string;
+  deltaMs: number;
+}): Promise<void> {
+  const seconds = Math.round(input.deltaMs / 1000);
+  await prisma.$executeRaw`
+    INSERT INTO meeting_points (id, group_id, activity_id, label, google_maps_url, location, time, arrived_at, created_by, created_at)
+    SELECT gen_random_uuid(), ${input.toGroupId}, ${input.toActivityId}, label, google_maps_url, location,
+      time + (${seconds} * INTERVAL '1 second'), NULL, ${input.createdBy},
+      now() + (row_number() OVER (ORDER BY created_at) * INTERVAL '1 millisecond')
+    FROM meeting_points
+    WHERE activity_id = ${input.fromActivityId}
+  `;
+}
+
 const LOCATION_SNAPSHOT_COLUMNS = Prisma.sql`
   id, activity_id AS "activityId", user_id AS "userId", meeting_point_id AS "meetingPointId",
   ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng,
