@@ -44,6 +44,18 @@ export const createGroupSchema = z.object({
   description: z.string().optional(),
 });
 
+/**
+ * A new group started from an existing one. What comes across is the leader's call: the roster
+ * (the same people carrying on) and the events (the same trip run again, as drafts). Events move
+ * by `shiftDays` whole days, in the leader's `timeZone` so a 08:00 start stays 08:00.
+ */
+export const duplicateGroupSchema = createGroupSchema.extend({
+  copyRoster: z.boolean(),
+  copyEvents: z.boolean(),
+  shiftDays: z.number().int().min(-3650).max(3650).default(0),
+  timeZone: z.string().min(1).default('UTC'),
+});
+
 export const updateGroupSchema = createGroupSchema
   .extend({
     status: z.enum([GroupStatus.Planned, GroupStatus.InProgress, GroupStatus.Completed]),

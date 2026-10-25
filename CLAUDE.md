@@ -79,6 +79,12 @@ ordinary events in the same group, and they *do* take RSVPs.
   its distance from the start (stored as absolute times, created from offsets), a trip keeps its length.
   RSVPs, attendance, status and any recurrence stay behind — copying one occurrence of a series gives
   one draft. It's a prefill, not a clone: the leader still reviews the form and creates it as a draft.
+- **Duplicating a group is two independent choices: the roster, the events.** "Copy roster" is the
+  2025 group continuing into 2026 (same people, new events); "copy events" is the same tour run for
+  new people. Events arrive as drafts moved by whole days in the leader's own time zone (sent by the
+  browser, since the server runs UTC) so an 08:00 start stays 08:00 across a daylight-saving change.
+  Same shape as copying an activity: the shape comes across, the history doesn't. All of it is
+  editable afterwards on the new group.
 - **A leader runs one event at a time.** `startActivity` refuses (409) if that leader already has
   an activity `in_progress` — they can't be in two places at once. Scoped per leader, so other
   leaders are unaffected. Ending one frees them to start the next.

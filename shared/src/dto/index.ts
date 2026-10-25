@@ -5,6 +5,7 @@ import type {
   createActivitySchema,
   createGroupSchema,
   createMeetingPointSchema,
+  duplicateGroupSchema,
   inviteMemberSchema,
   loginSchema,
   meetingPointTemplateSchema,
@@ -29,6 +30,7 @@ export type RegisterDto = z.infer<typeof registerSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;
 export type RoleElevationDto = z.infer<typeof roleElevationSchema>;
 export type CreateGroupDto = z.infer<typeof createGroupSchema>;
+export type DuplicateGroupDto = z.input<typeof duplicateGroupSchema>;
 export type UpdateGroupDto = z.infer<typeof updateGroupSchema>;
 export type InviteMemberDto = z.infer<typeof inviteMemberSchema>;
 export type PartyMemberDto = z.infer<typeof partyMemberSchema>;

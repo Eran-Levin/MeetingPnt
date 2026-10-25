@@ -1,5 +1,6 @@
 import type {
   CreateGroupDto,
+  DuplicateGroupDto,
   Group,
   GroupMemberWithUser,
   GroupWithRole,
@@ -11,6 +12,8 @@ export const groupsApi = {
   list: () => apiFetch<{ groups: GroupWithRole[] }>('/api/groups'),
   create: (dto: CreateGroupDto) =>
     apiFetch<{ group: Group }>('/api/groups', { method: 'POST', body: dto }),
+  duplicate: (id: string, dto: DuplicateGroupDto) =>
+    apiFetch<{ group: Group }>(`/api/groups/${id}/duplicate`, { method: 'POST', body: dto }),
   get: (id: string) => apiFetch<{ group: Group }>(`/api/groups/${id}`),
   update: (id: string, dto: UpdateGroupDto) =>
     apiFetch<{ group: Group }>(`/api/groups/${id}`, { method: 'PATCH', body: dto }),
