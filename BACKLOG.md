@@ -62,7 +62,7 @@ snapshots, "open forever because nobody pressed End" is the wrong resting state.
 time-based sweep closing anything still running well past its `endAt`, which belongs with the
 BullMQ jobs below — the two should land together.
 
-**Duplicate group is web-only, and copies no one's replies.** The portal's "Duplicate group"
+**Creating a group from an existing one is web-only, and copies no one's replies.** The portal's New group form, "Start from"
 (`duplicateGroup` in the groups service) copies the roster and/or the events. Copied members are
 added directly with no notice, and copied events are drafts, so nobody hears anything until the
 leader publishes. Not copied, on purpose: pending invitations, visitors, RSVPs, attendance, chat.

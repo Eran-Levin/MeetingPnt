@@ -1,5 +1,5 @@
 import type { GroupWithRole } from '@meetingpnt/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { groupsApi } from '../../api/groupsApi.js';
@@ -7,15 +7,11 @@ import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
-import { TextField } from '../../components/ui/TextField.js';
+import { NewGroupForm } from '../../components/NewGroupForm.js';
 import { useLocale, useTranslation } from '../../i18n/index.js';
 
 export function GroupsPage() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [creating, setCreating] = useState(false);
   const [composing, setComposing] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -38,21 +34,6 @@ export function GroupsPage() {
   const activeGroups = myGroups.filter((g) => g.status !== 'completed');
   const closedGroups = myGroups.filter((g) => g.status === 'completed');
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setCreating(true);
-    try {
-      await groupsApi.create({ name, description: description || undefined });
-      setName('');
-      setDescription('');
-      setComposing(false);
-      queryClient.invalidateQueries({ queryKey: ['groups'] });
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
     <PageContainer wide>
       <div className="flex items-end justify-between gap-4">
@@ -65,27 +46,7 @@ export function GroupsPage() {
 
       {composing && (
         <Card className="mt-6">
-          <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3">
-            <TextField
-              label={t('groups.groupName')}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              className="min-w-[160px] flex-1"
-            />
-            <TextField
-              label={t('newActivity.description')}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="min-w-[200px] flex-[2]"
-            />
-            <Button type="submit" disabled={creating}>
-              {creating ? t('groups.creating') : t('groups.createGroup')}
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setComposing(false)}>
-              {t('common.cancel')}
-            </Button>
-          </form>
+          <NewGroupForm groups={myGroups} onDone={() => setComposing(false)} />
         </Card>
       )}
 
