@@ -407,6 +407,23 @@ export const en = {
       'A group holds a roster and the activities that run inside it — a yoga term, a photo club, one trip departure.',
     active: 'Active',
     closed: 'Closed',
+    from: {
+      pick: 'Start from',
+      none: 'A blank group',
+      hint: 'Carries over what you choose below. You can change everything about the new group afterwards.',
+      nameSuffix: '(copy)',
+      loading: 'Loading…',
+      copyRoster: 'Copy the roster',
+      copyRosterHint:
+        'The current members are added straight away, parties included. Pending invitations are not copied.',
+      copyEvents: 'Copy the events',
+      copyEventsHint:
+        'Every event comes across as a draft, with its stops. Replies and attendance stay behind, and nobody is told until you publish.',
+      noEvents: 'This group has no events to copy.',
+      firstEventOn: 'First event on',
+      firstEventHint: 'It is on {{when}} now. The other events move by the same number of days.',
+      failed: 'Failed to create the group',
+    },
   },
   groupPage: {
     closed: 'Closed',
@@ -418,24 +435,6 @@ export const en = {
     deleting: 'Deleting…',
     confirmDelete:
       'Delete "{{name}}"? This removes the group, its roster, activities, and meeting points. This cannot be undone.',
-    duplicate: {
-      open: 'Duplicate group',
-      title: 'New group from "{{name}}"',
-      hint: 'Start a new group from this one. You can change everything about it afterwards.',
-      nameSuffix: '(copy)',
-      copyRoster: 'Copy the roster',
-      copyRosterHint:
-        'The current members are added straight away, parties included. Pending invitations are not copied.',
-      copyEvents: 'Copy the events',
-      copyEventsHint:
-        'Every event comes across as a draft, with its stops. Replies and attendance stay behind, and nobody is told until you publish.',
-      noEvents: 'This group has no events to copy.',
-      firstEventOn: 'First event on',
-      firstEventHint: 'It is on {{when}} now. The other events move by the same number of days.',
-      submit: 'Create group',
-      creating: 'Creating…',
-      failed: 'Failed to duplicate the group',
-    },
     roster: 'Roster',
     partyOf: 'Party of {{count}}',
     emptyHeadline: 'Nobody on the roster yet',
