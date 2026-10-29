@@ -170,20 +170,19 @@ redirects and the app still shows the landing page itself at `/`.
 
 ## Environments (free plan)
 
-> **Staging is postponed.** There are no real users yet, so the cloud setup above is the test system and
-> testing needs none of this. Do it before real people's data goes into production. The photo storage
-> below (Backblaze B2) is **not** postponed — production uses it.
+> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master`.
 
 | | Production | Staging |
 |---|---|---|
 | Branch | `master` | `staging` |
-| Portal | `app.meetingpnt.com` | Cloudflare branch preview of `staging` |
-| API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) — not created yet |
+| Portal | `app.meetingpnt.com` | `https://staging-meetingpnt.eranlevin.workers.dev` (Cloudflare branch preview of `staging`) |
+| API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) |
 | Database | Neon `main` branch | Neon `staging` branch — starts as a copy of production, then diverges |
 | Photos | Backblaze B2 bucket | the same bucket, or a second one |
 | Phone app | EAS channel `production` | EAS channel `staging` (build profile `staging`) |
 
-Day to day: push to `staging`, test from any machine, merge to `master` when it's good. Every
+Day to day: push to `staging` (a Cloudflare build setting a variable does not rebuild — push, or retry
+the build), test from any machine, merge to `master` when it's good. Every
 Cloudflare *preview* of the portal, for any branch, talks to staging and never to production —
 the choice is made from the host name in `portal/src/lib/env.ts`, because Cloudflare gives all
 builds the same variables.
