@@ -202,21 +202,13 @@ redirects and the app still shows the landing page itself at `/`.
 
 ## Environments (free plan)
 
-<<<<<<< HEAD
-> **Staging is live** and is where changes are tested before `master` — see "Release flow" at the top.
-> The one-time setup below is kept for reference.
-=======
-> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master`.
->>>>>>> origin/master
+> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master` — see
+> "Release flow" at the top.
 
 | | Production | Staging |
 |---|---|---|
 | Branch | `master` | `staging` |
-<<<<<<< HEAD
-| Portal | `app.meetingpnt.com` | Cloudflare branch preview of `staging` |
-=======
 | Portal | `app.meetingpnt.com` | `https://staging-meetingpnt.eranlevin.workers.dev` (Cloudflare branch preview of `staging`) |
->>>>>>> origin/master
 | API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) |
 | Database | Neon `main` branch | Neon `staging` branch — starts as a copy of production, then diverges |
 | Photos | Backblaze B2 bucket | the same bucket, or a second one |
