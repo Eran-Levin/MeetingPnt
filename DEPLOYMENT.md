@@ -7,7 +7,39 @@ verification).
 
 ---
 
+## Release flow — two developers, test before production
+
+Staging is a second, separate copy of the whole system (own API, database, portal and phone-app
+channel), so a change is tried there before it can touch real users. See "Environments" below for
+the addresses.
+
+| Step | What |
+|---|---|
+| 1 | One developer starts the change on **a branch off `master`**. Never push work in progress straight to `staging` — two people's unfinished changes would end up mixed together there |
+| 2 | Check it before merging: `npm run typecheck` (and `npm run typecheck -w mobile` + `npx expo export --platform android` if `mobile/` changed). Run `npm run build:shared` first if `shared/` changed |
+| 3 | Merge the branch into **`staging`**. Render redeploys the staging API (~5 min) and Cloudflare builds the staging portal |
+| 4 | **Test on staging.** `npm run wake` first (free servers sleep). Portal: the Cloudflare preview of `staging`. Phone: `cd mobile && npx eas-cli@latest update --channel staging --message "<what>"`, then reopen the app twice. Use fake data |
+| 5 | Works → merge to **`master`**; the server and portal deploy on their own (~5 min). Phone-app changes then go out with `npm run update:mobile` (from `master`, production channel) |
+| 6 | Broken → fix on the branch and merge to `staging` again. Production never saw it |
+
+**Database changes:** each environment has its own database, so a migration is applied to staging
+first (`prisma migrate deploy` against the staging connection string), checked, and only then
+applied to production.
+
+**Emulator against staging:** set both `EXPO_PUBLIC_API_BASE_URL` and `EXPO_PUBLIC_SOCKET_URL` in
+`mobile/.env` to `https://meetingpnt-api-staging.onrender.com`, then restart Metro with
+`npx expo start -c` (the values are baked in at bundle time). Local backend values are
+`http://192.168.7.7:4000`.
+
+Staging and production share Render's free 750 hours a month, so don't leave either awake on a
+schedule.
+
+---
+
 ## Testing day to day — start here
+
+> This section describes testing against **production** from the `preview` app. For anything that
+> should be tried before real users see it, use the release flow above.
 
 Everything runs in the cloud. Your phone needs nothing on your laptop: no backend, no Metro, no
 Wi-Fi address, no Docker.
@@ -170,7 +202,8 @@ redirects and the app still shows the landing page itself at `/`.
 
 ## Environments (free plan)
 
-> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master`.
+> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master` — see
+> "Release flow" at the top.
 
 | | Production | Staging |
 |---|---|---|
