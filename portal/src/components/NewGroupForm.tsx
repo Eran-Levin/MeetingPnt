@@ -7,7 +7,7 @@ import { groupsApi } from '../api/groupsApi.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 import { Select } from './ui/Select.js';
-import { TextField } from './ui/TextField.js';
+import { TextArea, TextField } from './ui/TextField.js';
 
 interface Props {
   /** Groups this leader runs — what a new group can start from. */
@@ -133,22 +133,19 @@ export function NewGroupForm({ groups, onDone }: Props) {
         </Select>
       )}
 
-      <div className="flex flex-wrap items-end gap-3">
-        <TextField
-          label={t('groups.groupName')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoFocus
-          required
-          className="min-w-[160px] flex-1"
-        />
-        <TextField
-          label={t('newActivity.description')}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="min-w-[200px] flex-[2]"
-        />
-      </div>
+      <TextField
+        label={t('groups.groupName')}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoFocus
+        required
+      />
+      <TextArea
+        label={t('newActivity.description')}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+      />
 
       {source && (
         <>

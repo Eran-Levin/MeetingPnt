@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { authApi } from '../api/authApi.js';
 import { useLocaleSync, useTranslation } from '../i18n/index.js';
+import { isMarketingHost } from '../lib/site.js';
 import { useAuthStore } from '../store/authStore.js';
 
 /** Attempts a silent refresh via the httpOnly cookie on first load, then renders children. */
@@ -19,7 +20,9 @@ export function Bootstrap({ children }: { children: React.ReactNode }) {
       .finally(() => setReady(true));
   }, [setSession, clearSession]);
 
-  if (!ready) {
+  // The public site must not wait on a sleeping API: it renders at once, and MarketingGate
+  // redirects if the session check turns up someone signed in.
+  if (!ready && !isMarketingHost) {
     return <p style={{ padding: 24 }}>{t('common.loading')}</p>;
   }
 
