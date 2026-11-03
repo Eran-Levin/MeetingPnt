@@ -253,7 +253,7 @@ on a local disk are not migrated.
 
 | # | Action | Who |
 |---|---|---|
-| 1 | Neon console → Branches → create `staging` from `main`; copy its connection string (add `connect_timeout=30`) | Me |
+| 1 | Neon console → Branches → create `staging` from `main`; set **Auto Delete to Never** (the staging branch went missing once and the API failed with "can't reach database"; it was recreated with this set); copy its connection string (add `connect_timeout=30`) | Me |
 | 2 | Render → New → Web Service → this repo, branch `staging`, runtime Docker, Dockerfile `backend/Dockerfile`, root directory empty, **name `meetingpnt-api-staging`**, Free | Me |
 | 3 | Its environment: `NODE_ENV=production`, `DATABASE_URL` (the staging branch), **new random** `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`, `BACKEND_PUBLIC_URL` (its own URL), `PORTAL_URL` and `CORS_ORIGINS` (the staging portal URL), the `S3_*` values from above, and `GOOGLE_MAPS_API_KEY` / `RESEND_*` copied from production | Me |
 | 4 | Create and push the `staging` branch from `master` | Claude |
