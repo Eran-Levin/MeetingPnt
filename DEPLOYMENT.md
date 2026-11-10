@@ -7,7 +7,75 @@ verification).
 
 ---
 
+## Release flow — two developers, test before production
+
+Staging is a second, separate copy of the whole system (own API, database, portal and phone-app
+channel), so a change is tried there before it can touch real users. See "Environments" below for
+the addresses.
+
+| Step | What |
+|---|---|
+| 1 | One developer starts the change on **a branch off `master`**. Never push work in progress straight to `staging` — two people's unfinished changes would end up mixed together there |
+| 2 | Check it before merging: `npm run typecheck` (and `npm run typecheck -w mobile` + `npx expo export --platform android` if `mobile/` changed). Run `npm run build:shared` first if `shared/` changed |
+| 3 | Merge the branch into **`staging`**. Render redeploys the staging API (~5 min) and Cloudflare builds the staging portal |
+| 4 | **Test on staging.** `npm run wake` first (free servers sleep). Portal: the Cloudflare preview of `staging`. Phone: `cd mobile && npx eas-cli@latest update --channel staging --message "<what>"`, then reopen the app twice. Use fake data |
+| 5 | Works → merge to **`master`**; the server and portal deploy on their own (~5 min). Phone-app changes then go out with `npm run update:mobile` (from `master`, production channel) |
+| 6 | Broken → fix on the branch and merge to `staging` again. Production never saw it |
+
+**Database changes:** each environment has its own database, so a migration is applied to staging
+first (`prisma migrate deploy` against the staging connection string), checked, and only then
+applied to production.
+
+**Trying a UI or flow change from your own PC:** see "Test a branch on your PC" below.
+
+Staging and production share Render's free 750 hours a month, so don't leave either awake on a
+schedule.
+
+---
+
+## Test a branch on your PC (UI and flow changes, against staging)
+
+For a branch that changes only how things look or flow. The app code runs on your PC; the API and
+database are staging in the cloud, so no Docker, no `dev:backend`. If the branch changes the API or
+the database, merge it to `staging` first instead (see "Release flow").
+
+**One-time setup**
+
+| # | What |
+|---|---|
+| 1 | Android Studio → Device Manager → create a Pixel with the latest recommended system image |
+| 2 | `mobile/.env.local` (gitignored; Expo loads it over `mobile/.env`): `EXPO_PUBLIC_API_BASE_URL` and `EXPO_PUBLIC_SOCKET_URL` both `https://meetingpnt-api-staging.onrender.com` |
+| 3 | `portal/.env.local` (gitignored; Vite loads it over `portal/.env`): `VITE_API_BASE_URL` and `VITE_SOCKET_URL`, same address |
+| 4 | Render → staging API → Environment: `CORS_ORIGINS` must include `http://localhost:5173`, comma-separated, **with** `http://` and no trailing slash. Without it, portal login fails with a CORS error. Check: `curl -si -X OPTIONS <staging>/health -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET"` shows `access-control-allow-origin` |
+
+Delete a `.env.local` to point that app back at a local backend.
+
+**Each time**
+
+```bash
+git checkout <branch>
+npm run wake                              # wakes production and staging (free servers sleep)
+cd mobile && npx expo start --go --android -c    # start the emulator first
+npm run dev:portal                        # in another terminal; http://localhost:5173
+```
+
+- Log in with a real staging account (staging's database started as a copy of production's); create
+  only fake data.
+- `--go` is needed because the project has a development client and Expo would otherwise look for a
+  dev build on the emulator. Expo Go has no push notifications and no native code beyond its own.
+- Restart with `-c` after changing a `.env.local` (values are baked in at bundle time) or after
+  switching branches.
+- This runs the branch's UI against the code staging is *running*. If the branch needs a new
+  endpoint or column, staging won't have it until the branch is merged there.
+
+**Neon:** the `staging` branch must have Auto Delete set to Never.
+
+---
+
 ## Testing day to day — start here
+
+> This section describes testing against **production** from the `preview` app. For anything that
+> should be tried before real users see it, use the release flow above.
 
 Everything runs in the cloud. Your phone needs nothing on your laptop: no backend, no Metro, no
 Wi-Fi address, no Docker.
@@ -170,7 +238,8 @@ redirects and the app still shows the landing page itself at `/`.
 
 ## Environments (free plan)
 
-> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master`.
+> **Staging is live** (set up 2026-10-29). Test a change there before merging it to `master` — see
+> "Release flow" at the top.
 
 | | Production | Staging |
 |---|---|---|
@@ -220,7 +289,7 @@ on a local disk are not migrated.
 
 | # | Action | Who |
 |---|---|---|
-| 1 | Neon console → Branches → create `staging` from `main`; copy its connection string (add `connect_timeout=30`) | Me |
+| 1 | Neon console → Branches → create `staging` from `main`; set **Auto Delete to Never** (the staging branch went missing once and the API failed with "can't reach database"; it was recreated with this set); copy its connection string (add `connect_timeout=30`) | Me |
 | 2 | Render → New → Web Service → this repo, branch `staging`, runtime Docker, Dockerfile `backend/Dockerfile`, root directory empty, **name `meetingpnt-api-staging`**, Free | Me |
 | 3 | Its environment: `NODE_ENV=production`, `DATABASE_URL` (the staging branch), **new random** `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`, `BACKEND_PUBLIC_URL` (its own URL), `PORTAL_URL` and `CORS_ORIGINS` (the staging portal URL), the `S3_*` values from above, and `GOOGLE_MAPS_API_KEY` / `RESEND_*` copied from production | Me |
 | 4 | Create and push the `staging` branch from `master` | Claude |
