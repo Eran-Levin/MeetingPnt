@@ -82,7 +82,7 @@ function GroupSection({ title, groups }: { title: string; groups: GroupWithRole[
         {title} <span className="text-line-strong">({groups.length})</span>
       </h2>
 
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+      <ul className="mt-3 grid gap-3">
         {groups.map((group) => (
           <li key={group.id}>
             <Link to={`/groups/${group.id}`} className="block h-full">
