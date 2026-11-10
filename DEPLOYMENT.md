@@ -26,13 +26,49 @@ the addresses.
 first (`prisma migrate deploy` against the staging connection string), checked, and only then
 applied to production.
 
-**Emulator against staging:** set both `EXPO_PUBLIC_API_BASE_URL` and `EXPO_PUBLIC_SOCKET_URL` in
-`mobile/.env` to `https://meetingpnt-api-staging.onrender.com`, then restart Metro with
-`npx expo start -c` (the values are baked in at bundle time). Local backend values are
-`http://192.168.7.7:4000`.
+**Trying a UI or flow change from your own PC:** see "Test a branch on your PC" below.
 
 Staging and production share Render's free 750 hours a month, so don't leave either awake on a
 schedule.
+
+---
+
+## Test a branch on your PC (UI and flow changes, against staging)
+
+For a branch that changes only how things look or flow. The app code runs on your PC; the API and
+database are staging in the cloud, so no Docker, no `dev:backend`. If the branch changes the API or
+the database, merge it to `staging` first instead (see "Release flow").
+
+**One-time setup**
+
+| # | What |
+|---|---|
+| 1 | Android Studio → Device Manager → create a Pixel with the latest recommended system image |
+| 2 | `mobile/.env.local` (gitignored; Expo loads it over `mobile/.env`): `EXPO_PUBLIC_API_BASE_URL` and `EXPO_PUBLIC_SOCKET_URL` both `https://meetingpnt-api-staging.onrender.com` |
+| 3 | `portal/.env.local` (gitignored; Vite loads it over `portal/.env`): `VITE_API_BASE_URL` and `VITE_SOCKET_URL`, same address |
+| 4 | Render → staging API → Environment: `CORS_ORIGINS` must include `http://localhost:5173`, comma-separated, **with** `http://` and no trailing slash. Without it, portal login fails with a CORS error. Check: `curl -si -X OPTIONS <staging>/health -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: GET"` shows `access-control-allow-origin` |
+
+Delete a `.env.local` to point that app back at a local backend.
+
+**Each time**
+
+```bash
+git checkout <branch>
+npm run wake                              # wakes production and staging (free servers sleep)
+cd mobile && npx expo start --go --android -c    # start the emulator first
+npm run dev:portal                        # in another terminal; http://localhost:5173
+```
+
+- Log in with a real staging account (staging's database started as a copy of production's); create
+  only fake data.
+- `--go` is needed because the project has a development client and Expo would otherwise look for a
+  dev build on the emulator. Expo Go has no push notifications and no native code beyond its own.
+- Restart with `-c` after changing a `.env.local` (values are baked in at bundle time) or after
+  switching branches.
+- This runs the branch's UI against the code staging is *running*. If the branch needs a new
+  endpoint or column, staging won't have it until the branch is merged there.
+
+**Neon:** the `staging` branch must have Auto Delete set to Never.
 
 ---
 
