@@ -63,6 +63,21 @@ export async function listMeetingPoints(activityId: string): Promise<MeetingPoin
   `;
 }
 
+/** Where each of these activities starts — the first stop on its plan — in one query, for the
+ * calendar feed, which needs a location per event and would otherwise ask once per activity. */
+export async function listFirstMeetingPoints(
+  activityIds: string[],
+): Promise<{ activityId: string; label: string | null; googleMapsUrl: string }[]> {
+  if (activityIds.length === 0) return [];
+  return prisma.$queryRaw`
+    SELECT DISTINCT ON (activity_id)
+      activity_id AS "activityId", label, google_maps_url AS "googleMapsUrl"
+    FROM meeting_points
+    WHERE activity_id IN (${Prisma.join(activityIds)})
+    ORDER BY activity_id, created_at ASC
+  `;
+}
+
 /** The stops the group has actually reached, oldest first. */
 export async function listArrivedMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
   return prisma.$queryRaw<MeetingPointRow[]>`

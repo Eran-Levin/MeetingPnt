@@ -6,6 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { authApi } from '../src/api/authApi';
 import { apiErrorMessage, useTranslation } from '../src/i18n';
 import { usersApi } from '../src/api/usersApi';
+import { CalendarFeedSection } from '../src/features/account/CalendarFeedSection';
 import { secureStore } from '../src/services/secureStore';
 import { endSession } from '../src/services/session';
 import { useAuthStore } from '../src/store/authStore';
@@ -195,6 +196,8 @@ export default function AccountScreen() {
           ))}
         </ChipRow>
       </Section>
+
+      <CalendarFeedSection />
 
       <Section label={t('account.session')}>
         <Button label={t('account.logOut')} variant="secondary" onPress={handleLogout} />

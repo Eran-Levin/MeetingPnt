@@ -11,6 +11,7 @@ import {
   meetingPointAttendanceRouter,
 } from './modules/attendance/routes.js';
 import { authRouter } from './modules/auth/routes.js';
+import { calendarFeedRouter, calendarFeedSettingsRouter } from './modules/calendar/routes.js';
 import { chatRouter } from './modules/chat/routes.js';
 import { directMessagesRouter } from './modules/directMessages/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
@@ -48,6 +49,9 @@ export function createApp() {
   // Local disk or, for a private bucket, fetched from it — see lib/uploads.ts.
   app.use('/uploads', uploadsRouter());
 
+  // Public by design: a calendar app fetching a subscription can't log in. See modules/calendar.
+  app.use('/calendar', calendarFeedRouter);
+
   app.use('/api/auth', authRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/groups', groupsRouter);
@@ -64,6 +68,7 @@ export function createApp() {
   app.use('/api/meeting-points', meetingPointsRouter);
   app.use('/api/activities', locationsRouter);
   app.use('/api/activities/:activityId', activityInvitationsRouter);
+  app.use('/api/users/me/calendar-feed', calendarFeedSettingsRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/direct-messages', directMessagesRouter);
 

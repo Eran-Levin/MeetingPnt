@@ -474,5 +474,6 @@ export async function generateIcs(activityId: string, requesterId: string): Prom
     description: activity.description,
     startAt: activity.startAt,
     endAt: activity.endAt,
+    allDay: activity.allDay,
   });
 }
