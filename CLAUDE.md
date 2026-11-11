@@ -120,6 +120,14 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Waze is a way to navigate, nothing more.** `User.navApp` (Account screen) picks what "Directions" opens; `navigationUrl` in `shared/src/utils` builds the link — Google uses the leader's saved URL, Waze is built from the stored coordinates. Planning, the leader's live position and the ETA stay on Google Maps (Waze has no routing API), so leaders still paste Google links.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
+- **Their own calendar is a subscription, not an integration.** Each user has a private feed link
+  (`User.calendarToken`, `backend/src/modules/calendar`) that Google, Apple or Outlook re-reads on
+  its own schedule — no OAuth, no Google review, nothing paid. `/calendar/<token>.ics` is the one
+  route that serves events without a session, so the token is the credential and "Reset link" is
+  the revocation. The feed leaves out drafts and cancelled events **for the leader too** (a
+  subscription is a copy held by a third party; unpublished plans don't belong there) and anything
+  the person declined. All-day trips are stored as local-midnight instants with no time zone, so
+  the day is recovered by rounding (`formatIcsDay` in `lib/ics.ts`).
 - **A member has one destination.** Their read-only view of a roster didn't earn a permanent tab,
   so mobile hides Groups for them and the tab bar goes away — the calendar is the app. Chat moved
   onto the event as a result, which is where a member's conversation nearly always belongs

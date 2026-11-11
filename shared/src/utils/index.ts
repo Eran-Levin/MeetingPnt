@@ -117,3 +117,18 @@ export function navigationUrl(
   }
   return point.googleMapsUrl;
 }
+
+/**
+ * The two ways a calendar app takes a subscription, from one feed address.
+ *
+ * `webcal` is the scheme Apple Calendar and Outlook claim: opening it offers to subscribe. Google
+ * Calendar claims nothing, so it gets its own "add by URL" page with the feed passed in — and it
+ * wants the `webcal` form there too.
+ */
+export function calendarSubscribeLinks(feedUrl: string): { webcal: string; google: string } {
+  const webcal = feedUrl.replace(/^https?:\/\//, 'webcal://');
+  return {
+    webcal,
+    google: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`,
+  };
+}

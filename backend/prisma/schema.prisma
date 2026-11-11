@@ -85,6 +85,9 @@ model User {
   locale       String   @default("en")
   // Which app "Directions" opens (google_maps | waze). Plain text, validated against shared NavApp.
   navApp       String   @default("google_maps") @map("nav_app")
+  // The secret in their calendar subscription link — a calendar app can't log in, so the link is
+  // the credential. Null until first asked for; replaced on reset, which kills the old link.
+  calendarToken String? @unique @map("calendar_token")
   // A roster slot for someone with no account of their own (e.g. a child in a party) — a real
   // User row so Rsvp/Attendance/GroupMember work unchanged, but passwordHash is unusable and
   // login can never succeed. Flipped false in place when the person later claims it via their
