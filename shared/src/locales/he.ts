@@ -765,4 +765,20 @@ export const he: Catalog = {
     session: 'התחברות',
     logOut: 'התנתקות',
   },
+  calendarFeed: {
+    title: 'לוח השנה שלכם',
+    open: 'הוספה ללוח השנה שלכם',
+    blurb:
+      'הפעילויות שלכם ב-MeetingPnt, בלוח השנה של Google, Apple או Outlook. מוסיפים פעם אחת וזה מתעדכן מעצמו — שינויים עשויים להופיע רק אחרי כמה שעות.',
+    add: 'הוספה ללוח השנה שלי',
+    addGoogle: 'Google Calendar',
+    addOther: 'Apple או Outlook',
+    copy: 'העתקת קישור',
+    copied: 'הועתק',
+    reset: 'איפוס הקישור',
+    confirmResetTitle: 'לאפס את הקישור?',
+    confirmReset: 'לוחות שנה שכבר משתמשים בו יפסיקו להתעדכן עד שתוסיפו את הקישור החדש.',
+    privateNote: 'הקישור פרטי — כל מי שמחזיק בו יכול לראות את הפעילויות שלכם.',
+    failed: 'לא הצלחנו לקבל את הקישור ללוח השנה.',
+  },
 };

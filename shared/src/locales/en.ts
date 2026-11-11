@@ -776,6 +776,22 @@ export const en = {
     session: 'Session',
     logOut: 'Log out',
   },
+  calendarFeed: {
+    title: 'Your calendar',
+    open: 'Add to your calendar',
+    blurb:
+      'See your MeetingPnt events in Google, Apple or Outlook Calendar. Add it once and it keeps itself up to date — changes can take a few hours to show.',
+    add: 'Add to my calendar',
+    addGoogle: 'Google Calendar',
+    addOther: 'Apple or Outlook',
+    copy: 'Copy link',
+    copied: 'Copied',
+    reset: 'Reset link',
+    confirmResetTitle: 'Reset the link?',
+    confirmReset: 'Calendars that already use it will stop updating until you add the new one.',
+    privateNote: 'The link is private — anyone who has it can see your events.',
+    failed: 'Could not get your calendar link.',
+  },
 };
 
 export type Catalog = typeof en;

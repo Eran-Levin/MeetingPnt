@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
+import { CalendarFeedPanel } from '../../components/CalendarFeedPanel.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
@@ -56,6 +57,7 @@ export function ActivitiesPage() {
     <PageContainer wide>
       <h1 className="text-2xl font-semibold text-ink">{t('groupDetail.activities')}</h1>
       <p className="mt-1 text-sm text-ink-secondary">{t('activitiesPage.subtitle')}</p>
+      <CalendarFeedPanel />
 
       {isLoading && (
         <div className="mt-8">
