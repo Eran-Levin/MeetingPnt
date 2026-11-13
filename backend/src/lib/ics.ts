@@ -103,7 +103,3 @@ export function buildIcsCalendar(events: IcsEventInput[], name?: string): string
   ];
   return lines.map(fold).join('\r\n') + '\r\n';
 }
-
-export function buildIcsEvent(input: IcsEventInput): string {
-  return buildIcsCalendar([input]);
-}

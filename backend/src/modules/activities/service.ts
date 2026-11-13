@@ -17,7 +17,6 @@ import {
 } from '../../db/geo.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
-import { buildIcsEvent } from '../../lib/ics.js';
 import { toLocale } from '../../lib/userName.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
 import { assertMembership } from '../groups/service.js';
@@ -464,16 +463,4 @@ export async function deleteActivity(activityId: string, requesterId: string) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
   await prisma.activity.delete({ where: { id: activityId } });
-}
-
-export async function generateIcs(activityId: string, requesterId: string): Promise<string> {
-  const activity = await assertActivityParticipant(activityId, requesterId);
-  return buildIcsEvent({
-    uid: activity.id,
-    title: activity.title,
-    description: activity.description,
-    startAt: activity.startAt,
-    endAt: activity.endAt,
-    allDay: activity.allDay,
-  });
 }

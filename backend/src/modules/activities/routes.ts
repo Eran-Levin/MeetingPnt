@@ -119,14 +119,3 @@ activitiesRouter.delete('/:id', async (req, res, next) => {
     next(err);
   }
 });
-
-activitiesRouter.get('/:id/ics', async (req, res, next) => {
-  try {
-    const ics = await activitiesService.generateIcs(req.params.id as string, req.user!.id);
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="activity.ics"');
-    res.send(ics);
-  } catch (err) {
-    next(err);
-  }
-});

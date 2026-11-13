@@ -10,7 +10,7 @@ const LINK_CLASSES =
 
 /**
  * Puts the leader's schedule in the calendar they already live in. A subscription rather than the
- * per-event download: added once, it follows every reschedule and every newly published event.
+ * one-event file it replaced: added once, it follows every reschedule and every newly published event.
  *
  * Closed until asked for — the link is a secret, so it isn't fetched or put on screen for someone
  * who only came to read the list.

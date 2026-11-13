@@ -485,7 +485,6 @@ export const he: Catalog = {
     notApproved: 'ההגעה אינה מאושרת מראש',
     edit: 'עריכת הפעילות',
     publish: 'פרסום ועדכון המשתתפים',
-    download: 'הורדת קובץ .ics',
     whosComing: 'מי מגיע',
     publishToCollect: 'פרסמו את הפעילות כדי להתחיל לאסוף תשובות.',
     confirmEnd:
