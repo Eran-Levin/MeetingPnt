@@ -19,7 +19,7 @@ the addresses.
 | 2 | Check it before merging: `npm run typecheck` (and `npm run typecheck -w mobile` + `npx expo export --platform android` if `mobile/` changed). Run `npm run build:shared` first if `shared/` changed |
 | 3 | Merge the branch into **`staging`**. Render redeploys the staging API (~5 min) and Cloudflare builds the staging portal |
 | 4 | **Test on staging.** `npm run wake` first (free servers sleep). Portal: the Cloudflare preview of `staging`. Phone: `cd mobile && npx eas-cli@latest update --channel staging --message "<what>"`, then reopen the app twice. Use fake data |
-| 5 | Works → merge to **`master`**; the server and portal deploy on their own (~5 min). Phone-app changes then go out with `npm run update:mobile` (from `master`, production channel) |
+| 5 | Works → merge to **`master`**; the server and portal deploy on their own (~5 min). Phone-app changes then go out with `npm run update:mobile` (from `master`; it publishes to the `preview` channel — the installed app that talks to production) |
 | 6 | Broken → fix on the branch and merge to `staging` again. Production never saw it |
 
 **Database changes:** each environment has its own database, so a migration is applied to staging
@@ -248,7 +248,7 @@ redirects and the app still shows the landing page itself at `/`.
 | API | `api.meetingpnt.com` (Render) | `meetingpnt-api-staging.onrender.com` (Render) |
 | Database | Neon `main` branch | Neon `staging` branch — starts as a copy of production, then diverges |
 | Photos | Backblaze B2 bucket | the same bucket, or a second one |
-| Phone app | EAS channel `production` | EAS channel `staging` (build profile `staging`) |
+| Phone app | EAS channel `preview` (build profile `preview` — named for the kind of build, but it talks to the production API). The `production` profile and channel in `eas.json` are for a store build and are not in use | EAS channel `staging` (build profile `staging`) |
 
 Day to day: push to `staging` (a Cloudflare build setting a variable does not rebuild — push, or retry
 the build), test from any machine, merge to `master` when it's good. Every
