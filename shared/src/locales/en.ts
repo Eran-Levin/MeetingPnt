@@ -491,7 +491,6 @@ export const en = {
     notApproved: 'attendance not approved',
     edit: 'Edit activity',
     publish: 'Publish & notify members',
-    download: 'Download .ics',
     whosComing: 'Who’s coming',
     publishToCollect: 'Publish this event to start collecting replies.',
     confirmEnd:
