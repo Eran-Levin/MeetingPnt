@@ -317,7 +317,10 @@ export async function publishActivity(activityId: string, requesterId: string) {
           to: token.expoPushToken,
           title: pushText(locale, 'activityPublishedTitle', { group: isolate(group.name) }),
           body: pushText(locale, 'activityPublishedBody', { title: isolate(activity.title) }),
-          data: { type: 'activity_published', activityId },
+          // The category is what puts "Add to calendar" on the notification itself; the group
+          // id is what lets a tap open the event (its screen lives under the group).
+          data: { type: 'activity_published', activityId, groupId: activity.groupId },
+          categoryId: 'activity_published',
         }));
       }),
   );

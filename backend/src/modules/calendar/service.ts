@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { buildIcsCalendar } from '@meetingpnt/shared';
 import { listFirstMeetingPoints } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
-import { buildIcsCalendar } from '../../lib/ics.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
 /** Long enough that guessing one is not a thing; URL-safe so it drops straight into the link. */

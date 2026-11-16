@@ -764,14 +764,17 @@ export const he: Catalog = {
     session: 'התחברות',
     logOut: 'התנתקות',
   },
+  addToCalendar: {
+    label: 'הוספה ללוח השנה',
+    google: 'Google Calendar',
+    file: 'Apple או Outlook',
+    failed: 'לא הצלחנו לפתוח את לוח השנה.',
+  },
   calendarFeed: {
     title: 'לוח השנה שלכם',
-    open: 'הוספה ללוח השנה שלכם',
     blurb:
       'הפעילויות שלכם ב-MeetingPnt, בלוח השנה של Google, Apple או Outlook. מוסיפים פעם אחת וזה מתעדכן מעצמו — שינויים עשויים להופיע רק אחרי כמה שעות.',
     add: 'הוספה ללוח השנה שלי',
-    addGoogle: 'Google Calendar',
-    addOther: 'Apple או Outlook',
     copy: 'העתקת קישור',
     copied: 'הועתק',
     reset: 'איפוס הקישור',

@@ -120,14 +120,21 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Waze is a way to navigate, nothing more.** `User.navApp` (Account screen) picks what "Directions" opens; `navigationUrl` in `shared/src/utils` builds the link — Google uses the leader's saved URL, Waze is built from the stored coordinates. Planning, the leader's live position and the ETA stay on Google Maps (Waze has no routing API), so leaders still paste Google links.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
-- **Their own calendar is a subscription, not an integration.** Each user has a private feed link
-  (`User.calendarToken`, `backend/src/modules/calendar`) that Google, Apple or Outlook re-reads on
-  its own schedule — no OAuth, no Google review, nothing paid. `/calendar/<token>.ics` is the one
-  route that serves events without a session, so the token is the credential and "Reset link" is
-  the revocation. The feed leaves out drafts and cancelled events **for the leader too** (a
-  subscription is a copy held by a third party; unpublished plans don't belong there) and anything
-  the person declined. All-day trips are stored as local-midnight instants with no time zone, so
-  the day is recovered by rounding (`formatIcsDay` in `lib/ics.ts`).
+- **Adding to a calendar is per event, and it is a copy.** A leader adds an event from its page
+  on the portal (drafts included — it's their plan); a member is offered it on the publish
+  notification itself ("Add to calendar", category `activity_published`) and again on the event
+  screen while the event is still ahead. Everything goes through `shared/src/utils/calendar.ts`:
+  a filled-in Google Calendar link (which is also what the phone opens — no permission, no native
+  module) and, on the portal, an `.ics` file for Apple and Outlook. It doesn't follow a later
+  reschedule. All-day trips are stored as local-midnight instants with no time zone, so the day is
+  recovered by rounding (`compactDay`). A published *series* gets no button: there is no link
+  that adds twenty events.
+- **The subscription feed exists but is not the main road.** `User.calendarToken` and
+  `/calendar/<token>.ics` (`backend/src/modules/calendar`) give each user a private link that
+  Google, Apple or Outlook re-reads; it is offered only in mobile Account. It was on the portal's
+  Activities page and event page and was taken off both — "subscribe to everything" answered a
+  question nobody on an event page was asking. It leaves out drafts and cancelled events for the
+  leader too, and anything the person declined. The token is the credential; "Reset link" revokes.
 - **A member has one destination.** Their read-only view of a roster didn't earn a permanent tab,
   so mobile hides Groups for them and the tab bar goes away — the calendar is the app. Chat moved
   onto the event as a result, which is where a member's conversation nearly always belongs
