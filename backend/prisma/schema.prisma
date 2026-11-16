@@ -285,6 +285,11 @@ model Activity {
   // a force-quit app or a dead battery can't leave the channel open indefinitely; null means not
   // broadcasting, and a time in the past means the lease lapsed. Capped at the activity's end.
   leaderBroadcastUntil  DateTime? @map("leader_broadcast_until")
+  // Set when a series is published: the whole series goes to calendars as ONE repeating entry, and
+  // this is the start this occurrence had in it. A later change or removal of just this date has
+  // to name it by that original start, however often it has moved since. Null = invited on its
+  // own, under its own id.
+  invitedInstanceStart  DateTime? @map("invited_instance_start")
   createdBy     String         @map("created_by")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")

@@ -1,6 +1,5 @@
 import type { LocationSnapshotWithUser, MeetingPoint, RsvpStatus } from '@meetingpnt/shared';
 import {
-  activityCalendarEvent,
   formatActivityWhen,
   isLeaderBroadcasting,
   isolate,
@@ -10,7 +9,7 @@ import type { TFunction } from 'i18next';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../../../../src/api/activitiesApi';
 import { activityInvitationsApi } from '../../../../../../src/api/activityInvitationsApi';
 import { attendanceApi } from '../../../../../../src/api/attendanceApi';
@@ -25,7 +24,6 @@ import { MemberPanel } from '../../../../../../src/features/activity/MemberPanel
 import { RollCallList } from '../../../../../../src/features/activity/RollCallList';
 import { RouteList } from '../../../../../../src/features/activity/RouteList';
 import { VisitorInvite } from '../../../../../../src/features/activity/VisitorInvite';
-import { openInCalendar } from '../../../../../../src/services/calendar';
 import { getCurrentLocationSnapshot, watchPosition } from '../../../../../../src/services/location';
 import { useAuthStore } from '../../../../../../src/store/authStore';
 import {
@@ -606,24 +604,6 @@ export default function ActivityDetailScreen() {
           mapsLinkFor={mapsLinkFor}
         />
       )}
-
-      {/* Only while it's still ahead: once the event is running the calendar has done its job,
-          and someone who said they can't make it has no use for it. */}
-      {(activity.status === 'published' || (isLeader && activity.status === 'draft')) &&
-        myStatus !== 'declined' && (
-          <Button
-            label={t('addToCalendar.label')}
-            variant="quiet"
-            onPress={() =>
-              openInCalendar(
-                activityCalendarEvent(activity, {
-                  groupName: groupQuery.data?.group.name,
-                  start: meetingPoints[0],
-                }),
-              ).catch(() => Alert.alert(t('addToCalendar.failed')))
-            }
-          />
-        )}
 
       {/* Who else is coming. Names only — attendance is the leader's view. Tapping someone opens
           a thread with just them, which is where sorting a lift belongs: the group chat is for
