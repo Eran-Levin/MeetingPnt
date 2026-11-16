@@ -775,14 +775,17 @@ export const en = {
     session: 'Session',
     logOut: 'Log out',
   },
+  addToCalendar: {
+    label: 'Add to calendar',
+    google: 'Google Calendar',
+    file: 'Apple or Outlook',
+    failed: 'Could not open your calendar.',
+  },
   calendarFeed: {
     title: 'Your calendar',
-    open: 'Add to your calendar',
     blurb:
       'See your MeetingPnt events in Google, Apple or Outlook Calendar. Add it once and it keeps itself up to date — changes can take a few hours to show.',
     add: 'Add to my calendar',
-    addGoogle: 'Google Calendar',
-    addOther: 'Apple or Outlook',
     copy: 'Copy link',
     copied: 'Copied',
     reset: 'Reset link',
