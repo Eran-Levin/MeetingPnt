@@ -1,5 +1,3 @@
-import type { Activity, MeetingPoint } from '../types/index.js';
-
 /** One event as a calendar app wants it — the common shape behind every way of handing one over. */
 export interface CalendarEvent {
   uid: string;
@@ -11,31 +9,6 @@ export interface CalendarEvent {
   /** Date-only (a multi-day trip). Written as whole days so it sits in the all-day strip. */
   allDay?: boolean;
   updatedAt?: Date;
-}
-
-/**
- * An activity as a calendar entry: its group, what the leader wrote, and where it starts.
- * No labels, so nothing here needs translating.
- */
-export function activityCalendarEvent(
-  activity: Pick<
-    Activity,
-    'id' | 'title' | 'description' | 'startAt' | 'endAt' | 'allDay' | 'updatedAt'
-  >,
-  context: { groupName?: string | null; start?: Pick<MeetingPoint, 'label' | 'googleMapsUrl'> | null },
-): CalendarEvent {
-  return {
-    uid: activity.id,
-    title: activity.title,
-    description: [context.groupName, activity.description, context.start?.googleMapsUrl]
-      .filter(Boolean)
-      .join('\n\n'),
-    location: context.start?.label ?? null,
-    startAt: new Date(activity.startAt),
-    endAt: new Date(activity.endAt),
-    allDay: activity.allDay,
-    updatedAt: new Date(activity.updatedAt),
-  };
 }
 
 function compactInstant(date: Date): string {
@@ -59,24 +32,6 @@ function span(event: CalendarEvent): { start: string; end: string } {
   return event.allDay
     ? { start: compactDay(event.startAt), end: compactDay(new Date(event.endAt.getTime() + 1000)) }
     : { start: compactInstant(event.startAt), end: compactInstant(event.endAt) };
-}
-
-/**
- * Google Calendar's "new event" page, filled in. Needs no file and no sign-in to us — and on
- * Android the Calendar app opens it directly, which is what makes it the phone's way in.
- */
-export function googleCalendarEventUrl(event: CalendarEvent): string {
-  const { start, end } = span(event);
-  const params = [
-    ['action', 'TEMPLATE'],
-    ['text', event.title],
-    ['dates', `${start}/${end}`],
-    ...(event.description ? [['details', event.description]] : []),
-    ...(event.location ? [['location', event.location]] : []),
-  ];
-  return `https://calendar.google.com/calendar/render?${params
-    .map(([key, value]) => `${key}=${encodeURIComponent(value!)}`)
-    .join('&')}`;
 }
 
 function escapeIcsText(value: string): string {
@@ -113,7 +68,7 @@ function fold(line: string): string {
   return parts.join('\r\n ');
 }
 
-function eventLines(event: CalendarEvent, stamp: string): string[] {
+function eventLines(event: CalendarEvent, stamp: string, extra: string[] = []): string[] {
   const { start, end } = span(event);
   const value = event.allDay ? ';VALUE=DATE' : '';
   return [
@@ -126,6 +81,7 @@ function eventLines(event: CalendarEvent, stamp: string): string[] {
     `SUMMARY:${escapeIcsText(event.title)}`,
     ...(event.description ? [`DESCRIPTION:${escapeIcsText(event.description)}`] : []),
     ...(event.location ? [`LOCATION:${escapeIcsText(event.location)}`] : []),
+    ...extra,
     'END:VEVENT',
   ];
 }
@@ -151,6 +107,70 @@ export function buildIcsCalendar(events: CalendarEvent[], name?: string): string
         ]
       : []),
     ...events.flatMap((event) => eventLines(event, stamp)),
+    'END:VCALENDAR',
+  ];
+  return lines.map(fold).join('\r\n') + '\r\n';
+}
+
+/** A parameter value (a person's name) — quoted, so a comma or colon in it can't end the value. */
+function quoteParam(value: string): string {
+  return `"${value.replace(/["\r\n]/g, ' ')}"`;
+}
+
+export interface CalendarInvitation {
+  /** `request` puts the event on the calendar or moves it; `cancel` takes it off. */
+  method: 'request' | 'cancel';
+  event: CalendarEvent;
+  /**
+   * What makes a calendar accept a change: it ignores anything not newer than what it holds. Must
+   * only ever grow for one `uid`.
+   */
+  sequence: number;
+  /** Who the calendar shows as having sent it. The address has to be the one the email comes from. */
+  organizer: { name: string; email: string };
+  /** The one person this copy is for. Nobody else is listed — a roster is not theirs to read. */
+  attendee: { name: string; email: string };
+  /**
+   * The other dates of a series, making this one repeating entry rather than twenty invitations.
+   * Listed outright, not as a weekly rule: the occurrences are stored as separate events and a rule
+   * would have to guess a time zone the server doesn't know.
+   */
+  moreStarts?: Date[];
+  /** Which date of a series this is about — the start it was invited with. Without it, a change
+   * means the whole series. */
+  instanceStart?: Date;
+}
+
+/**
+ * A calendar invitation, as the file an email carries. Gmail, Outlook and Apple Mail read it and
+ * put the event on the calendar themselves; sending the same `uid` again with a higher `sequence`
+ * moves it, and `cancel` removes it.
+ *
+ * It asks for no reply (`RSVP=FALSE`): whether someone is coming is answered in the app, and a
+ * calendar's own Yes/No would go to an address nobody reads.
+ */
+export function buildIcsInvitation(invitation: CalendarInvitation): string {
+  const { event, organizer, attendee } = invitation;
+  const cancel = invitation.method === 'cancel';
+  const value = event.allDay ? ';VALUE=DATE' : '';
+  const day = event.allDay ? compactDay : compactInstant;
+  const extra = [
+    `SEQUENCE:${invitation.sequence}`,
+    `STATUS:${cancel ? 'CANCELLED' : 'CONFIRMED'}`,
+    `ORGANIZER;CN=${quoteParam(organizer.name)}:mailto:${organizer.email}`,
+    `ATTENDEE;CN=${quoteParam(attendee.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:${attendee.email}`,
+    ...(invitation.moreStarts?.length
+      ? [`RDATE${value}:${invitation.moreStarts.map(day).join(',')}`]
+      : []),
+    ...(invitation.instanceStart ? [`RECURRENCE-ID${value}:${day(invitation.instanceStart)}`] : []),
+  ];
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//MeetingPnt//EN',
+    'CALSCALE:GREGORIAN',
+    `METHOD:${cancel ? 'CANCEL' : 'REQUEST'}`,
+    ...eventLines(event, compactInstant(new Date()), extra),
     'END:VCALENDAR',
   ];
   return lines.map(fold).join('\r\n') + '\r\n';

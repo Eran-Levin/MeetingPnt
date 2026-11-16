@@ -224,6 +224,22 @@ misfire. Revisit only if manual roll-call proves too tedious in practice.
 a map. What shipped instead is Google Maps URL parsing, which covers the same need more
 simply. Worth reconsidering only if pasting links proves awkward on mobile.
 
+**Calendar invitations cover publish, edit and delete — not who joins later, and not the route.**
+Someone added to a group or invited as a visitor *after* an event was published gets no
+invitation for it, a member who leaves a group keeps the entries they already have, and changing
+the first stop doesn't update the location on calendars (only title, description and time do).
+Each needs a hook in a different module; left until the basic flow has been used for real.
+
+**Calendar invitations are bounded by Resend's free tier** — 100 emails a day, 3,000 a month, one
+per person per publish, edit or delete. A 30-person group published three times in a day reaches
+the cap, and the rest are logged and dropped, not retried. There is no queue. Fine while testing;
+a real launch needs either a paid tier or a retry the next day.
+
+**How mail apps treat a series is unproven.** A series goes out as one repeating entry with its
+dates listed (`RDATE`). Google and Apple read that; desktop Outlook is known to show only the
+first date. If that matters, the alternative is a weekly rule, which needs the leader's time zone
+stored with the series.
+
 ## Tech debt
 
 **The monorepo spans two React majors.** Mobile is on React 19 (forced by Expo SDK 54);

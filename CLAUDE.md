@@ -120,15 +120,27 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Waze is a way to navigate, nothing more.** `User.navApp` (Account screen) picks what "Directions" opens; `navigationUrl` in `shared/src/utils` builds the link — Google uses the leader's saved URL, Waze is built from the stored coordinates. Planning, the leader's live position and the ETA stay on Google Maps (Waze has no routing API), so leaders still paste Google links.
 - Members see the **whole route**, led by where to go now (see the itinerary decision above).
 - Events awaiting a reply are **flagged on the event card** in their timeline.
-- **Adding to a calendar is per event, and it is a copy.** A leader adds an event from its page
-  on the portal (drafts included — it's their plan); a member is offered it on the publish
-  notification itself ("Add to calendar", category `activity_published`) and again on the event
-  screen while the event is still ahead. Everything goes through `shared/src/utils/calendar.ts`:
-  a filled-in Google Calendar link (which is also what the phone opens — no permission, no native
-  module) and, on the portal, an `.ics` file for Apple and Outlook. It doesn't follow a later
-  reschedule. All-day trips are stored as local-midnight instants with no time zone, so the day is
-  recovered by rounding (`compactDay`). A published *series* gets no button: there is no link
-  that adds twenty events.
+- **Publishing an event invites everyone to it by email — nobody adds anything to a calendar.**
+  The leader, the roster and visitors each get a calendar invitation
+  (`backend/src/modules/calendar/invitations.ts`, file built by `buildIcsInvitation` in
+  `shared/src/utils/calendar.ts`) that Gmail, Outlook and Apple Mail put on the calendar
+  themselves. Editing a published event's title, description or time sends an update that moves
+  the entry; deleting one that is still ahead sends a cancellation. This replaced "Add to
+  calendar" buttons (portal event page, publish notification, event screen), which made a copy
+  that never followed a reschedule — and having both would put the event on a calendar twice.
+  Things that are deliberate:
+  - **The sender is MeetingPnt with the leader's name on it**, and the organiser address must be
+    the one the mail comes from. Sending as the leader would need access to their mail account.
+  - **It asks for no reply.** RSVP stays in the app; the calendar's own Yes/No goes nowhere, and
+    the email says so when the event takes RSVPs.
+  - **One email per person, listing only them** — an invitation is not a way to read the roster.
+  - **A series is ONE repeating entry** (`series-<id>`, the dates listed as `RDATE`), not an
+    email per date. `Activity.invitedInstanceStart` is the start each date went out with, which
+    is how a later change to a single date names it (`RECURRENCE-ID`).
+  - **Sending never fails the action.** Emails go out in the background, spaced for Resend's rate
+    limit; a failure is logged and the event is published regardless.
+  - All-day trips are stored as local-midnight instants with no time zone, so the day is
+    recovered by rounding (`compactDay`).
 - **The subscription feed exists but is not the main road.** `User.calendarToken` and
   `/calendar/<token>.ics` (`backend/src/modules/calendar`) give each user a private link that
   Google, Apple or Outlook re-reads; it is offered only in mobile Account. It was on the portal's

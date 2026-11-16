@@ -6,7 +6,7 @@ import type {
   UpdateActivityDto,
 } from '@meetingpnt/shared';
 import { isolate, pushText } from '@meetingpnt/shared';
-import type { Activity } from '@prisma/client';
+import { Prisma, type Activity } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import {
@@ -19,6 +19,7 @@ import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { toLocale } from '../../lib/userName.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
+import { announceCalendarChange, prepareCalendarInvitations } from '../calendar/invitations.js';
 import { assertMembership } from '../groups/service.js';
 
 function toSharedActivity(activity: Activity): SharedActivity {
@@ -173,6 +174,10 @@ export async function publishSeries(seriesId: string, requesterId: string) {
 
   const updated = await prisma.$transaction(async (tx) => {
     await tx.activity.updateMany({ where: { id: { in: draftIds } }, data: { status: 'published' } });
+    // The start each date goes out with — what a later change to just that date refers back to.
+    await tx.$executeRaw`
+      UPDATE activities SET invited_instance_start = start_at WHERE id IN (${Prisma.join(draftIds)})
+    `;
     await tx.rsvp.createMany({
       data: draftIds.flatMap((activityId) =>
         members.map((member) => ({
@@ -202,6 +207,14 @@ export async function publishSeries(seriesId: string, requesterId: string) {
           data: { type: 'activity_series_published', seriesId },
         }));
       }),
+  );
+
+  // One repeating calendar entry for the lot, not an email per date.
+  const invited = updated.filter((a) => draftIds.includes(a.id));
+  await announceCalendarChange(
+    'invited',
+    invited[0]!,
+    invited.map((a) => a.startAt),
   );
 
   return updated.map(toSharedActivity);
@@ -244,6 +257,18 @@ export async function updateActivity(activityId: string, requesterId: string, dt
 
   if (dto.requiresRsvp !== undefined && dto.requiresRsvp !== activity.requiresRsvp) {
     await reconcileRsvpsToApprovalSetting(activityId, dto.requiresRsvp);
+  }
+
+  // Calendars follow a published event when what they show has changed. Drafts are on nobody's
+  // calendar yet, and one that is running or over is past the point of rescheduling.
+  const calendarChanged =
+    updated.title !== activity.title ||
+    updated.description !== activity.description ||
+    updated.allDay !== activity.allDay ||
+    updated.startAt.getTime() !== activity.startAt.getTime() ||
+    updated.endAt.getTime() !== activity.endAt.getTime();
+  if (updated.status === 'published' && calendarChanged) {
+    await announceCalendarChange('updated', updated);
   }
 
   return toSharedActivity(updated);
@@ -317,13 +342,13 @@ export async function publishActivity(activityId: string, requesterId: string) {
           to: token.expoPushToken,
           title: pushText(locale, 'activityPublishedTitle', { group: isolate(group.name) }),
           body: pushText(locale, 'activityPublishedBody', { title: isolate(activity.title) }),
-          // The category is what puts "Add to calendar" on the notification itself; the group
-          // id is what lets a tap open the event (its screen lives under the group).
+          // The group id is what lets a tap open the event (its screen lives under the group).
           data: { type: 'activity_published', activityId, groupId: activity.groupId },
-          categoryId: 'activity_published',
         }));
       }),
   );
+
+  await announceCalendarChange('invited', updated);
 
   return toSharedActivity(updated);
 }
@@ -465,5 +490,17 @@ export async function getActivity(activityId: string, requesterId: string) {
 export async function deleteActivity(activityId: string, requesterId: string) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
+
+  // Deleting an event people were invited to takes it off their calendars. The emails are worked
+  // out first — once the row is gone there is no roster left to read.
+  const stillAhead = activity.status === 'published' && activity.endAt.getTime() > Date.now();
+  const sendCancellations = stillAhead
+    ? await prepareCalendarInvitations('cancelled', activity).catch((error) => {
+        console.error(`[calendar] could not prepare cancellations (${activityId})`, error);
+        return null;
+      })
+    : null;
+
   await prisma.activity.delete({ where: { id: activityId } });
+  sendCancellations?.();
 }

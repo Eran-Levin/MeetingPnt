@@ -3,16 +3,14 @@ import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { locationsApi } from '../api/locationsApi';
 import { i18n } from '../i18n';
-import { addActivityToCalendar } from './calendar';
 import { getCurrentLocationSnapshot } from './location';
 
 const LOCATION_PING_CATEGORY = 'location_ping';
 /** The mirror of the above: a member asking the leader. Same action, same response — the only
  * difference is who is being asked, so both categories share one handler. */
 const LEADER_LOCATION_REQUEST_CATEGORY = 'leader_location_request';
-/** A newly published event: the notification itself offers to put it in the calendar. */
-const ACTIVITY_PUBLISHED_CATEGORY = 'activity_published';
-const ADD_TO_CALENDAR_ACTION = 'add_to_calendar';
+/** A newly published event: tapping the notification opens it. */
+const ACTIVITY_PUBLISHED = 'activity_published';
 const BACKGROUND_NOTIFICATION_TASK = 'background-notification-task';
 
 /** Built per call: the button's label is in the reader's language, which can change. */
@@ -33,14 +31,6 @@ export async function setupNotificationCategories() {
     LEADER_LOCATION_REQUEST_CATEGORY,
     shareLocationAction(),
   );
-  await Notifications.setNotificationCategoryAsync(ACTIVITY_PUBLISHED_CATEGORY, [
-    {
-      identifier: ADD_TO_CALENDAR_ACTION,
-      buttonTitle: i18n.t('addToCalendar.label'),
-      // The calendar is another app, and Android only lets a foreground app open one.
-      options: { opensAppToForeground: true },
-    },
-  ]);
 }
 
 interface PingNotificationData {
@@ -72,14 +62,8 @@ export function registerNotificationResponseHandler() {
       await respondToPing(data.activityId);
       return;
     }
-    if (data?.type === ACTIVITY_PUBLISHED_CATEGORY && data.activityId) {
-      // The button adds it; a plain tap opens the event, where the same button is waiting next
-      // to the reply. Either can fail quietly — the event is still in the timeline.
-      if (response.actionIdentifier === ADD_TO_CALENDAR_ACTION) {
-        await addActivityToCalendar(data.activityId).catch(() => undefined);
-      } else if (data.groupId) {
-        router.push(`/(tabs)/groups/${data.groupId}/activities/${data.activityId}`);
-      }
+    if (data?.type === ACTIVITY_PUBLISHED && data.activityId && data.groupId) {
+      router.push(`/(tabs)/groups/${data.groupId}/activities/${data.activityId}`);
     }
   });
 }

@@ -8,7 +8,6 @@ import { groupsApi } from '../../api/groupsApi.js';
 import { rsvpsApi } from '../../api/rsvpsApi.js';
 import { ActivityEditor } from '../../components/ActivityEditor.js';
 import { ActivityVisitorsPanel } from '../../components/ActivityVisitorsPanel.js';
-import { AddToCalendar } from '../../components/AddToCalendar.js';
 import { AttendancePanel } from '../../components/AttendancePanel.js';
 import { MeetingPointsPanel } from '../../components/MeetingPointsPanel.js';
 import { Badge } from '../../components/ui/Badge.js';
@@ -178,8 +177,6 @@ export function ActivityDetailPage() {
       )}
 
       <p className="mt-4 max-w-2xl text-sm text-ink">{activity.description}</p>
-
-      <AddToCalendar activity={activity} groupName={groupQuery.data?.group.name} />
 
       {/* The route is the thing being built here, so it leads and takes the wider column; walking
           it and the roll call happen on the leader's phone. Replies sit alongside rather than
