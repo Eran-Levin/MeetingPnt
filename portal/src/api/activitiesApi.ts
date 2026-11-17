@@ -17,7 +17,10 @@ export const activitiesApi = {
     ),
   get: (id: string) => apiFetch<{ activity: Activity }>(`/api/activities/${id}`),
   update: (id: string, dto: UpdateActivityDto) =>
-    apiFetch<{ activity: Activity }>(`/api/activities/${id}`, { method: 'PATCH', body: dto }),
+    apiFetch<{ activity: Activity; invited: number }>(`/api/activities/${id}`, {
+      method: 'PATCH',
+      body: dto,
+    }),
   publish: (id: string) =>
     apiFetch<{ activity: Activity; invited: number }>(`/api/activities/${id}/publish`, { method: 'POST' }),
   start: (id: string) =>
@@ -28,5 +31,6 @@ export const activitiesApi = {
     apiFetch<{ activities: Activity[]; invited: number }>(`/api/activities/series/${seriesId}/publish`, {
       method: 'POST',
     }),
-  remove: (id: string) => apiFetch<void>(`/api/activities/${id}`, { method: 'DELETE' }),
+  remove: (id: string) =>
+    apiFetch<{ invited: number }>(`/api/activities/${id}`, { method: 'DELETE' }),
 };

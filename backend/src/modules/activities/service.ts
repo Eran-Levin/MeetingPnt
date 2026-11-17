@@ -267,11 +267,12 @@ export async function updateActivity(activityId: string, requesterId: string, dt
     updated.allDay !== activity.allDay ||
     updated.startAt.getTime() !== activity.startAt.getTime() ||
     updated.endAt.getTime() !== activity.endAt.getTime();
-  if (updated.status === 'published' && calendarChanged) {
-    await announceCalendarChange('updated', updated);
-  }
+  const invited =
+    updated.status === 'published' && calendarChanged
+      ? await announceCalendarChange('updated', updated)
+      : 0;
 
-  return toSharedActivity(updated);
+  return { activity: toSharedActivity(updated), invited };
 }
 
 /**
@@ -491,6 +492,12 @@ export async function deleteActivity(activityId: string, requesterId: string) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
 
+  // Only an event that hasn't happened can be deleted. One that is running or over is a record —
+  // who was at which stop, what a class is billed from — and ending it is how it is closed.
+  if (activity.status === 'in_progress' || activity.status === 'completed') {
+    throw new HttpError(409, 'delete_not_started_only');
+  }
+
   // Deleting an event people were invited to takes it off their calendars. The emails are worked
   // out first — once the row is gone there is no roster left to read.
   const stillAhead = activity.status === 'published' && activity.endAt.getTime() > Date.now();
@@ -503,4 +510,6 @@ export async function deleteActivity(activityId: string, requesterId: string) {
 
   await prisma.activity.delete({ where: { id: activityId } });
   sendCancellations?.send();
+  // How many people a cancellation is going to, so the leader can be told.
+  return { invited: sendCancellations?.count ?? 0 };
 }

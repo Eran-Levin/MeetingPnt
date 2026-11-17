@@ -1,7 +1,7 @@
 import { formatActivityWhen } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { groupsApi } from '../../api/groupsApi.js';
@@ -21,6 +21,7 @@ import { useAuthStore } from '../../store/authStore.js';
 export function ActivityDetailPage() {
   const { t } = useTranslation();
   const showToast = useToast();
+  const navigate = useNavigate();
   const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const activityId = id!;
@@ -71,9 +72,33 @@ export function ActivityDetailPage() {
   const handlePublish = () =>
     runLifecycleAction(async () => {
       const { invited } = await activitiesApi.publish(activityId);
-      if (invited > 0) showToast(t('publishToast.invited', { count: invited }));
+      // Always says something: with nobody to email it still confirms the publish.
+      showToast(
+        invited > 0 ? t('publishToast.invited', { count: invited }) : t('publishToast.published'),
+      );
     });
   const handleStart = () => runLifecycleAction(() => activitiesApi.start(activityId));
+
+  /** Only before it has run — a running or finished event is a record, and is ended, not deleted. */
+  async function handleDelete(published: boolean, groupId: string) {
+    const confirmed = window.confirm(
+      t(published ? 'activityPage.confirmDeletePublished' : 'activityPage.confirmDeleteDraft'),
+    );
+    if (!confirmed) return;
+    setLifecycleError(null);
+    try {
+      const { invited } = await activitiesApi.remove(activityId);
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
+      showToast(
+        invited > 0 ? t('publishToast.cancelled', { count: invited }) : t('publishToast.deleted'),
+      );
+      // The page is about an event that no longer exists.
+      navigate(`/groups/${groupId}`, { replace: true });
+    } catch (err) {
+      setLifecycleError(apiErrorMessage(err, t('common.somethingWentWrong')));
+    }
+  }
 
   async function handleEnd() {
     const confirmed = window.confirm(t('activityPage.confirmEnd'));
@@ -159,6 +184,15 @@ export function ActivityDetailPage() {
             {(activity.status === 'published' || activity.status === 'in_progress') && (
               <Button variant="secondary" size="sm" onClick={handleEnd}>
                 {t('calendar.endActivity')}
+              </Button>
+            )}
+            {(activity.status === 'draft' || activity.status === 'published') && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => handleDelete(activity.status === 'published', activity.groupId)}
+              >
+                {t('activityPage.delete')}
               </Button>
             )}
           </div>

@@ -61,12 +61,10 @@ activitiesRouter.get('/:id', async (req, res, next) => {
 
 activitiesRouter.patch('/:id', validate(updateActivitySchema), async (req, res, next) => {
   try {
-    const activity = await activitiesService.updateActivity(
-      req.params.id as string,
-      req.user!.id,
-      req.body,
+    // `invited` is how many calendars the change is being sent to (0 when none needed it).
+    res.json(
+      await activitiesService.updateActivity(req.params.id as string, req.user!.id, req.body),
     );
-    res.json({ activity });
   } catch (err) {
     next(err);
   }
@@ -109,8 +107,7 @@ activitiesRouter.post('/series/:seriesId/publish', async (req, res, next) => {
 
 activitiesRouter.delete('/:id', async (req, res, next) => {
   try {
-    await activitiesService.deleteActivity(req.params.id as string, req.user!.id);
-    res.status(204).send();
+    res.json(await activitiesService.deleteActivity(req.params.id as string, req.user!.id));
   } catch (err) {
     next(err);
   }
