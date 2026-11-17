@@ -237,4 +237,8 @@ meeting-point ordering was tested on an activity whose times happened to match c
 which never exercised the mid-event case. Clean up test rows afterwards — this database is the
 one being manually tested.
 
-`BACKLOG.md` records consciously deferred work and why.
+**Jira is the base for all planned and deferred work** — project `MPNT` at
+`meetingpnt.atlassian.net`. Look there for a ticket before starting something new and put its key
+in the PR; file anything postponed there (what it does today, the gap, what it would take, and
+when to build it) rather than in a file. `BACKLOG.md` is the earlier record, imported into Jira
+and kept as history — the "see BACKLOG" pointers above lead to it. Don't add to it.
