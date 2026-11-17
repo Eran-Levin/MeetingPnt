@@ -9,6 +9,7 @@ import { generateRefreshToken, hashRefreshToken } from '../../lib/refreshToken.j
 import { consumeInvitation, findPendingInvitationByToken } from '../invitations/service.js';
 import { toSharedUser } from '../../lib/userName.js';
 import type { User } from '@prisma/client';
+import { sendVerificationLink } from './emailVerification.js';
 
 async function issueTokens(user: User) {
   const accessToken = signAccessToken({ sub: user.id, role: user.role });
@@ -48,6 +49,7 @@ export async function register(input: RegisterDto) {
             lastName: input.lastName,
             phone: input.phone ?? placeholder.phone,
             isPlaceholder: false,
+            emailVerifiedAt: new Date(),
           },
         });
         await consumeInvitation(input.invitationToken, user.email, user.id);
@@ -70,6 +72,9 @@ export async function register(input: RegisterDto) {
   const inviter = inviterId
     ? await prisma.user.findUnique({ where: { id: inviterId }, select: { locale: true } })
     : null;
+  // Only a leader signing up on their own has an address nobody has vouched for; anyone else is
+  // here because a link was emailed to them.
+  const selfRegisteredLeader = Boolean(input.asLeader && !input.invitationToken);
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -78,9 +83,18 @@ export async function register(input: RegisterDto) {
       lastName: input.lastName,
       phone: input.phone,
       locale: inviter?.locale ?? input.locale ?? 'en',
-      role: input.asLeader && !input.invitationToken ? 'leader' : 'user',
+      role: selfRegisteredLeader ? 'leader' : 'user',
+      emailVerifiedAt: selfRegisteredLeader ? null : new Date(),
     },
   });
+
+  if (selfRegisteredLeader) {
+    // The account exists either way. If the email can't leave, the screen they land on has a
+    // "send it again" button, and that one does report the failure.
+    await sendVerificationLink(user).catch((error) =>
+      console.error(`[auth] verification email failed for new leader ${user.id}`, error),
+    );
+  }
 
   if (input.invitationToken) {
     await consumeInvitation(input.invitationToken, user.email, user.id);

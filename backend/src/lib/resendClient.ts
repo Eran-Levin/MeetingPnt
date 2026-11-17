@@ -1,8 +1,46 @@
 import { emailText, isRtlLocale, isolate, type Locale } from '@meetingpnt/shared';
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
+import { HttpError } from '../middleware/errorHandler.js';
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+
+/**
+ * The one place mail leaves from, and it fails loudly. Two silent failures used to look like
+ * success: Resend answers a rejected email with an error value rather than throwing, and with no
+ * API key the email was only written to the log — which is right on a laptop and, in production,
+ * meant invitations that never left while the portal said "invited".
+ */
+async function deliver(email: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
+  /** What to print instead when there is no API key (development). */
+  devNote: string;
+}) {
+  if (!resend) {
+    if (env.NODE_ENV === 'production') {
+      console.error('[email] RESEND_API_KEY is not set — nothing can be sent');
+      throw new HttpError(502, 'email_send_failed');
+    }
+    console.log(`[email:dev] To: ${email.to}\nSubject: ${email.subject}\n${email.devNote}`);
+    return;
+  }
+
+  const { error } = await resend.emails.send({
+    from: env.RESEND_FROM_EMAIL,
+    to: email.to,
+    subject: email.subject,
+    html: email.html,
+    attachments: email.attachments,
+  });
+  if (error) {
+    // The reason goes to the log, not to the person: it names our sender setup, not their mistake.
+    console.error(`[email] send failed: ${error.name}: ${error.message}`);
+    throw new HttpError(502, 'email_send_failed');
+  }
+}
 
 interface SendInvitationEmailParams {
   to: string;
@@ -57,18 +95,24 @@ export function buildInvitationEmail(params: Omit<SendInvitationEmailParams, 'to
 
 export async function sendInvitationEmail(params: SendInvitationEmailParams) {
   const { subject, html } = buildInvitationEmail(params);
+  await deliver({ to: params.to, subject, html, devNote: `Accept URL: ${params.acceptUrl}` });
+}
 
-  if (!resend) {
-    // No RESEND_API_KEY configured: log instead of sending, so the invite flow is testable in dev.
-    console.log(`[email:dev] To: ${params.to}\nSubject: ${subject}\nAccept URL: ${params.acceptUrl}`);
-    return;
-  }
-
-  await resend.emails.send({
-    from: env.RESEND_FROM_EMAIL,
+/** The link a leader who signed up on their own has to open before they can create a group. */
+export async function sendVerificationEmail(params: { to: string; verifyUrl: string; locale: Locale }) {
+  const { locale } = params;
+  const html = `
+    <div lang="${locale}" dir="${isRtlLocale(locale) ? 'rtl' : 'ltr'}">
+      <p>${emailText(locale, 'verifyIntro')}</p>
+      <p><a href="${escapeHtml(params.verifyUrl)}">${emailText(locale, 'verifyOpen')}</a></p>
+      <p>${emailText(locale, 'verifyExpires')}</p>
+    </div>
+  `;
+  await deliver({
     to: params.to,
-    subject,
+    subject: emailText(locale, 'verifySubject'),
     html,
+    devNote: `Verify URL: ${params.verifyUrl}`,
   });
 }
 
@@ -90,13 +134,7 @@ interface SendCalendarEmailParams {
  * mail app treat the file as an invitation to act on rather than a file to download.
  */
 export async function sendCalendarEmail(params: SendCalendarEmailParams) {
-  if (!resend) {
-    console.log(`[email:dev] To: ${params.to}\nSubject: ${params.subject}\n${params.ics}`);
-    return;
-  }
-
-  const { error } = await resend.emails.send({
-    from: env.RESEND_FROM_EMAIL,
+  await deliver({
     to: params.to,
     subject: params.subject,
     html: params.html,
@@ -107,8 +145,6 @@ export async function sendCalendarEmail(params: SendCalendarEmailParams) {
         contentType: `text/calendar; charset=utf-8; method=${params.method.toUpperCase()}`,
       },
     ],
+    devNote: params.ics,
   });
-  if (error) {
-    throw new Error(`${error.name}: ${error.message}`);
-  }
 }

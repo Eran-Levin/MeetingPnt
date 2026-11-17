@@ -71,6 +71,8 @@ async function ensureUser(email: string, name: string, role: 'admin' | 'leader' 
       phone: seededPhone(email),
       role,
       passwordHash,
+      // Seeded addresses can't receive mail, so nobody could ever confirm one.
+      emailVerifiedAt: new Date(),
     },
   });
 }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { createGroupSchema, duplicateGroupSchema, updateGroupSchema } from '@meetingpnt/shared';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/requireRole.js';
+import { requireVerifiedEmail } from '../../middleware/requireVerifiedEmail.js';
 import { validate } from '../../middleware/validate.js';
 import * as groupsService from './service.js';
 
@@ -9,7 +10,7 @@ export const groupsRouter = Router();
 
 groupsRouter.use(authenticate);
 
-groupsRouter.post('/', requireRole('leader', 'admin'), validate(createGroupSchema), async (req, res, next) => {
+groupsRouter.post('/', requireRole('leader', 'admin'), requireVerifiedEmail, validate(createGroupSchema), async (req, res, next) => {
   try {
     const group = await groupsService.createGroup(req.user!.id, req.body);
     res.status(201).json({ group });
@@ -21,6 +22,7 @@ groupsRouter.post('/', requireRole('leader', 'admin'), validate(createGroupSchem
 groupsRouter.post(
   '/:id/duplicate',
   requireRole('leader', 'admin'),
+  requireVerifiedEmail,
   validate(duplicateGroupSchema),
   async (req, res, next) => {
     try {

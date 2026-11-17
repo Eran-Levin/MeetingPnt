@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { groupsApi } from '../../../src/api/groupsApi';
-import { useLocale, useTranslation } from '../../../src/i18n';
+import { apiErrorMessage, useLocale, useTranslation } from '../../../src/i18n';
 import { useAuthStore } from '../../../src/store/authStore';
 import {
   Badge,
@@ -50,6 +50,9 @@ export default function GroupsScreen() {
       setName('');
       setComposing(false);
       queryClient.invalidateQueries({ queryKey: ['groups'] });
+    } catch (err) {
+      // Most often a leader who hasn't confirmed their email yet — the reason has to be readable.
+      Alert.alert(apiErrorMessage(err, t('common.somethingWentWrong')));
     } finally {
       setCreating(false);
     }

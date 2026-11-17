@@ -47,6 +47,20 @@ function makePlaceholderEmail(): string {
   return `placeholder+${randomBytes(12).toString('hex')}@members.meetingpnt.invalid`;
 }
 
+/**
+ * Sends an invitation's email, and if it can't be sent, undoes what was just created and passes the
+ * failure on. A pending invitation nobody received is worse than none: the leader sees "invited",
+ * the person never hears, and inviting them again is refused as a duplicate.
+ */
+async function sendOrUndo(send: () => Promise<void>, undo: () => Promise<unknown>) {
+  try {
+    await send();
+  } catch (error) {
+    await undo().catch((undoError) => console.error('[invitations] undo failed', undoError));
+    throw error;
+  }
+}
+
 function hashToken(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
@@ -149,13 +163,17 @@ async function inviteOnePerson(
   });
 
   const acceptUrl = buildAcceptUrl(rawToken);
-  await sendInvitationEmail({
-    to: contact.email,
-    groupName: group.name,
-    inviterName: inviter ? displayName(inviter) : null,
-    locale: toLocale(inviter?.locale ?? 'en'),
-    acceptUrl,
-  });
+  await sendOrUndo(
+    () =>
+      sendInvitationEmail({
+        to: contact.email,
+        groupName: group.name,
+        inviterName: inviter ? displayName(inviter) : null,
+        locale: toLocale(inviter?.locale ?? 'en'),
+        acceptUrl,
+      }),
+    () => prisma.invitation.delete({ where: { id: invitation.id } }),
+  );
 
   return { type: 'invited', invitation };
 }
@@ -269,13 +287,23 @@ export async function addPartyMember(
     },
   });
 
-  await sendInvitationEmail({
-    to: pm.email,
-    groupName: group!.name,
-    inviterName: requester ? displayName(requester) : null,
-    locale: toLocale(requester?.locale ?? 'en'),
-    acceptUrl: buildAcceptUrl(rawToken),
-  });
+  const email = pm.email;
+  await sendOrUndo(
+    () =>
+      sendInvitationEmail({
+        to: email,
+        groupName: group!.name,
+        inviterName: requester ? displayName(requester) : null,
+        locale: toLocale(requester?.locale ?? 'en'),
+        acceptUrl: buildAcceptUrl(rawToken),
+      }),
+    // The placeholder goes too (its roster slot with it): it holds the address, so leaving it
+    // would refuse the retry.
+    async () => {
+      await prisma.invitation.delete({ where: { id: invitation.id } });
+      await prisma.user.delete({ where: { id: placeholder.id } });
+    },
+  );
 
   return { type: 'invited' as const, invitation: toSharedInvitation(invitation) };
 }
@@ -329,13 +357,17 @@ export async function inviteActivityGuest(
   });
 
   const acceptUrl = buildAcceptUrl(rawToken);
-  await sendInvitationEmail({
-    to: dto.email,
-    groupName: `${group.name} — ${activity.title}`,
-    inviterName: inviter ? displayName(inviter) : null,
-    locale: toLocale(inviter?.locale ?? 'en'),
-    acceptUrl,
-  });
+  await sendOrUndo(
+    () =>
+      sendInvitationEmail({
+        to: dto.email,
+        groupName: `${group.name} — ${activity.title}`,
+        inviterName: inviter ? displayName(inviter) : null,
+        locale: toLocale(inviter?.locale ?? 'en'),
+        acceptUrl,
+      }),
+    () => prisma.invitation.delete({ where: { id: invitation.id } }),
+  );
 
   return { type: 'invited' as const, invitation: toSharedInvitation(invitation) };
 }

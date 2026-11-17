@@ -99,6 +99,22 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Ending an event closes location sharing.** OMW and pings return 409 once an activity is
   `completed`, and the socket room refuses joins. Attendance stays editable — leaders reconcile
   after the fact.
+- **A leader who signs up on their own confirms their email before creating a group.** Nobody
+  else is asked: a member arrives through a link that was emailed to them, which already proves the
+  address, while a sign-up form proves nothing — and a leader's address is where invitations appear
+  to come from. `User.emailVerifiedAt` null + role `leader` is the held-back state
+  (`backend/src/modules/auth/emailVerification.ts`); they can sign in, the portal shows "Confirm
+  your email" in place of the app, and `requireVerifiedEmail` refuses creating or copying a group.
+  The link is a signed token, not a stored one, and uses its own secret so it can't double as a
+  sign-in token. Accounts that existed before this were marked confirmed by the migration, and the
+  seed marks its own (`example.com` can't receive mail).
+- **An email that can't be sent is an error, never a quiet success.** Everything goes through
+  `deliver` in `backend/src/lib/resendClient.ts`, which throws `email_send_failed` when Resend
+  refuses or — in production — when there is no API key. This was learned the hard way: with no
+  key the server logged the email and reported success, so group invitations looked sent for
+  months and none ever left. An invitation whose email fails is undone, so the leader can retry.
+  Calendar invitations are the exception: they go out in the background after publish, so their
+  failures are only logged.
 - **Drafts are the leader's private planning space.** Never expose them to members (this leaked
   once).
 - **Visitors** (`ActivityGuest`) attend one activity without joining the group. They appear in the
