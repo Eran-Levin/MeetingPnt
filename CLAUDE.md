@@ -61,7 +61,13 @@ ordinary events in the same group, and they *do* take RSVPs.
   card per event led by its next day ("Day 3 of 5", so today's while the trip is on), the other
   days under "Show all days", finished events collapsed to one row. The day numbering comes from
   `listMyActivities` (`multiDay`), counted over the days the caller can see, not just those in the
-  timeline's lookback. Not yet: moving/copying a whole multi-day event, RSVP at the container level.
+  timeline's lookback. The leader can also edit, move, copy and delete the whole event from its
+  group-page card. **Rename** renames the days that carry the old title as a prefix ("Peru Trek ·
+  Day 2"); a day titled by hand is left alone. **Move** shifts every day and stop by whole days in
+  the leader's time zone, and is refused once any day has started. **Copy** is same-group, drafts
+  only, days and stops across, RSVPs and attendance left behind (the group-copy rules, per event).
+  **Delete** is refused once a day is running or over, and sends one cancellation for the whole
+  calendar entry. Not yet: RSVP at the container level.
 - **Attendance hangs off the meeting point, not the activity.** A group that moves between sites
   needs a roll call at each. Activity-level participation is *derived* (present at ≥1 point), never
   stored. Single-point activities behave identically, so yoga billing is unaffected.

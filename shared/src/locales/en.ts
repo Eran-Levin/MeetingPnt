@@ -90,6 +90,10 @@ export const en = {
     series_all_published: 'All occurrences in this series are already published',
     multi_day_event_not_found: 'Multi-day event not found',
     multi_day_all_published: 'All days of this multi-day event are already published',
+    multi_day_nothing_to_copy: 'This multi-day event has no days to copy',
+    multi_day_move_not_started_only: "A multi-day event that has started can't be moved",
+    multi_day_delete_not_started_only:
+      "A multi-day event with a day that is running or over is a record and can't be deleted",
     end_before_start: 'The end must be after the start',
     schedule_in_past: "You can't schedule an event in the past",
     publish_draft_only: 'Only draft activities can be published',
@@ -428,6 +432,23 @@ export const en = {
     create: 'Create multi-day event',
     failed: 'Failed to create the multi-day event',
     published: 'Published',
+    edit: 'Edit',
+    move: 'Move',
+    copy: 'Copy',
+    delete: 'Delete',
+    newStart: 'New start date',
+    copyTitle: 'Title of the copy',
+    moveHint:
+      'Every day and every stop moves by the same number of days, at the same time of day. Anyone already invited gets a calendar update.',
+    copyHint:
+      'Makes a new draft event with the same days and stops, starting on the date you pick. Replies and attendance are not copied.',
+    moveAction: 'Move event',
+    copyAction: 'Create copy',
+    working: 'Working…',
+    copied: 'Copied as drafts. Review the days and publish when ready.',
+    confirmDelete:
+      'Delete “{{title}}” and all {{count}} of its days? Anyone invited gets a cancellation. Replies are deleted too. This cannot be undone.',
+    actionFailed: 'That did not work',
   },
   groupsPage: {
     subtitle: 'Groups you lead.',

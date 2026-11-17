@@ -3,15 +3,20 @@ import type {
   ActivityWithGroup,
   Activity as SharedActivity,
   CreateActivityDto,
+  CopyMultiDayEventDto,
   CreateMultiDayEventDto,
+  MoveMultiDayEventDto,
   MultiDayEvent as SharedMultiDayEvent,
   UpdateActivityDto,
+  UpdateMultiDayEventDto,
 } from '@meetingpnt/shared';
 import { isolate, pushText } from '@meetingpnt/shared';
 import { Prisma, type Activity, type MultiDayEvent } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { assertTimeZone, shiftDays } from '../../lib/shiftDays.js';
 import {
+  copyMeetingPoints,
   getNextPlannedMeetingPoint,
   insertMeetingPoint,
   markMeetingPointArrived,
@@ -357,6 +362,226 @@ export async function publishMultiDayEvent(multiDayEventId: string, requesterId:
 
   const invited = await announceMultiDayChange('invited', multiDayEventId);
   return { activities: updated.map(toSharedActivity), invited };
+}
+
+async function loadMultiDayForLeader(multiDayEventId: string, requesterId: string) {
+  const multiDay = await prisma.multiDayEvent.findUnique({
+    where: { id: multiDayEventId },
+    include: { days: { orderBy: { startAt: 'asc' } } },
+  });
+  if (!multiDay) {
+    throw new HttpError(404, 'multi_day_event_not_found');
+  }
+  await assertGroupLeader(multiDay.groupId, requesterId);
+  return multiDay;
+}
+
+function checkedTimeZone(timeZone: string): string {
+  try {
+    assertTimeZone(timeZone);
+  } catch {
+    throw new HttpError(400, 'invalid_time_zone');
+  }
+  return timeZone;
+}
+
+/** Days are titled "<event> · Day n". Renaming the event renames the days that still carry its
+ * old title as a prefix; a day the leader titled by hand is left alone. */
+function retitleDay(dayTitle: string, oldTitle: string, newTitle: string): string {
+  return oldTitle !== newTitle && dayTitle.startsWith(oldTitle)
+    ? newTitle + dayTitle.slice(oldTitle.length)
+    : dayTitle;
+}
+
+/** Renames and re-describes a multi-day event. Calendars follow once any day is published. */
+export async function updateMultiDayEvent(
+  multiDayEventId: string,
+  requesterId: string,
+  dto: UpdateMultiDayEventDto,
+) {
+  const multiDay = await loadMultiDayForLeader(multiDayEventId, requesterId);
+
+  const title = dto.title ?? multiDay.title;
+  const description = dto.description !== undefined ? dto.description || null : multiDay.description;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.multiDayEvent.update({
+      where: { id: multiDayEventId },
+      data: { title, description },
+    });
+    for (const day of multiDay.days) {
+      const dayTitle = retitleDay(day.title, multiDay.title, title);
+      if (dayTitle !== day.title) {
+        await tx.activity.update({ where: { id: day.id }, data: { title: dayTitle } });
+      }
+    }
+    return row;
+  });
+
+  const changed = title !== multiDay.title || description !== multiDay.description;
+  const invited =
+    changed && multiDay.days.some((d) => d.status !== 'draft')
+      ? await announceMultiDayChange('updated', multiDayEventId)
+      : 0;
+  return { multiDayEvent: toSharedMultiDayEvent(updated), invited };
+}
+
+/**
+ * Moves the whole event by whole calendar days, every day and every stop with it. Only an event
+ * that hasn't started: once a day is running or over, the record shouldn't slide around.
+ */
+export async function moveMultiDayEvent(
+  multiDayEventId: string,
+  requesterId: string,
+  dto: MoveMultiDayEventDto,
+) {
+  const multiDay = await loadMultiDayForLeader(multiDayEventId, requesterId);
+  const timeZone = checkedTimeZone(dto.timeZone);
+
+  if (multiDay.days.some((d) => d.status !== 'draft' && d.status !== 'published')) {
+    throw new HttpError(409, 'multi_day_move_not_started_only');
+  }
+
+  const moved = multiDay.days.map((day) => ({
+    day,
+    startAt: shiftDays(day.startAt, dto.shiftDays, timeZone),
+    endAt: shiftDays(day.endAt, dto.shiftDays, timeZone),
+  }));
+  // Same rule as rescheduling one event: nothing that hasn't run can be planned into the past.
+  if (dto.shiftDays !== 0 && moved.some((m) => m.startAt.getTime() < Date.now())) {
+    throw new HttpError(400, 'schedule_in_past');
+  }
+
+  if (dto.shiftDays !== 0) {
+    await prisma.$transaction(
+      moved.map(({ day, startAt, endAt }) =>
+        prisma.activity.update({ where: { id: day.id }, data: { startAt, endAt } }),
+      ),
+    );
+    // Each stop keeps its distance from its day's start, even across a daylight-saving change.
+    for (const { day, startAt } of moved) {
+      await shiftMeetingPointTimes(day.id, startAt.getTime() - day.startAt.getTime());
+    }
+  }
+
+  const activities = await prisma.activity.findMany({
+    where: { multiDayEventId },
+    orderBy: { startAt: 'asc' },
+  });
+  const invited =
+    dto.shiftDays !== 0 && activities.some((a) => a.status !== 'draft')
+      ? await announceMultiDayChange('updated', multiDayEventId)
+      : 0;
+  return { activities: activities.map(toSharedActivity), invited };
+}
+
+/**
+ * A new multi-day event from an existing one, in the same group: title, description, every day and
+ * every stop, as drafts moved by `shiftDays`. RSVPs, attendance and progress stay behind, so a
+ * finished trip can be copied for the next departure. Nothing is announced — drafts reach nobody.
+ */
+export async function copyMultiDayEvent(
+  multiDayEventId: string,
+  requesterId: string,
+  dto: CopyMultiDayEventDto,
+) {
+  const source = await loadMultiDayForLeader(multiDayEventId, requesterId);
+  const timeZone = checkedTimeZone(dto.timeZone);
+
+  const days = source.days.filter((d) => d.status !== 'cancelled');
+  if (days.length === 0) {
+    throw new HttpError(409, 'multi_day_nothing_to_copy');
+  }
+
+  const title = dto.title ?? source.title;
+  const created = await prisma.multiDayEvent.create({
+    data: {
+      groupId: source.groupId,
+      title,
+      description: source.description,
+      createdBy: requesterId,
+    },
+  });
+
+  try {
+    const copies = days.map((day) => ({
+      day,
+      id: randomUUID(),
+      startAt: shiftDays(day.startAt, dto.shiftDays, timeZone),
+      endAt: shiftDays(day.endAt, dto.shiftDays, timeZone),
+    }));
+    await prisma.activity.createMany({
+      data: copies.map(({ day, id, startAt, endAt }) => ({
+        id,
+        groupId: source.groupId,
+        multiDayEventId: created.id,
+        title: retitleDay(day.title, source.title, title),
+        description: day.description,
+        startAt,
+        endAt,
+        allDay: day.allDay,
+        transportMode: day.transportMode,
+        requiresRsvp: day.requiresRsvp,
+        singleLocation: day.singleLocation,
+        status: 'draft' as const,
+        createdBy: requesterId,
+      })),
+    });
+    for (const { day, id, startAt } of copies) {
+      await copyMeetingPoints({
+        fromActivityId: day.id,
+        toActivityId: id,
+        toGroupId: source.groupId,
+        createdBy: requesterId,
+        deltaMs: startAt.getTime() - day.startAt.getTime(),
+      });
+    }
+  } catch (err) {
+    // Half a copy is worse than none: the leader would find a trip with some of its days.
+    await prisma.activity.deleteMany({ where: { multiDayEventId: created.id } }).catch(() => undefined);
+    await prisma.multiDayEvent.delete({ where: { id: created.id } }).catch(() => undefined);
+    throw err;
+  }
+
+  const activities = await prisma.activity.findMany({
+    where: { multiDayEventId: created.id },
+    orderBy: { startAt: 'asc' },
+  });
+  return {
+    multiDayEvent: toSharedMultiDayEvent(created),
+    activities: activities.map(toSharedActivity),
+  };
+}
+
+/**
+ * Deletes the event and all its days. Refused once a day is running or over — that is a record
+ * (who was at which stop), and ending it is how it is closed. If it is on calendars, one
+ * cancellation takes the whole entry off.
+ */
+export async function deleteMultiDayEvent(multiDayEventId: string, requesterId: string) {
+  const multiDay = await loadMultiDayForLeader(multiDayEventId, requesterId);
+
+  if (multiDay.days.some((d) => d.status === 'in_progress' || d.status === 'completed')) {
+    throw new HttpError(409, 'multi_day_delete_not_started_only');
+  }
+
+  // Worked out first — once the days are gone there is nothing left to describe.
+  const stillAhead = multiDay.days.some(
+    (d) => d.status === 'published' && d.endAt.getTime() > Date.now(),
+  );
+  const cancellations = stillAhead
+    ? await prepareMultiDayInvitations('cancelled', multiDayEventId).catch((error) => {
+        console.error(`[calendar] could not prepare cancellations (${multiDayEventId})`, error);
+        return null;
+      })
+    : null;
+
+  await prisma.$transaction([
+    prisma.activity.deleteMany({ where: { multiDayEventId } }),
+    prisma.multiDayEvent.delete({ where: { id: multiDayEventId } }),
+  ]);
+  cancellations?.send();
+  return { invited: cancellations?.count ?? 0 };
 }
 
 /** A day of a multi-day event is on calendars as part of the one entry, so a change to it
