@@ -210,6 +210,11 @@ export const he: Catalog = {
     earlier: 'קודם ({{count}})',
     hidePast: 'הסתרת פעילויות שעברו',
     showPast: 'הצגת פעילויות שעברו',
+    dayOfCount: 'יום {{n}} מתוך {{count}}',
+    showDays: 'הצגת כל הימים',
+    hideDays: 'הסתרת הימים',
+    pastDays_one: 'יום אחד',
+    pastDays_other: '{{count}} ימים',
   },
   live: {
     openA11y: 'פתיחת הפעילות המתקיימת עכשיו, {{title}}',

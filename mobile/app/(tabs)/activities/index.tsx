@@ -71,6 +71,7 @@ export default function CalendarScreen() {
   const [endingId, setEndingId] = useState<string | null>(null);
   const [dismissedOverdueId, setDismissedOverdueId] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   const leads = user?.role === 'leader' || user?.role === 'admin';
 
   const { data, isFetching } = useQuery({
@@ -109,9 +110,31 @@ export default function CalendarScreen() {
   );
   const askToClose = overdueLive && overdueLive.id !== dismissedOverdueId ? overdueLive : null;
 
+  /**
+   * A multi-day event is one card, led by its next day — today's, while the trip is on. The rest
+   * of its days are one tap away under the card rather than a card each: a week-long trek was
+   * seven rows standing in for a single thing.
+   */
+  const upcomingDays = new Map<string, ActivityWithGroup[]>();
+  for (const activity of upcoming) {
+    if (!activity.multiDay) continue;
+    upcomingDays.set(activity.multiDay.id, [...(upcomingDays.get(activity.multiDay.id) ?? []), activity]);
+  }
+  const cards = upcoming.filter(
+    (activity) => !activity.multiDay || upcomingDays.get(activity.multiDay.id)![0] === activity,
+  );
+
+  /** Finished multi-day events collapse the same way: one row, opening the last day. */
+  const pastRows: { key: string; lead: ActivityWithGroup; days: number }[] = [];
+  for (const activity of past) {
+    const existing = activity.multiDay && pastRows.find((r) => r.key === activity.multiDay!.id);
+    if (existing) existing.days += 1;
+    else pastRows.push({ key: activity.multiDay?.id ?? activity.id, lead: activity, days: 1 });
+  }
+
   const nearTermCutoff = now + NEAR_TERM_DAYS * 24 * 60 * 60 * 1000;
   const buckets: { label: string; items: ActivityWithGroup[] }[] = [];
-  for (const activity of upcoming) {
+  for (const activity of cards) {
     const label = bucketFor(activity, nearTermCutoff, t('calendar.thisWeek'), locale);
     const bucket = buckets.find((b) => b.label === label);
     if (bucket) bucket.items.push(activity);
@@ -147,12 +170,16 @@ export default function CalendarScreen() {
 
   function EventRow({ activity, last }: { activity: ActivityWithGroup; last: boolean }) {
     const start = new Date(activity.startAt);
+    const multiDay = activity.multiDay;
+    const days = multiDay ? (upcomingDays.get(multiDay.id) ?? []) : [];
+    const expanded = multiDay ? expandedEvents.has(multiDay.id) : false;
     return (
       <View>
         <Row
-          title={activity.title}
+          title={multiDay ? multiDay.title : activity.title}
           subtitle={joinDot([
             activity.group.name,
+            multiDay && t('calendar.dayOfCount', { n: multiDay.dayNumber, count: multiDay.dayCount }),
             formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
           ])}
           leading={
@@ -175,8 +202,36 @@ export default function CalendarScreen() {
             />
           )}
         </View>
+        {multiDay && days.length > 1 && (
+          <Pressable onPress={() => toggleExpanded(multiDay.id)} style={styles.toggle}>
+            <Text style={[text.secondary, { color: color.accentText }]}>
+              {expanded ? t('calendar.hideDays') : t('calendar.showDays')}
+            </Text>
+          </Pressable>
+        )}
+        {expanded &&
+          days.map((day, index) => (
+            <Row
+              key={day.id}
+              title={day.title}
+              subtitle={joinDot([
+                t('calendar.dayOfCount', { n: day.multiDay!.dayNumber, count: day.multiDay!.dayCount }),
+                formatActivityWhen(day.startAt, day.endAt, day.allDay, locale),
+              ])}
+              onPress={() => open(day)}
+              last={index === days.length - 1}
+            />
+          ))}
       </View>
     );
+  }
+
+  function toggleExpanded(multiDayId: string) {
+    setExpandedEvents((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(multiDayId)) next.add(multiDayId);
+      return next;
+    });
   }
 
   return (
@@ -233,25 +288,27 @@ export default function CalendarScreen() {
         />
       )}
 
-      {past.length > 0 && (
-        <Section label={t('calendar.earlier', { count: past.length })}>
+      {pastRows.length > 0 && (
+        <Section label={t('calendar.earlier', { count: pastRows.length })}>
           <Pressable onPress={() => setShowPast((v) => !v)} style={styles.toggle}>
             <Text style={[text.secondary, { color: color.accentText }]}>
               {showPast ? t('calendar.hidePast') : t('calendar.showPast')}
             </Text>
           </Pressable>
           {showPast &&
-            past.map((activity, index) => (
+            pastRows.map(({ key, lead, days }, index) => (
               <Row
-                key={activity.id}
-                title={activity.title}
+                key={key}
+                title={lead.multiDay ? lead.multiDay.title : lead.title}
                 subtitle={joinDot([
-                  activity.group.name,
-                  formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+                  lead.group.name,
+                  lead.multiDay
+                    ? t('calendar.pastDays', { count: days })
+                    : formatActivityWhen(lead.startAt, lead.endAt, lead.allDay, locale),
                 ])}
-                onPress={() => open(activity)}
+                onPress={() => open(lead)}
                 done
-                last={index === past.length - 1}
+                last={index === pastRows.length - 1}
               />
             ))}
         </Section>

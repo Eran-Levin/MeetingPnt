@@ -57,8 +57,11 @@ ordinary events in the same group, and they *do* take RSVPs.
   Publishing it sends ONE push and ONE all-day calendar entry spanning the days (`multiday-<id>`,
   the days listed in the description), and a day's own publish/edit/delete re-sends that entry
   rather than a per-day invitation. Draft days stay off the entry. Built so far: create (portal,
-  `/groups/:id/multi-day/new`), publish all, group-page card. Not yet: mobile timeline card,
-  moving/copying a whole multi-day event, RSVP at the container level.
+  `/groups/:id/multi-day/new`), publish all, group-page card, and the mobile timeline card: one
+  card per event led by its next day ("Day 3 of 5", so today's while the trip is on), the other
+  days under "Show all days", finished events collapsed to one row. The day numbering comes from
+  `listMyActivities` (`multiDay`), counted over the days the caller can see, not just those in the
+  timeline's lookback. Not yet: moving/copying a whole multi-day event, RSVP at the container level.
 - **Attendance hangs off the meeting point, not the activity.** A group that moves between sites
   needs a roll call at each. Activity-level participation is *derived* (present at ≥1 point), never
   stored. Single-point activities behave identically, so yoga billing is unaffected.
