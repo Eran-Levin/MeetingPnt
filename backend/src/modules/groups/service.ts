@@ -242,11 +242,37 @@ async function copyEvents(
     return { event, id: randomUUID(), seriesId, startAt, endAt };
   });
 
+  // A multi-day event stays one: its days arrive grouped under a new container, so the copy shows
+  // a trip as a trip rather than a run of loose days.
+  const sourceContainerIds = [
+    ...new Set(events.map((e) => e.multiDayEventId).filter((id) => id !== null)),
+  ];
+  const newContainerId = new Map<string, string>();
+  if (sourceContainerIds.length > 0) {
+    const containers = await prisma.multiDayEvent.findMany({
+      where: { id: { in: sourceContainerIds } },
+    });
+    for (const container of containers) {
+      const created = await prisma.multiDayEvent.create({
+        data: {
+          groupId: targetId,
+          title: container.title,
+          description: container.description,
+          createdBy: leaderId,
+        },
+      });
+      newContainerId.set(container.id, created.id);
+    }
+  }
+
   await prisma.activity.createMany({
     data: copies.map(({ event, id, seriesId, startAt, endAt }) => ({
       id,
       groupId: targetId,
       seriesId,
+      multiDayEventId: event.multiDayEventId
+        ? (newContainerId.get(event.multiDayEventId) ?? null)
+        : null,
       title: event.title,
       description: event.description,
       startAt,

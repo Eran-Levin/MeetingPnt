@@ -64,8 +64,13 @@ ordinary events in the same group, and they *do* take RSVPs.
   timeline's lookback. The leader can also edit, move, copy and delete the whole event from its
   group-page card. **Rename** renames the days that carry the old title as a prefix ("Peru Trek ·
   Day 2"); a day titled by hand is left alone. **Move** shifts every day and stop by whole days in
-  the leader's time zone, and is refused once any day has started. **Copy** is same-group, drafts
-  only, days and stops across, RSVPs and attendance left behind (the group-copy rules, per event).
+  the leader's time zone, and is refused once any day has started. **Copy** is done from the
+  *target* group, not from the event: the new multi-day page has "Copy from existing", which lists
+  multi-day events (not their days) across the leader's groups and creates the copy in the group the
+  page is for — drafts only, days and stops across, RSVPs and attendance left behind. A copy button
+  on the event's own card was tried and removed: it only ever copied into the same group, which is
+  not how a trip is rerun. The single-activity "Copy from existing" no longer lists days of a
+  multi-day event. Duplicating a group with "copy events" keeps its multi-day events grouped.
   **Delete** is refused once a day is running or over, and sends one cancellation for the whole
   calendar entry. **RSVP at the container level** is for events that take RSVPs: while a member
   has an unanswered day that hasn't started, the timeline card offers "Coming to all days" / "Can't

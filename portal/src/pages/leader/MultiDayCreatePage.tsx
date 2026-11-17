@@ -2,12 +2,18 @@ import type { TransportMode } from '@meetingpnt/shared';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { activitiesApi } from '../../api/activitiesApi.js';
+import {
+  CopyMultiDayFromExisting,
+  type MultiDayCopy,
+} from '../../components/CopyMultiDayFromExisting.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Select } from '../../components/ui/Select.js';
 import { TextArea, TextField } from '../../components/ui/TextField.js';
-import { apiErrorMessage, useTranslation } from '../../i18n/index.js';
+import { useToast } from '../../components/ui/Toast.js';
+import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
+import { addDays, daysBetween } from '../../lib/days.js';
 
 const TRANSPORT_MODES: TransportMode[] = ['walking', 'driving', 'bicycling', 'transit'];
 const MAX_DAYS = 60;
@@ -17,9 +23,15 @@ const MAX_DAYS = 60;
  * each day becomes its own draft (own stops, own roll call) which they then plan. The days are
  * worked out here because only the browser knows the leader's time zone — an all-day trip is
  * stored as local-midnight instants.
+ *
+ * "Copy from existing" starts from a multi-day event in any of the leader's groups and creates this
+ * one in the group the page is for: the length and the days' stops come from the source, so the end
+ * date follows the start and the transport and reply settings are not asked again.
  */
 export function MultiDayCreatePage() {
   const { t } = useTranslation();
+  const locale = useLocale();
+  const showToast = useToast();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
@@ -29,14 +41,54 @@ export function MultiDayCreatePage() {
   const [transportMode, setTransportMode] = useState<TransportMode>('walking');
   // Off by default: people booked the trip, they don't re-confirm each morning.
   const [requiresRsvp, setRequiresRsvp] = useState(false);
+  const [copy, setCopy] = useState<MultiDayCopy | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const dayCount = daysBetween(startDate, endDate);
+  const dayCount = copy
+    ? copy.dayCount
+    : startDate && endDate
+      ? Math.max(0, daysBetween(startDate, endDate) + 1)
+      : 0;
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  function applyCopy(source: MultiDayCopy) {
+    setCopy(source);
+    setTitle(source.title);
+    setDescription(source.description);
+    setStartDate(source.newStart);
+    setEndDate(addDays(source.newStart, source.dayCount - 1));
+  }
+
+  function changeStart(value: string) {
+    setStartDate(value);
+    // A copy keeps its length, so the end follows.
+    if (copy && value) setEndDate(addDays(value, copy.dayCount - 1));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (copy) {
+      setSubmitting(true);
+      try {
+        await activitiesApi.copyMultiDay(copy.sourceId, {
+          groupId: groupId!,
+          shiftDays: daysBetween(copy.sourceStart, startDate),
+          timeZone,
+          title,
+          description,
+        });
+        showToast(t('multiDay.copied'));
+        navigate(`/groups/${groupId}`);
+      } catch (err) {
+        setError(apiErrorMessage(err, t('multiDay.failed')));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     if (dayCount < 1) {
       setError(t('newActivity.endDateBeforeStart'));
@@ -80,6 +132,20 @@ export function MultiDayCreatePage() {
       <h1 className="mt-2 text-2xl font-semibold text-ink">{t('multiDay.title')}</h1>
       <p className="mt-1 text-sm text-ink-secondary">{t('multiDay.subtitle')}</p>
 
+      <div className="mt-6">
+        <CopyMultiDayFromExisting onApply={applyCopy} />
+        {copy && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-sunken px-3 py-2 text-sm text-ink-secondary">
+            <span>
+              {t('multiDay.copyFrom.applied', { title: copy.title, count: copy.dayCount })}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setCopy(null)}>
+              {t('multiDay.copyFrom.stop')}
+            </Button>
+          </div>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
         <Card className="flex flex-col gap-4">
           <TextField
@@ -100,41 +166,55 @@ export function MultiDayCreatePage() {
               type="date"
               required
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => changeStart(e.target.value)}
             />
             <TextField
               label={t('newActivity.endDate')}
               type="date"
               required
+              disabled={copy !== null}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
-          <Select
-            label={t('newActivity.transport')}
-            value={transportMode}
-            onChange={(e) => setTransportMode(e.target.value as TransportMode)}
-          >
-            {TRANSPORT_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {t(`newActivity.${mode}`)}
-              </option>
-            ))}
-          </Select>
-          <label className="flex cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              checked={requiresRsvp}
-              onChange={(e) => setRequiresRsvp(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
-            />
-            <span>
-              <span className="block text-sm font-medium text-ink">{t('newActivity.approve')}</span>
-              <span className="block text-sm text-ink-secondary">
-                {requiresRsvp ? t('newActivity.approveOn') : t('newActivity.approveOff')}
-              </span>
-            </span>
-          </label>
+          {copy && endDate && (
+            <p className="text-sm text-ink-secondary">
+              {t('multiDay.copyFrom.endsOn', {
+                date: new Date(`${endDate}T12:00:00`).toLocaleDateString(locale),
+              })}
+            </p>
+          )}
+          {!copy && (
+            <>
+              <Select
+                label={t('newActivity.transport')}
+                value={transportMode}
+                onChange={(e) => setTransportMode(e.target.value as TransportMode)}
+              >
+                {TRANSPORT_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {t(`newActivity.${mode}`)}
+                  </option>
+                ))}
+              </Select>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={requiresRsvp}
+                  onChange={(e) => setRequiresRsvp(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-line-strong text-accent-text focus:ring-accent"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-ink">
+                    {t('newActivity.approve')}
+                  </span>
+                  <span className="block text-sm text-ink-secondary">
+                    {requiresRsvp ? t('newActivity.approveOn') : t('newActivity.approveOff')}
+                  </span>
+                </span>
+              </label>
+            </>
+          )}
         </Card>
 
         {error && (
@@ -146,27 +226,14 @@ export function MultiDayCreatePage() {
             {dayCount >= 1 && dayCount <= MAX_DAYS ? t('multiDay.daysSummary', { count: dayCount }) : ''}
           </p>
           <Button type="submit" disabled={submitting}>
-            {submitting ? t('newActivity.creating') : t('multiDay.create')}
+            {submitting
+              ? t('newActivity.creating')
+              : copy
+                ? t('multiDay.copyFrom.create')
+                : t('multiDay.create')}
           </Button>
         </div>
       </form>
     </PageContainer>
   );
-}
-
-/** Whole days from `start` to `end` inclusive (`YYYY-MM-DD`); 0 when either is missing or reversed. */
-function daysBetween(start: string, end: string): number {
-  if (!start || !end) return 0;
-  // Noon, so a daylight-saving change inside the range can't push the count off by one.
-  const from = new Date(`${start}T12:00:00`);
-  const to = new Date(`${end}T12:00:00`);
-  const days = Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1;
-  return days > 0 ? days : 0;
-}
-
-/** `YYYY-MM-DD` plus a number of calendar days, in the browser's own time zone. */
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T12:00:00`);
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
