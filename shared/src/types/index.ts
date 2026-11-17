@@ -29,6 +29,9 @@ export interface User {
   /** Absolute URL of the photo they took of themselves, or null. Everywhere a person is listed
    * shows a face when there is one and their initials when there isn't. */
   avatarUrl: string | null;
+  /** Whether they have opened the link sent to their address. Only a leader who signed up on their
+   * own is held back by this — until then they can sign in but not create a group. */
+  emailVerified: boolean;
   /** UI language — see `Locale`. */
   locale: Locale;
   /** Which app "Directions" opens for this person — see `NavApp`. */

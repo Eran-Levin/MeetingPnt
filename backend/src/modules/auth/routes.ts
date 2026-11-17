@@ -7,6 +7,7 @@ import { HttpError } from '../../middleware/errorHandler.js';
 import { validate } from '../../middleware/validate.js';
 import { parseDurationMs } from '../../lib/duration.js';
 import * as authService from './service.js';
+import { resendVerificationLink, verifyEmail } from './emailVerification.js';
 
 export const authRouter = Router();
 
@@ -71,6 +72,25 @@ authRouter.post('/logout', async (req, res, next) => {
       await authService.logout(token);
     }
     clearRefreshCookie(res);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public: the link is opened from an email, often in a browser that isn't signed in.
+authRouter.post('/verify-email', async (req, res, next) => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    res.json({ user: await verifyEmail(token) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/verification-email', authenticate, async (req, res, next) => {
+  try {
+    await resendVerificationLink(req.user!.id);
     res.status(204).send();
   } catch (err) {
     next(err);

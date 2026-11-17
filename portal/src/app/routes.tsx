@@ -15,6 +15,7 @@ import { HomeRedirect } from '../pages/HomeRedirect.js';
 import { InvitePage } from '../pages/InvitePage.js';
 import { LoginPage } from '../pages/LoginPage.js';
 import { RegisterPage } from '../pages/RegisterPage.js';
+import { VerifyEmailPage } from '../pages/VerifyEmailPage.js';
 
 const appRoutes: RouteObject[] = [
   { path: '/', element: <HomeRedirect /> },
@@ -22,6 +23,8 @@ const appRoutes: RouteObject[] = [
   { path: '/register', element: <RegisterPage /> },
   // Public: an invitation link is opened by someone who has no account yet.
   { path: '/invite', element: <InvitePage /> },
+  // Public: the confirmation link is opened from an email, signed in or not.
+  { path: '/verify-email', element: <VerifyEmailPage /> },
   {
     element: <AuthenticatedLayout />,
     children: [

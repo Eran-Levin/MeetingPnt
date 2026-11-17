@@ -30,6 +30,7 @@ export function toSharedUser(user: User): SharedUser {
     name: displayName(user),
     phone: user.phone,
     avatarUrl: user.avatarUrl,
+    emailVerified: user.emailVerifiedAt !== null,
     locale: toLocale(user.locale),
     navApp: toNavApp(user.navApp),
     role: user.role,
