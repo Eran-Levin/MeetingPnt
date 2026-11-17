@@ -1,4 +1,5 @@
 import type { TransportMode } from '@meetingpnt/shared';
+import { nextFullHour } from '@meetingpnt/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -35,8 +36,10 @@ export default function NewActivityScreen() {
   const [description, setDescription] = useState('');
   // Timed activities are entered as one date plus two clock times; all-day ones as two dates.
   const [allDay, setAllDay] = useState(false);
-  const [startAt, setStartAt] = useState(new Date(Date.now() + 60 * 60 * 1000));
-  const [endAt, setEndAt] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000));
+  // The next full hour and the one after, so the time picker opens at :00 rather than at the
+  // minute the form happened to be opened in.
+  const [startAt, setStartAt] = useState(() => nextFullHour());
+  const [endAt, setEndAt] = useState(() => new Date(nextFullHour().getTime() + 60 * 60 * 1000));
   const [picker, setPicker] = useState<null | 'date' | 'startTime' | 'endTime' | 'endDate'>(null);
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);

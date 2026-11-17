@@ -1,4 +1,5 @@
 import type { MeetingPointTemplateDto, TransportMode } from '@meetingpnt/shared';
+import { nextFullHour } from '@meetingpnt/shared';
 import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -18,6 +19,11 @@ function emptyTemplate(): MeetingPointTemplateDto {
   return { label: '', googleMapsUrl: '', offsetMinutes: 0 };
 }
 
+/** `HH:MM`, which is what a time input holds. */
+function clock(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export function ActivityCreatePage() {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -32,8 +38,15 @@ export function ActivityCreatePage() {
   // Timed activities are entered as one date plus two clock times; all-day ones as two dates.
   const [allDay, setAllDay] = useState(false);
   const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  // Start on the next full hour, end an hour later: an empty time field opens its picker at the
+  // current time of day, minutes and all.
+  const [startTime, setStartTime] = useState(() => clock(nextFullHour()));
+  const [endTime, setEndTime] = useState(() => {
+    const start = nextFullHour();
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    // An hour after 23:00 is tomorrow; stop at the end of today rather than before the start.
+    return end.getDate() === start.getDate() ? clock(end) : '23:59';
+  });
   const [endDate, setEndDate] = useState('');
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
