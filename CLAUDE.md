@@ -67,7 +67,13 @@ ordinary events in the same group, and they *do* take RSVPs.
   the leader's time zone, and is refused once any day has started. **Copy** is same-group, drafts
   only, days and stops across, RSVPs and attendance left behind (the group-copy rules, per event).
   **Delete** is refused once a day is running or over, and sends one cancellation for the whole
-  calendar entry. Not yet: RSVP at the container level.
+  calendar entry. **RSVP at the container level** is for events that take RSVPs: while a member
+  has an unanswered day that hasn't started, the timeline card offers "Coming to all days" / "Can't
+  make it" (`POST /multi-day-events/:id/rsvp`). It answers every published day that hasn't started,
+  replacing earlier answers on those days, and a day can still be answered alone afterwards — that
+  is how someone sits one out. Started days are skipped (RSVP locks at the start); a day published
+  later arrives with the normal default rather than inheriting the answer. There is no stored
+  "trip answer": it is just the days' own RSVPs, set together.
 - **Attendance hangs off the meeting point, not the activity.** A group that moves between sites
   needs a roll call at each. Activity-level participation is *derived* (present at ≥1 point), never
   stored. Single-point activities behave identically, so yoga billing is unaffected.

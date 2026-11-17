@@ -4,11 +4,13 @@ import {
   createActivitySchema,
   createMultiDayEventSchema,
   moveMultiDayEventSchema,
+  multiDayRsvpSchema,
   updateActivitySchema,
   updateMultiDayEventSchema,
 } from '@meetingpnt/shared';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
+import * as rsvpsService from '../rsvps/service.js';
 import * as activitiesService from './service.js';
 
 // Nested under /api/groups/:groupId/activities
@@ -108,6 +110,15 @@ multiDayEventsRouter.post('/:id/copy', validate(copyMultiDayEventSchema), async 
 multiDayEventsRouter.delete('/:id', async (req, res, next) => {
   try {
     res.json(await activitiesService.deleteMultiDayEvent(req.params.id as string, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// A member's one answer for every day that hasn't started.
+multiDayEventsRouter.post('/:id/rsvp', validate(multiDayRsvpSchema), async (req, res, next) => {
+  try {
+    res.json(await rsvpsService.replyToMultiDayEvent(req.params.id as string, req.user!.id, req.body));
   } catch (err) {
     next(err);
   }
