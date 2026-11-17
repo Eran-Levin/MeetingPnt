@@ -134,3 +134,14 @@ export function calendarSubscribeLinks(feedUrl: string): { webcal: string; googl
     google: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`,
   };
 }
+
+/**
+ * The next whole hour — what a new event's start defaults to. A time control left to itself opens
+ * at the current time of day, so the minutes would be whatever minute the leader happened to open
+ * the form in (14:37); events start on the hour, and nobody has to scroll the minutes back to 0.
+ */
+export function nextFullHour(from: Date = new Date()): Date {
+  const next = new Date(from);
+  next.setHours(next.getHours() + 1, 0, 0, 0);
+  return next;
+}
