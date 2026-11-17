@@ -6,6 +6,7 @@ import { apiErrorMessage, useTranslation } from '../i18n/index.js';
 import { Button } from './ui/Button.js';
 import { Select } from './ui/Select.js';
 import { TextArea, TextField } from './ui/TextField.js';
+import { useToast } from './ui/Toast.js';
 
 const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'transit'];
 
@@ -33,6 +34,7 @@ function toTimeInput(iso: string): string {
  */
 export function ActivityEditor({ activity, onDone }: Props) {
   const { t } = useTranslation();
+  const showToast = useToast();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(activity.title);
   const [description, setDescription] = useState(activity.description ?? '');
@@ -71,7 +73,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
 
     setSaving(true);
     try {
-      await activitiesApi.update(activity.id, {
+      const { invited } = await activitiesApi.update(activity.id, {
         title: title.trim(),
         description,
         transportMode,
@@ -83,6 +85,11 @@ export function ActivityEditor({ activity, onDone }: Props) {
       queryClient.invalidateQueries({ queryKey: ['activities', activity.id] });
       queryClient.invalidateQueries({ queryKey: ['activities', activity.id, 'rsvps'] });
       queryClient.invalidateQueries({ queryKey: ['groups', activity.groupId, 'activities'] });
+      // Saving closes the form, which says "saved"; that calendars are being updated is the part
+      // nobody could otherwise see.
+      showToast(
+        invited > 0 ? t('publishToast.updated', { count: invited }) : t('publishToast.saved'),
+      );
       onDone();
     } catch (err) {
       setError(apiErrorMessage(err, t('activityEditor.failed')));

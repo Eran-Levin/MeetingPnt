@@ -91,6 +91,8 @@ export const en = {
     end_before_start: 'The end must be after the start',
     schedule_in_past: "You can't schedule an event in the past",
     publish_draft_only: 'Only draft activities can be published',
+    delete_not_started_only:
+      'An event that is running or has ended is part of the record and cannot be deleted.',
     start_published_only: 'Only a published activity can be started',
     end_published_or_running_only: 'Only a published or in-progress activity can be ended',
     already_running_elsewhere:
@@ -494,6 +496,10 @@ export const en = {
     back: 'Back to group',
     notApproved: 'attendance not approved',
     edit: 'Edit activity',
+    delete: 'Delete event',
+    confirmDeleteDraft: 'Delete this draft? This cannot be undone.',
+    confirmDeletePublished:
+      'Delete this event? Everyone invited will get a cancellation and it will come off their calendars. Replies are deleted too. This cannot be undone.',
     publish: 'Publish & notify members',
     whosComing: 'Who’s coming',
     publishToCollect: 'Publish this event to start collecting replies.',
@@ -807,6 +813,15 @@ export const en = {
     continue: 'Continue to MeetingPnt',
   },
   publishToast: {
+    published: 'Published.',
+    saved: 'Saved.',
+    updated_one: 'Saved. The calendar update is on its way to {{count}} person.',
+    updated_two: 'Saved. Calendar updates are on their way to {{count}} people.',
+    updated_other: 'Saved. Calendar updates are on their way to {{count}} people.',
+    deleted: 'Event deleted.',
+    cancelled_one: 'Event deleted. A cancellation is on its way to {{count}} person.',
+    cancelled_two: 'Event deleted. Cancellations are on their way to {{count}} people.',
+    cancelled_other: 'Event deleted. Cancellations are on their way to {{count}} people.',
     invited_one: 'Published. A calendar invitation is on its way to {{count}} person.',
     invited_two: 'Published. Calendar invitations are on their way to {{count}} people.',
     invited_other: 'Published. Calendar invitations are on their way to {{count}} people.',
