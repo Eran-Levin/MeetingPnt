@@ -629,20 +629,51 @@ export async function listMyActivities(userId: string): Promise<ActivityWithGrou
     },
     include: {
       group: { select: { id: true, name: true, leaderId: true } },
+      multiDayEvent: { select: { id: true, title: true } },
       // The caller's own RSVP only — enough to flag "you haven't replied" without loading everyone's.
       rsvps: { where: { userId }, select: { status: true } },
     },
     orderBy: { startAt: 'asc' },
   });
 
-  return activities
-    .filter((activity) => activity.group.leaderId === userId || activity.status !== 'draft')
-    .map((activity) => ({
-      ...toSharedActivity(activity),
-      group: { id: activity.group.id, name: activity.group.name },
-      isLeader: activity.group.leaderId === userId,
-      myRsvpStatus: activity.rsvps[0]?.status ?? null,
-    }));
+  const visible = activities.filter(
+    (activity) => activity.group.leaderId === userId || activity.status !== 'draft',
+  );
+
+  // "Day 3 of 5" counts the days the caller can see across the whole event, not just those inside
+  // the timeline's window — a trip in its last days has most of its days behind the lookback.
+  const eventIds = [...new Set(visible.map((a) => a.multiDayEventId).filter((id) => id !== null))];
+  const siblings = eventIds.length
+    ? await prisma.activity.findMany({
+        where: { multiDayEventId: { in: eventIds } },
+        select: { id: true, multiDayEventId: true, status: true, group: { select: { leaderId: true } } },
+        orderBy: { startAt: 'asc' },
+      })
+    : [];
+  const daysOf = new Map<string, string[]>();
+  for (const day of siblings) {
+    if (day.group.leaderId !== userId && day.status === 'draft') continue;
+    daysOf.set(day.multiDayEventId!, [...(daysOf.get(day.multiDayEventId!) ?? []), day.id]);
+  }
+
+  return visible
+    .map((activity) => {
+      const days = activity.multiDayEvent ? (daysOf.get(activity.multiDayEvent.id) ?? []) : [];
+      return {
+        ...toSharedActivity(activity),
+        group: { id: activity.group.id, name: activity.group.name },
+        multiDay: activity.multiDayEvent
+          ? {
+              id: activity.multiDayEvent.id,
+              title: activity.multiDayEvent.title,
+              dayNumber: days.indexOf(activity.id) + 1,
+              dayCount: days.length,
+            }
+          : null,
+        isLeader: activity.group.leaderId === userId,
+        myRsvpStatus: activity.rsvps[0]?.status ?? null,
+      };
+    });
 }
 
 export async function getActivity(activityId: string, requesterId: string) {

@@ -215,6 +215,11 @@ export const en = {
     earlier: 'Earlier ({{count}})',
     hidePast: 'Hide past activities',
     showPast: 'Show past activities',
+    dayOfCount: 'Day {{n}} of {{count}}',
+    showDays: 'Show all days',
+    hideDays: 'Hide days',
+    pastDays_one: '{{count}} day',
+    pastDays_other: '{{count}} days',
   },
   live: {
     openA11y: 'Open the running activity, {{title}}',

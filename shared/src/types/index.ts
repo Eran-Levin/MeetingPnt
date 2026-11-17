@@ -181,6 +181,11 @@ export interface Activity {
 /** An activity carrying enough group context to render in a cross-group timeline. */
 export interface ActivityWithGroup extends Activity {
   group: Pick<Group, 'id' | 'name'>;
+  /**
+   * Set when this is a day of a multi-day event: its title, and which day this is among the days
+   * the caller can see (drafts count only for the leader). The timeline folds the days into one card.
+   */
+  multiDay: { id: string; title: string; dayNumber: number; dayCount: number } | null;
   isLeader: boolean;
   /** The caller's own RSVP, so the timeline can flag events still awaiting a reply. Null for a
    * leader, who doesn't RSVP to their own event. */
