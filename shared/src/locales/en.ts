@@ -437,18 +437,26 @@ export const en = {
     published: 'Published',
     edit: 'Edit',
     move: 'Move',
-    copy: 'Copy',
     delete: 'Delete',
     newStart: 'New start date',
-    copyTitle: 'Title of the copy',
     moveHint:
       'Every day and every stop moves by the same number of days, at the same time of day. Anyone already invited gets a calendar update.',
-    copyHint:
-      'Makes a new draft event with the same days and stops, starting on the date you pick. Replies and attendance are not copied.',
     moveAction: 'Move event',
-    copyAction: 'Create copy',
     working: 'Working…',
     copied: 'Copied as drafts. Review the days and publish when ready.',
+    copyFrom: {
+      hint: 'Start from a multi-day event you already planned, in any of your groups. Its days and every stop come across as drafts.',
+      event: 'Multi-day event',
+      pickEvent: 'Choose a multi-day event',
+      noEvents: 'This group has no multi-day events to copy yet.',
+      newStart: 'New start date',
+      failed: 'Could not load that. Try again.',
+      applied:
+        'Copying "{{title}}": its {{count}} days and every stop come across as drafts. Check the dates and details before creating.',
+      stop: 'Start from scratch instead',
+      endsOn: 'Ends on {{date}}',
+      create: 'Create copy (drafts)',
+    },
     confirmDelete:
       'Delete “{{title}}” and all {{count}} of its days? Anyone invited gets a cancellation. Replies are deleted too. This cannot be undone.',
     actionFailed: 'That did not work',

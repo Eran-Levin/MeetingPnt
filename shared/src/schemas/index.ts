@@ -185,8 +185,12 @@ export const moveMultiDayEventSchema = z.object({
 
 // A copy carries the shape — title, description, days and their stops — as drafts, moved by
 // `shiftDays`. RSVPs, attendance and progress stay behind. `title` renames the copy (and its days).
+// `groupId` is the group the copy lands in — any group the leader runs; the source's own if absent.
 export const copyMultiDayEventSchema = moveMultiDayEventSchema.extend({
+  groupId: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
+  // Replaces the description; an empty string clears it. Absent keeps the source's.
+  description: z.string().optional(),
 });
 
 export const updateActivitySchema =createActivityBaseSchema

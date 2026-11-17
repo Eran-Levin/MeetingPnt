@@ -47,8 +47,16 @@ export function CopyFromExisting({ onApply }: Props) {
     activitiesApi
       .list(groupId)
       .then(({ activities }) => {
-        // Newest first: the one worth repeating is usually the last one run.
-        if (!stale) setActivities([...activities].sort((a, b) => b.startAt.localeCompare(a.startAt)));
+        // Newest first: the one worth repeating is usually the last one run. A day of a multi-day
+        // event is left out — on its own it is a fragment of a trip, and the multi-day page copies
+        // the whole event.
+        if (!stale) {
+          setActivities(
+            activities
+              .filter((a) => !a.multiDayEventId)
+              .sort((a, b) => b.startAt.localeCompare(a.startAt)),
+          );
+        }
       })
       .catch((err) => !stale && setError(apiErrorMessage(err, t('activityForm.copy.failed'))));
     return () => {

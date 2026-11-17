@@ -476,9 +476,10 @@ export async function moveMultiDayEvent(
 }
 
 /**
- * A new multi-day event from an existing one, in the same group: title, description, every day and
- * every stop, as drafts moved by `shiftDays`. RSVPs, attendance and progress stay behind, so a
- * finished trip can be copied for the next departure. Nothing is announced — drafts reach nobody.
+ * A new multi-day event from an existing one: title, description, every day and every stop, as
+ * drafts moved by `shiftDays`. It lands in `dto.groupId` — any group the leader runs, so a trip
+ * can be run again for a new departure's group — or the source's own. RSVPs, attendance and
+ * progress stay behind. Nothing is announced — drafts reach nobody.
  */
 export async function copyMultiDayEvent(
   multiDayEventId: string,
@@ -493,12 +494,17 @@ export async function copyMultiDayEvent(
     throw new HttpError(409, 'multi_day_nothing_to_copy');
   }
 
+  const targetGroupId = dto.groupId ?? source.groupId;
+  if (targetGroupId !== source.groupId) {
+    await assertGroupLeader(targetGroupId, requesterId);
+  }
+
   const title = dto.title ?? source.title;
   const created = await prisma.multiDayEvent.create({
     data: {
-      groupId: source.groupId,
+      groupId: targetGroupId,
       title,
-      description: source.description,
+      description: dto.description !== undefined ? dto.description || null : source.description,
       createdBy: requesterId,
     },
   });
@@ -513,7 +519,7 @@ export async function copyMultiDayEvent(
     await prisma.activity.createMany({
       data: copies.map(({ day, id, startAt, endAt }) => ({
         id,
-        groupId: source.groupId,
+        groupId: targetGroupId,
         multiDayEventId: created.id,
         title: retitleDay(day.title, source.title, title),
         description: day.description,
@@ -531,7 +537,7 @@ export async function copyMultiDayEvent(
       await copyMeetingPoints({
         fromActivityId: day.id,
         toActivityId: id,
-        toGroupId: source.groupId,
+        toGroupId: targetGroupId,
         createdBy: requesterId,
         deltaMs: startAt.getTime() - day.startAt.getTime(),
       });
