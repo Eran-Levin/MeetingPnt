@@ -74,8 +74,8 @@ activitiesRouter.patch('/:id', validate(updateActivitySchema), async (req, res, 
 
 activitiesRouter.post('/:id/publish', async (req, res, next) => {
   try {
-    const activity = await activitiesService.publishActivity(req.params.id as string, req.user!.id);
-    res.json({ activity });
+    // `invited` is how many people a calendar invitation is going to.
+    res.json(await activitiesService.publishActivity(req.params.id as string, req.user!.id));
   } catch (err) {
     next(err);
   }
@@ -101,11 +101,7 @@ activitiesRouter.post('/:id/end', async (req, res, next) => {
 
 activitiesRouter.post('/series/:seriesId/publish', async (req, res, next) => {
   try {
-    const activities = await activitiesService.publishSeries(
-      req.params.seriesId as string,
-      req.user!.id,
-    );
-    res.json({ activities });
+    res.json(await activitiesService.publishSeries(req.params.seriesId as string, req.user!.id));
   } catch (err) {
     next(err);
   }

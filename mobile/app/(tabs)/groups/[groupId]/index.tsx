@@ -8,6 +8,7 @@ import { activitiesApi } from '../../../../src/api/activitiesApi';
 import { apiErrorMessage, useLocale, useTranslation } from '../../../../src/i18n';
 import { groupsApi } from '../../../../src/api/groupsApi';
 import { invitationsApi } from '../../../../src/api/invitationsApi';
+import { showToast } from '../../../../src/services/toast';
 import { useAuthStore } from '../../../../src/store/authStore';
 import {
   Avatar,
@@ -67,7 +68,8 @@ export default function GroupDetailScreen() {
   }
 
   async function handlePublishSeries(seriesId: string) {
-    await activitiesApi.publishSeries(seriesId);
+    const { invited } = await activitiesApi.publishSeries(seriesId);
+    if (invited > 0) showToast(t('publishToast.invited', { count: invited }));
     queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
   }
 

@@ -774,6 +774,11 @@ export const he: Catalog = {
     session: 'התחברות',
     logOut: 'התנתקות',
   },
+  publishToast: {
+    invited_one: 'פורסם. הזמנה ללוח השנה בדרך לאדם אחד.',
+    invited_two: 'פורסם. הזמנות ללוח השנה בדרך לשני אנשים.',
+    invited_other: 'פורסם. הזמנות ללוח השנה בדרך ל-{{count}} אנשים.',
+  },
   calendarFeed: {
     title: 'לוח השנה שלכם',
     blurb:

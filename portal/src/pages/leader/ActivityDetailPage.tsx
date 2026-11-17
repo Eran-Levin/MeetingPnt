@@ -15,10 +15,12 @@ import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
+import { useToast } from '../../components/ui/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 export function ActivityDetailPage() {
   const { t } = useTranslation();
+  const showToast = useToast();
   const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const activityId = id!;
@@ -66,7 +68,11 @@ export function ActivityDetailPage() {
     }
   }
 
-  const handlePublish = () => runLifecycleAction(() => activitiesApi.publish(activityId));
+  const handlePublish = () =>
+    runLifecycleAction(async () => {
+      const { invited } = await activitiesApi.publish(activityId);
+      if (invited > 0) showToast(t('publishToast.invited', { count: invited }));
+    });
   const handleStart = () => runLifecycleAction(() => activitiesApi.start(activityId));
 
   async function handleEnd() {

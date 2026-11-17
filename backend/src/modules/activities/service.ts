@@ -210,14 +210,14 @@ export async function publishSeries(seriesId: string, requesterId: string) {
   );
 
   // One repeating calendar entry for the lot, not an email per date.
-  const invited = updated.filter((a) => draftIds.includes(a.id));
-  await announceCalendarChange(
+  const newlyPublished = updated.filter((a) => draftIds.includes(a.id));
+  const invited = await announceCalendarChange(
     'invited',
-    invited[0]!,
-    invited.map((a) => a.startAt),
+    newlyPublished[0]!,
+    newlyPublished.map((a) => a.startAt),
   );
 
-  return updated.map(toSharedActivity);
+  return { activities: updated.map(toSharedActivity), invited };
 }
 
 export async function updateActivity(activityId: string, requesterId: string, dto: UpdateActivityDto) {
@@ -348,9 +348,9 @@ export async function publishActivity(activityId: string, requesterId: string) {
       }),
   );
 
-  await announceCalendarChange('invited', updated);
+  const invited = await announceCalendarChange('invited', updated);
 
-  return toSharedActivity(updated);
+  return { activity: toSharedActivity(updated), invited };
 }
 
 /** Marks an event as running. Purely a signal to members and the leader's own UI —
@@ -502,5 +502,5 @@ export async function deleteActivity(activityId: string, requesterId: string) {
     : null;
 
   await prisma.activity.delete({ where: { id: activityId } });
-  sendCancellations?.();
+  sendCancellations?.send();
 }
