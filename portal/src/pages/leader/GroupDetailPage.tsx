@@ -17,6 +17,7 @@ import { Select } from '../../components/ui/Select.js';
 import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
 import { TextField } from '../../components/ui/TextField.js';
 import { useToast } from '../../components/ui/Toast.js';
+import { MultiDayActions } from '../../components/MultiDayActions.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
@@ -183,8 +184,8 @@ export function GroupDetailPage() {
       seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
     }
   }
-  const multiDayTitles = new Map(
-    (multiDayQuery.data?.multiDayEvents ?? []).map((event) => [event.id, event.title]),
+  const multiDayEvents = new Map(
+    (multiDayQuery.data?.multiDayEvents ?? []).map((event) => [event.id, event]),
   );
 
   return (
@@ -438,7 +439,7 @@ export function GroupDetailPage() {
                   <Card key={multiDayEventId}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-ink">
-                        {multiDayTitles.get(multiDayEventId) ?? days[0]!.title}{' '}
+                        {multiDayEvents.get(multiDayEventId)?.title ?? days[0]!.title}{' '}
                         <span className="font-normal text-ink-muted">
                           {t('groupDetail.multiDayDays', { count: days.length })}
                         </span>
@@ -464,6 +465,9 @@ export function GroupDetailPage() {
                         </Link>
                       ))}
                     </div>
+                    {isLeader && multiDayEvents.has(multiDayEventId) && (
+                      <MultiDayActions event={multiDayEvents.get(multiDayEventId)!} days={days} />
+                    )}
                   </Card>
                 );
               })}

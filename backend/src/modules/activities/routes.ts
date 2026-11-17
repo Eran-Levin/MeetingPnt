@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import {
+  copyMultiDayEventSchema,
   createActivitySchema,
   createMultiDayEventSchema,
+  moveMultiDayEventSchema,
   updateActivitySchema,
+  updateMultiDayEventSchema,
 } from '@meetingpnt/shared';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
@@ -71,6 +74,44 @@ groupMultiDayEventsRouter.get<{ groupId: string }>('/', async (req, res, next) =
 export const multiDayEventsRouter = Router();
 
 multiDayEventsRouter.use(authenticate);
+
+multiDayEventsRouter.patch('/:id', validate(updateMultiDayEventSchema), async (req, res, next) => {
+  try {
+    res.json(
+      await activitiesService.updateMultiDayEvent(req.params.id as string, req.user!.id, req.body),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+multiDayEventsRouter.post('/:id/move', validate(moveMultiDayEventSchema), async (req, res, next) => {
+  try {
+    res.json(
+      await activitiesService.moveMultiDayEvent(req.params.id as string, req.user!.id, req.body),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+multiDayEventsRouter.post('/:id/copy', validate(copyMultiDayEventSchema), async (req, res, next) => {
+  try {
+    res
+      .status(201)
+      .json(await activitiesService.copyMultiDayEvent(req.params.id as string, req.user!.id, req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+multiDayEventsRouter.delete('/:id', async (req, res, next) => {
+  try {
+    res.json(await activitiesService.deleteMultiDayEvent(req.params.id as string, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+});
 
 multiDayEventsRouter.post('/:id/publish', async (req, res, next) => {
   try {

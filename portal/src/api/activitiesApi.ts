@@ -1,10 +1,13 @@
 import type {
   Activity,
   ActivityWithGroup,
+  CopyMultiDayEventDto,
   CreateActivityDto,
   CreateMultiDayEventDto,
+  MoveMultiDayEventDto,
   MultiDayEvent,
   UpdateActivityDto,
+  UpdateMultiDayEventDto,
 } from '@meetingpnt/shared';
 import { apiFetch } from './client.js';
 
@@ -24,6 +27,23 @@ export const activitiesApi = {
     ),
   listMultiDay: (groupId: string) =>
     apiFetch<{ multiDayEvents: MultiDayEvent[] }>(`/api/groups/${groupId}/multi-day-events`),
+  updateMultiDay: (id: string, dto: UpdateMultiDayEventDto) =>
+    apiFetch<{ multiDayEvent: MultiDayEvent; invited: number }>(`/api/multi-day-events/${id}`, {
+      method: 'PATCH',
+      body: dto,
+    }),
+  moveMultiDay: (id: string, dto: MoveMultiDayEventDto) =>
+    apiFetch<{ activities: Activity[]; invited: number }>(`/api/multi-day-events/${id}/move`, {
+      method: 'POST',
+      body: dto,
+    }),
+  copyMultiDay: (id: string, dto: CopyMultiDayEventDto) =>
+    apiFetch<{ multiDayEvent: MultiDayEvent; activities: Activity[] }>(
+      `/api/multi-day-events/${id}/copy`,
+      { method: 'POST', body: dto },
+    ),
+  removeMultiDay: (id: string) =>
+    apiFetch<{ invited: number }>(`/api/multi-day-events/${id}`, { method: 'DELETE' }),
   publishMultiDay: (id: string) =>
     apiFetch<{ activities: Activity[]; invited: number }>(`/api/multi-day-events/${id}/publish`, {
       method: 'POST',

@@ -169,6 +169,26 @@ export const createMultiDayEventSchema = z.object({
   requiresRsvp: z.boolean().default(false),
 });
 
+// Renaming also renames the days that carry the old title as a prefix ("Peru Trek · Day 2").
+// An empty description clears it.
+export const updateMultiDayEventSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional(),
+});
+
+// Whole calendar days, in the leader's own time zone (sent by the browser — the server runs UTC),
+// so an 08:00 start stays 08:00 across a daylight-saving change.
+export const moveMultiDayEventSchema = z.object({
+  shiftDays: z.number().int().min(-3650).max(3650),
+  timeZone: z.string().min(1).default('UTC'),
+});
+
+// A copy carries the shape — title, description, days and their stops — as drafts, moved by
+// `shiftDays`. RSVPs, attendance and progress stay behind. `title` renames the copy (and its days).
+export const copyMultiDayEventSchema = moveMultiDayEventSchema.extend({
+  title: z.string().min(1).optional(),
+});
+
 export const updateActivitySchema =createActivityBaseSchema
   .omit({ recurrence: true, meetingPoints: true })
   .partial()
