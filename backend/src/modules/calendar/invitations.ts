@@ -45,9 +45,14 @@ interface Recipient {
   locale: Locale;
 }
 
+/** `example.com` is reserved for examples and can never receive mail — and it is where every
+ * seeded account lives. Writing to them would only bounce, and bounces count against the sender. */
+const isUndeliverable = (email: string) => email.toLowerCase().endsWith('@example.com');
+
 /**
  * Everyone whose calendar the event belongs on: the leader, the roster, and visitors to this one
- * event. Placeholders are left out — a roster slot for someone with no account has no real address.
+ * event. Left out: placeholders — a roster slot for someone with no account has no real address —
+ * and addresses that can't receive mail.
  */
 async function recipientsOf(activity: Activity) {
   const [group, guests] = await Promise.all([
@@ -67,7 +72,7 @@ async function recipientsOf(activity: Activity) {
     ...group.members.map((m) => m.user),
     ...guests.map((g) => g.user),
   ]) {
-    if (user.isPlaceholder) continue;
+    if (user.isPlaceholder || isUndeliverable(user.email)) continue;
     people.set(user.id, {
       email: user.email,
       name: displayName(user),
@@ -128,7 +133,7 @@ export async function prepareCalendarInvitations(
   change: CalendarChange,
   activity: Activity,
   seriesStarts?: Date[],
-): Promise<() => void> {
+): Promise<{ count: number; send: () => void }> {
   const { group, recipients } = await recipientsOf(activity);
   const [start] = await listFirstMeetingPoints([activity.id]);
 
@@ -175,7 +180,7 @@ export async function prepareCalendarInvitations(
     }),
   }));
 
-  return () => {
+  const send = () => {
     void (async () => {
       for (const email of emails) {
         try {
@@ -187,17 +192,22 @@ export async function prepareCalendarInvitations(
       }
     })();
   };
+  return { count: emails.length, send };
 }
 
-/** Prepare and send, never throwing — for the callers that have nothing to do in between. */
+/** Prepare and send, never throwing — for the callers that have nothing to do in between.
+ * Returns how many people an invitation is going to, so the leader can be told. */
 export async function announceCalendarChange(
   change: CalendarChange,
   activity: Activity,
   seriesStarts?: Date[],
-): Promise<void> {
+): Promise<number> {
   try {
-    (await prepareCalendarInvitations(change, activity, seriesStarts))();
+    const { count, send } = await prepareCalendarInvitations(change, activity, seriesStarts);
+    send();
+    return count;
   } catch (error) {
     console.error(`[calendar] could not prepare invitations (${activity.id})`, error);
+    return 0;
   }
 }

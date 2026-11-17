@@ -16,12 +16,14 @@ import { PageContainer } from '../../components/ui/PageContainer.js';
 import { Select } from '../../components/ui/Select.js';
 import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
 import { TextField } from '../../components/ui/TextField.js';
+import { useToast } from '../../components/ui/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
 
 export function GroupDetailPage() {
   const { t } = useTranslation();
+  const showToast = useToast();
   const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const groupId = id!;
@@ -112,7 +114,8 @@ export function GroupDetailPage() {
   }
 
   async function handlePublishSeries(seriesId: string) {
-    await activitiesApi.publishSeries(seriesId);
+    const { invited } = await activitiesApi.publishSeries(seriesId);
+    if (invited > 0) showToast(t('publishToast.invited', { count: invited }));
     queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
   }
 

@@ -785,6 +785,11 @@ export const en = {
     session: 'Session',
     logOut: 'Log out',
   },
+  publishToast: {
+    invited_one: 'Published. A calendar invitation is on its way to {{count}} person.',
+    invited_two: 'Published. Calendar invitations are on their way to {{count}} people.',
+    invited_other: 'Published. Calendar invitations are on their way to {{count}} people.',
+  },
   calendarFeed: {
     title: 'Your calendar',
     blurb:

@@ -19,13 +19,13 @@ export const activitiesApi = {
   update: (id: string, dto: UpdateActivityDto) =>
     apiFetch<{ activity: Activity }>(`/api/activities/${id}`, { method: 'PATCH', body: dto }),
   publish: (id: string) =>
-    apiFetch<{ activity: Activity }>(`/api/activities/${id}/publish`, { method: 'POST' }),
+    apiFetch<{ activity: Activity; invited: number }>(`/api/activities/${id}/publish`, { method: 'POST' }),
   start: (id: string) =>
     apiFetch<{ activity: Activity }>(`/api/activities/${id}/start`, { method: 'POST' }),
   end: (id: string) =>
     apiFetch<{ activity: Activity }>(`/api/activities/${id}/end`, { method: 'POST' }),
   publishSeries: (seriesId: string) =>
-    apiFetch<{ activities: Activity[] }>(`/api/activities/series/${seriesId}/publish`, {
+    apiFetch<{ activities: Activity[]; invited: number }>(`/api/activities/series/${seriesId}/publish`, {
       method: 'POST',
     }),
   remove: (id: string) => apiFetch<void>(`/api/activities/${id}`, { method: 'DELETE' }),
