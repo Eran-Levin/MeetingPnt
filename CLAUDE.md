@@ -49,6 +49,16 @@ ordinary events in the same group, and they *do* take RSVPs.
   to find someone. Across *different* groups it stays a 409: a leader can't be in two places at
   once, and silently ending another group's event would close sharing on people still out there.
   This only tidies up when there *is* a next start (see BACKLOG for the sweep that finishes it).
+- **A multi-day event is a container of day events** (`MultiDayEvent`, MPNT-33). A trip, or a
+  workshop weekend inside a standing group: the leader plans and publishes it as one thing, while
+  each day stays a real event with its own stops and roll call (see "a day is an event" above).
+  Used everywhere, including a tour guide's group, which also holds ordinary events around the trip
+  (a briefing before, a summary after). The container stores no dates — they are its days'.
+  Publishing it sends ONE push and ONE all-day calendar entry spanning the days (`multiday-<id>`,
+  the days listed in the description), and a day's own publish/edit/delete re-sends that entry
+  rather than a per-day invitation. Draft days stay off the entry. Built so far: create (portal,
+  `/groups/:id/multi-day/new`), publish all, group-page card. Not yet: mobile timeline card,
+  moving/copying a whole multi-day event, RSVP at the container level.
 - **Attendance hangs off the meeting point, not the activity.** A group that moves between sites
   needs a roll call at each. Activity-level participation is *derived* (present at ≥1 point), never
   stored. Single-point activities behave identically, so yoga billing is unaffected.

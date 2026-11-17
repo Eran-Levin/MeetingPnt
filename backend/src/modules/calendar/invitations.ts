@@ -38,6 +38,7 @@ function sequenceNow(): number {
 
 /** One repeating entry per series; an event published on its own goes under its own id. */
 const seriesUid = (seriesId: string) => `series-${seriesId}`;
+const multiDayUid = (id: string) => `multiday-${id}`;
 
 interface Recipient {
   email: string;
@@ -54,16 +55,19 @@ const isUndeliverable = (email: string) => email.toLowerCase().endsWith('@exampl
  * event. Left out: placeholders — a roster slot for someone with no account has no real address —
  * and addresses that can't receive mail.
  */
-async function recipientsOf(activity: Activity) {
+async function recipientsOf(groupId: string, activityId?: string) {
   const [group, guests] = await Promise.all([
     prisma.group.findUniqueOrThrow({
-      where: { id: activity.groupId },
+      where: { id: groupId },
       include: {
         leader: true,
         members: { where: { status: 'active' }, include: { user: true } },
       },
     }),
-    prisma.activityGuest.findMany({ where: { activityId: activity.id }, include: { user: true } }),
+    // Visitors belong to one event; a multi-day event has none of its own.
+    activityId
+      ? prisma.activityGuest.findMany({ where: { activityId }, include: { user: true } })
+      : Promise.resolve([]),
   ]);
 
   const people = new Map<string, Recipient>();
@@ -134,7 +138,7 @@ export async function prepareCalendarInvitations(
   activity: Activity,
   seriesStarts?: Date[],
 ): Promise<{ count: number; send: () => void }> {
-  const { group, recipients } = await recipientsOf(activity);
+  const { group, recipients } = await recipientsOf(activity.groupId, activity.id);
   const [start] = await listFirstMeetingPoints([activity.id]);
 
   const inSeries = activity.seriesId && (seriesStarts || activity.invitedInstanceStart);
@@ -150,21 +154,50 @@ export async function prepareCalendarInvitations(
     allDay: activity.allDay,
   };
 
+  const moreStarts = seriesStarts?.filter((s) => s.getTime() !== activity.startAt.getTime());
+  return compose({
+    change,
+    event,
+    group,
+    recipients,
+    dates: seriesStarts?.length ?? 1,
+    askReply: activity.requiresRsvp,
+    moreStarts,
+    // A change to one date of a series names it by the start it was invited with.
+    instanceStart: seriesStarts ? undefined : (activity.invitedInstanceStart ?? undefined),
+    logId: activity.id,
+  });
+}
+
+/**
+ * The emails for one change, and the function that sends them. Shared by single events and
+ * multi-day ones, which differ only in the entry they describe.
+ */
+function compose(args: {
+  change: CalendarChange;
+  event: CalendarEvent;
+  group: Awaited<ReturnType<typeof recipientsOf>>['group'];
+  recipients: Recipient[];
+  dates: number;
+  askReply: boolean;
+  moreStarts?: Date[];
+  instanceStart?: Date;
+  logId: string;
+}): { count: number; send: () => void } {
+  const { change, event, group, recipients } = args;
   const leader = displayName(group.leader);
   const sequence = sequenceNow();
-  const moreStarts = seriesStarts?.filter((s) => s.getTime() !== activity.startAt.getTime());
 
   const emails = recipients.map((recipient) => ({
     to: recipient.email,
     ...buildEmail(
       change,
       recipient.locale,
-      { leader, group: group.name, title: activity.title },
+      { leader, group: group.name, title: event.title },
       {
-        dates: seriesStarts?.length ?? 1,
+        dates: args.dates,
         // The leader isn't asked whether they're coming to their own event.
-        askReply:
-          change === 'invited' && activity.requiresRsvp && recipient.email !== group.leader.email,
+        askReply: change === 'invited' && args.askReply && recipient.email !== group.leader.email,
       },
     ),
     method: change === 'cancelled' ? ('cancel' as const) : ('request' as const),
@@ -174,9 +207,8 @@ export async function prepareCalendarInvitations(
       sequence,
       organizer: { name: leader, email: senderAddress },
       attendee: { name: recipient.name, email: recipient.email },
-      moreStarts,
-      // A change to one date of a series names it by the start it was invited with.
-      instanceStart: seriesStarts ? undefined : (activity.invitedInstanceStart ?? undefined),
+      moreStarts: args.moreStarts,
+      instanceStart: args.instanceStart,
     }),
   }));
 
@@ -186,13 +218,66 @@ export async function prepareCalendarInvitations(
         try {
           await sendCalendarEmail(email);
         } catch (error) {
-          console.error(`[calendar] invitation to one recipient failed (${activity.id})`, error);
+          console.error(`[calendar] invitation to one recipient failed (${args.logId})`, error);
         }
         await new Promise((resolve) => setTimeout(resolve, SEND_GAP_MS));
       }
     })();
   };
   return { count: emails.length, send };
+}
+
+/**
+ * A multi-day event goes onto calendars as ONE entry spanning its days, with the days listed in
+ * the description — not an email per day. The days themselves are left out of the per-event
+ * invitations (see `multiDayEventId` in the activities service).
+ */
+export async function prepareMultiDayInvitations(
+  change: CalendarChange,
+  multiDayEventId: string,
+): Promise<{ count: number; send: () => void }> {
+  const multiDay = await prisma.multiDayEvent.findUniqueOrThrow({
+    where: { id: multiDayEventId },
+    include: { days: { orderBy: { startAt: 'asc' } } },
+  });
+  // Drafts are the leader's private planning space: a day not yet published stays off the entry.
+  const days = multiDay.days.filter((day) => day.status !== 'draft');
+  if (days.length === 0) return { count: 0, send: () => {} };
+
+  const { group, recipients } = await recipientsOf(multiDay.groupId);
+  const agenda = days.map((day, index) => `${index + 1}. ${day.title}`).join('\n');
+  const event: CalendarEvent = {
+    uid: multiDayUid(multiDay.id),
+    title: multiDay.title,
+    description: [group.name, multiDay.description, agenda].filter(Boolean).join('\n\n'),
+    startAt: days[0]!.startAt,
+    endAt: days[days.length - 1]!.endAt,
+    allDay: true,
+  };
+  return compose({
+    change,
+    event,
+    group,
+    recipients,
+    dates: 1,
+    askReply: days.some((day) => day.requiresRsvp),
+    logId: multiDay.id,
+  });
+}
+
+/** Prepare and send a multi-day event's invitation, never throwing. */
+export async function announceMultiDayChange(
+  change: CalendarChange,
+  multiDayEventId: string,
+): Promise<number> {
+  try {
+    const { count, send } = await prepareMultiDayInvitations(change, multiDayEventId);
+    send();
+    return count;
+  } catch (error) {
+    console.error(`[calendar] could not prepare multi-day invitations (${multiDayEventId})`, error);
+    return 0;
+  }
 }
 
 /** Prepare and send, never throwing — for the callers that have nothing to do in between.

@@ -54,6 +54,10 @@ export function GroupDetailPage() {
     queryKey: ['groups', groupId, 'invitations'],
     queryFn: () => invitationsApi.listPending(groupId),
   });
+  const multiDayQuery = useQuery({
+    queryKey: ['groups', groupId, 'multi-day-events'],
+    queryFn: () => activitiesApi.listMultiDay(groupId),
+  });
   const activitiesQuery = useQuery({
     queryKey: ['groups', groupId, 'activities'],
     queryFn: () => activitiesApi.list(groupId),
@@ -119,6 +123,12 @@ export function GroupDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
   }
 
+  async function handlePublishMultiDay(multiDayEventId: string) {
+    const { invited } = await activitiesApi.publishMultiDay(multiDayEventId);
+    if (invited > 0) showToast(t('publishToast.invited', { count: invited }));
+    queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
+  }
+
   async function handleStatusChange(status: GroupStatus) {
     await groupsApi.update(groupId, { status });
     queryClient.invalidateQueries({ queryKey: ['groups', groupId] });
@@ -160,12 +170,22 @@ export function GroupDetailPage() {
     partyMembersById.get(member.party.id)!.push(member);
   }
   const activities = activitiesQuery.data?.activities ?? [];
-  const standaloneActivities = activities.filter((a) => !a.seriesId);
+  const standaloneActivities = activities.filter((a) => !a.seriesId && !a.multiDayEventId);
   const seriesGroups = new Map<string, typeof standaloneActivities>();
+  const multiDayGroups = new Map<string, typeof standaloneActivities>();
   for (const activity of activities) {
-    if (!activity.seriesId) continue;
-    seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
+    if (activity.multiDayEventId) {
+      multiDayGroups.set(activity.multiDayEventId, [
+        ...(multiDayGroups.get(activity.multiDayEventId) ?? []),
+        activity,
+      ]);
+    } else if (activity.seriesId) {
+      seriesGroups.set(activity.seriesId, [...(seriesGroups.get(activity.seriesId) ?? []), activity]);
+    }
   }
+  const multiDayTitles = new Map(
+    (multiDayQuery.data?.multiDayEvents ?? []).map((event) => [event.id, event.title]),
+  );
 
   return (
     <PageContainer wide>
@@ -374,9 +394,16 @@ export function GroupDetailPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-ink">{t('groupDetail.activities')}</h2>
             {isLeader && (
-              <Link to={`/groups/${groupId}/activities/new`}>
-                <Button size="sm">{t('groupDetail.newActivity')}</Button>
-              </Link>
+              <div className="flex gap-2">
+                <Link to={`/groups/${groupId}/multi-day/new`}>
+                  <Button size="sm" variant="secondary">
+                    {t('groupDetail.newMultiDay')}
+                  </Button>
+                </Link>
+                <Link to={`/groups/${groupId}/activities/new`}>
+                  <Button size="sm">{t('groupDetail.newActivity')}</Button>
+                </Link>
+              </div>
             )}
           </div>
 
@@ -404,6 +431,42 @@ export function GroupDetailPage() {
                   </Card>
                 </Link>
               ))}
+
+              {[...multiDayGroups.entries()].map(([multiDayEventId, days]) => {
+                const draftCount = days.filter((d) => d.status === 'draft').length;
+                return (
+                  <Card key={multiDayEventId}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-ink">
+                        {multiDayTitles.get(multiDayEventId) ?? days[0]!.title}{' '}
+                        <span className="font-normal text-ink-muted">
+                          {t('groupDetail.multiDayDays', { count: days.length })}
+                        </span>
+                      </p>
+                      {isLeader && draftCount > 0 && (
+                        <Button size="sm" onClick={() => handlePublishMultiDay(multiDayEventId)}>
+                          {t('groupPage.publishAll', { count: draftCount })}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-col divide-y divide-line">
+                      {days.map((activity) => (
+                        <Link
+                          key={activity.id}
+                          to={`/activities/${activity.id}`}
+                          className="flex items-center justify-between gap-2 py-2 text-sm hover:text-accent-text"
+                        >
+                          <span>{activity.title}</span>
+                          <span className="flex items-center gap-2 text-ink-secondary">
+                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+                            <Badge status={activity.status} />
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </Card>
+                );
+              })}
 
               {[...seriesGroups.entries()].map(([seriesId, occurrences]) => {
                 const draftCount = occurrences.filter((o) => o.status === 'draft').length;

@@ -15,7 +15,12 @@ import { calendarFeedRouter, calendarFeedSettingsRouter } from './modules/calend
 import { chatRouter } from './modules/chat/routes.js';
 import { directMessagesRouter } from './modules/directMessages/routes.js';
 import { groupsRouter } from './modules/groups/routes.js';
-import { activitiesRouter, groupActivitiesRouter } from './modules/activities/routes.js';
+import {
+  activitiesRouter,
+  groupActivitiesRouter,
+  groupMultiDayEventsRouter,
+  multiDayEventsRouter,
+} from './modules/activities/routes.js';
 import {
   activityInvitationsRouter,
   groupInvitationsRouter,
@@ -60,6 +65,8 @@ export function createApp() {
   app.use('/api/invitations', invitationsRouter);
   app.use('/api/parties', partiesRouter);
   app.use('/api/groups/:groupId/activities', groupActivitiesRouter);
+  app.use('/api/groups/:groupId/multi-day-events', groupMultiDayEventsRouter);
+  app.use('/api/multi-day-events', multiDayEventsRouter);
   app.use('/api/activities', activitiesRouter);
   app.use('/api/activities', rsvpsRouter);
   app.use('/api/activities', activityAttendanceRouter);

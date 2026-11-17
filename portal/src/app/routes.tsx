@@ -6,6 +6,7 @@ import { AuthenticatedLayout } from '../components/AuthenticatedLayout.js';
 import { RequireRole } from '../components/RequireRole.js';
 import { UsersPage } from '../pages/admin/UsersPage.js';
 import { ActivityCreatePage } from '../pages/leader/ActivityCreatePage.js';
+import { MultiDayCreatePage } from '../pages/leader/MultiDayCreatePage.js';
 import { AnalysisPage } from '../pages/leader/AnalysisPage.js';
 import { ActivitiesPage } from '../pages/leader/ActivitiesPage.js';
 import { ActivityDetailPage } from '../pages/leader/ActivityDetailPage.js';
@@ -36,6 +37,7 @@ const appRoutes: RouteObject[] = [
           { path: '/analysis', element: <AnalysisPage /> },
           { path: '/groups/:id', element: <GroupDetailPage /> },
           { path: '/groups/:groupId/activities/new', element: <ActivityCreatePage /> },
+          { path: '/groups/:groupId/multi-day/new', element: <MultiDayCreatePage /> },
           { path: '/activities/:id', element: <ActivityDetailPage /> },
         ],
       },

@@ -3,6 +3,7 @@ import type {
   addPartyMembersSchema,
   attendanceEntrySchema,
   createActivitySchema,
+  createMultiDayEventSchema,
   createGroupSchema,
   createMeetingPointSchema,
   duplicateGroupSchema,
@@ -38,7 +39,8 @@ export type AddPartyMembersDto = z.infer<typeof addPartyMembersSchema>;
 export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
 export type MeetingPointTemplateDto = z.infer<typeof meetingPointTemplateSchema>;
 export type CreateActivityDto = z.infer<typeof createActivitySchema>;
-export type UpdateActivityDto = z.infer<typeof updateActivitySchema>;
+export type CreateMultiDayEventDto = z.infer<typeof createMultiDayEventSchema>;
+export type UpdateActivityDto =z.infer<typeof updateActivitySchema>;
 export type RsvpUpdateDto = z.infer<typeof rsvpUpdateSchema>;
 export type CreateMeetingPointDto = z.infer<typeof createMeetingPointSchema>;
 export type UpdateMeetingPointDto = z.infer<typeof updateMeetingPointSchema>;

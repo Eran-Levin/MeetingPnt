@@ -129,10 +129,20 @@ export interface InvitationPreview {
   party: { id: string; name: string | null; size: number } | null;
 }
 
+/** A trip or workshop weekend made of day events. Its dates are those of its days. */
+export interface MultiDayEvent {
+  id: string;
+  groupId: string;
+  title: string;
+  description: string | null;
+}
+
 export interface Activity {
   id: string;
   groupId: string;
   seriesId: string | null;
+  /** The multi-day event this is one day of, if any. */
+  multiDayEventId: string | null;
   title: string;
   description: string | null;
   startAt: string;
