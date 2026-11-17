@@ -1,5 +1,6 @@
 import type {
   Attendee,
+  MultiDayRsvpDto,
   Rsvp as SharedRsvp,
   RsvpUpdateDto,
   RsvpWithUser,
@@ -9,6 +10,7 @@ import { prisma } from '../../db/prisma.js';
 import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import { assertActivityParticipant } from '../activities/service.js';
+import { assertMembership } from '../groups/service.js';
 
 /** How the RSVP dashboard reads top to bottom, rather than alphabetically or by reply time. */
 const RSVP_DISPLAY_ORDER: Record<Rsvp['status'], number> = {
@@ -43,6 +45,49 @@ export async function upsertRsvp(activityId: string, userId: string, dto: RsvpUp
   });
 
   return toSharedRsvp(rsvp);
+}
+
+/**
+ * One answer for a whole multi-day event: "I'm coming" or "I can't make it" to every day that
+ * hasn't started. Replaces earlier answers on those days — it is the member's latest word on the
+ * trip — and a day can still be answered on its own afterwards, which is how someone sits one out.
+ *
+ * Days that have started are skipped, as they are for a single reply (RSVP locks at the start), and
+ * drafts are skipped because members can't see them. A day published later arrives with the usual
+ * default, not this answer: the member is told about it and can reply again.
+ */
+export async function replyToMultiDayEvent(
+  multiDayEventId: string,
+  userId: string,
+  dto: MultiDayRsvpDto,
+) {
+  const multiDay = await prisma.multiDayEvent.findUnique({
+    where: { id: multiDayEventId },
+    include: { days: { orderBy: { startAt: 'asc' } } },
+  });
+  if (!multiDay) {
+    throw new HttpError(404, 'multi_day_event_not_found');
+  }
+  await assertMembership(multiDay.groupId, userId);
+
+  const now = new Date();
+  const open = multiDay.days.filter(
+    (day) => day.status === 'published' && day.startAt.getTime() >= now.getTime(),
+  );
+  if (open.length === 0) {
+    throw new HttpError(409, 'rsvp_locked');
+  }
+
+  const rsvps = await prisma.$transaction(
+    open.map((day) =>
+      prisma.rsvp.upsert({
+        where: { activityId_userId: { activityId: day.id, userId } },
+        create: { activityId: day.id, userId, status: dto.status, respondedAt: now },
+        update: { status: dto.status, respondedAt: now },
+      }),
+    ),
+  );
+  return { rsvps: rsvps.map(toSharedRsvp) };
 }
 
 /**

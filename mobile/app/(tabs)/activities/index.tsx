@@ -3,8 +3,9 @@ import { formatActivityWhen, formatWeekdayShort, isolate, joinDot } from '@meeti
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { activitiesApi } from '../../../src/api/activitiesApi';
+import { rsvpsApi } from '../../../src/api/rsvpsApi';
 import { useLocale, useTranslation } from '../../../src/i18n';
 import { useAuthStore } from '../../../src/store/authStore';
 import {
@@ -72,6 +73,7 @@ export default function CalendarScreen() {
   const [dismissedOverdueId, setDismissedOverdueId] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
+  const [replyingId, setReplyingId] = useState<string | null>(null);
   const leads = user?.role === 'leader' || user?.role === 'admin';
 
   const { data, isFetching } = useQuery({
@@ -173,6 +175,12 @@ export default function CalendarScreen() {
     const multiDay = activity.multiDay;
     const days = multiDay ? (upcomingDays.get(multiDay.id) ?? []) : [];
     const expanded = multiDay ? expandedEvents.has(multiDay.id) : false;
+    // One reply for the whole trip, offered while any of its coming days is still unanswered —
+    // otherwise a member would open and answer five days one by one.
+    // A day that has started is locked (the server skips it), so it can't keep the buttons up.
+    const owesReply =
+      multiDay !== null &&
+      days.some((day) => needsReply(day) && new Date(day.startAt).getTime() >= now);
     return (
       <View>
         <Row
@@ -190,7 +198,9 @@ export default function CalendarScreen() {
         />
         <View style={styles.rowExtras}>
           {activity.status === 'draft' && <Badge status="draft" />}
-          {needsReply(activity) && <Pill tone="warning" label={t('calendar.replyNeeded')} />}
+          {needsReply(activity) && !(multiDay && owesReply) && (
+            <Pill tone="warning" label={t('calendar.replyNeeded')} />
+          )}
           {startableToday(activity) && (
             <Button
               label={
@@ -202,6 +212,25 @@ export default function CalendarScreen() {
             />
           )}
         </View>
+        {multiDay && owesReply && (
+          <View style={styles.rowExtras}>
+            <ButtonRow>
+              <Button
+                label={t('calendar.comingAllDays')}
+                onPress={() => handleReplyAll(multiDay.id, 'approved')}
+                busy={replyingId === multiDay.id}
+                grow
+              />
+              <Button
+                label={t('calendar.cantMakeIt')}
+                variant="secondary"
+                onPress={() => handleReplyAll(multiDay.id, 'declined')}
+                busy={replyingId === multiDay.id}
+                grow
+              />
+            </ButtonRow>
+          </View>
+        )}
         {multiDay && days.length > 1 && (
           <Pressable onPress={() => toggleExpanded(multiDay.id)} style={styles.toggle}>
             <Text style={[text.secondary, { color: color.accentText }]}>
@@ -224,6 +253,19 @@ export default function CalendarScreen() {
           ))}
       </View>
     );
+  }
+
+  /** Answers every day of the trip that hasn't started, then refreshes the timeline. */
+  async function handleReplyAll(multiDayId: string, status: 'approved' | 'declined') {
+    setReplyingId(multiDayId);
+    try {
+      await rsvpsApi.replyToMultiDay(multiDayId, status);
+      queryClient.invalidateQueries({ queryKey: ['activities', 'mine'] });
+    } catch {
+      Alert.alert(t('calendar.replyAllFailed'));
+    } finally {
+      setReplyingId(null);
+    }
   }
 
   function toggleExpanded(multiDayId: string) {

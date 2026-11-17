@@ -204,6 +204,11 @@ export const rsvpUpdateSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+// One answer for a whole multi-day event: it applies to every day that hasn't started, replacing
+// earlier answers on those days. A day can still be answered on its own afterwards. No note —
+// a note belongs to one day.
+export const multiDayRsvpSchema = rsvpUpdateSchema.pick({ status: true });
+
 // ---- users ----
 export const pushTokenSchema = z.object({
   expoPushToken: z.string().min(1),
