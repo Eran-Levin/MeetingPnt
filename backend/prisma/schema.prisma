@@ -179,6 +179,7 @@ model Group {
   parties       Party[]
   invitations   Invitation[]
   activities    Activity[]
+  multiDayEvents MultiDayEvent[]
   meetingPoints MeetingPoint[]
   messages      Message[]
 
@@ -265,6 +266,9 @@ model Activity {
   id            String         @id @default(uuid())
   groupId       String         @map("group_id")
   seriesId      String?        @map("series_id")
+  // The multi-day event this is one day of. The day stays a real event (its own roll call, stops
+  // and timeline card); the parent only groups days for planning and the calendar.
+  multiDayEventId String?      @map("multi_day_event_id")
   title         String
   description   String?
   startAt       DateTime       @map("start_at")
@@ -298,6 +302,7 @@ model Activity {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   group             Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  multiDayEvent     MultiDayEvent?     @relation(fields: [multiDayEventId], references: [id], onDelete: SetNull)
   creator           User               @relation(fields: [createdBy], references: [id])
   rsvps             Rsvp[]
   meetingPoints     MeetingPoint[]
@@ -307,7 +312,27 @@ model Activity {
 
   @@index([groupId, startAt])
   @@index([seriesId])
+  @@index([multiDayEventId])
   @@map("activities")
+}
+
+// A trip, a workshop weekend: one thing the leader plans and members see as one, made of day
+// events. Holds only what is shared across the days — the dates are derived from the days, never
+// stored, so they can't drift when one day moves.
+model MultiDayEvent {
+  id          String   @id @default(uuid())
+  groupId     String   @map("group_id")
+  title       String
+  description String?
+  createdBy   String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  group Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  days  Activity[]
+
+  @@index([groupId])
+  @@map("multi_day_events")
 }
 
 // Scoped to a meeting point rather than an activity: a group that moves between sites needs

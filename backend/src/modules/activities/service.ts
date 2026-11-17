@@ -3,10 +3,12 @@ import type {
   ActivityWithGroup,
   Activity as SharedActivity,
   CreateActivityDto,
+  CreateMultiDayEventDto,
+  MultiDayEvent as SharedMultiDayEvent,
   UpdateActivityDto,
 } from '@meetingpnt/shared';
 import { isolate, pushText } from '@meetingpnt/shared';
-import { Prisma, type Activity } from '@prisma/client';
+import { Prisma, type Activity, type MultiDayEvent } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 import {
@@ -19,7 +21,12 @@ import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { toLocale } from '../../lib/userName.js';
 import { generateOccurrenceDates } from '../../lib/recurrence.js';
-import { announceCalendarChange, prepareCalendarInvitations } from '../calendar/invitations.js';
+import {
+  announceCalendarChange,
+  announceMultiDayChange,
+  prepareCalendarInvitations,
+  prepareMultiDayInvitations,
+} from '../calendar/invitations.js';
 import { assertMembership } from '../groups/service.js';
 
 function toSharedActivity(activity: Activity): SharedActivity {
@@ -27,6 +34,7 @@ function toSharedActivity(activity: Activity): SharedActivity {
     id: activity.id,
     groupId: activity.groupId,
     seriesId: activity.seriesId,
+    multiDayEventId: activity.multiDayEventId,
     title: activity.title,
     description: activity.description,
     startAt: activity.startAt.toISOString(),
@@ -220,6 +228,144 @@ export async function publishSeries(seriesId: string, requesterId: string) {
   return { activities: updated.map(toSharedActivity), invited };
 }
 
+/**
+ * Creates a multi-day event with its days as drafts. Each day is a real event — its own stops and
+ * roll call — so the day dates and titles come from the client, which knows the leader's time zone
+ * and language. Days are all-day and approved by default: nobody re-confirms each morning.
+ */
+export async function createMultiDayEvent(
+  groupId: string,
+  requesterId: string,
+  dto: CreateMultiDayEventDto,
+) {
+  await assertGroupLeader(groupId, requesterId);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const multiDay = await tx.multiDayEvent.create({
+      data: { groupId, title: dto.title, description: dto.description, createdBy: requesterId },
+    });
+    const days = [];
+    for (const day of dto.days) {
+      days.push(
+        await tx.activity.create({
+          data: {
+            groupId,
+            multiDayEventId: multiDay.id,
+            title: day.title,
+            startAt: new Date(day.startAt),
+            endAt: new Date(day.endAt),
+            allDay: true,
+            transportMode: dto.transportMode,
+            requiresRsvp: dto.requiresRsvp,
+            createdBy: requesterId,
+            status: 'draft',
+          },
+        }),
+      );
+    }
+    return { multiDay, days };
+  });
+
+  return {
+    multiDayEvent: toSharedMultiDayEvent(result.multiDay),
+    activities: result.days.map(toSharedActivity),
+  };
+}
+
+function toSharedMultiDayEvent(multiDay: MultiDayEvent): SharedMultiDayEvent {
+  return {
+    id: multiDay.id,
+    groupId: multiDay.groupId,
+    title: multiDay.title,
+    description: multiDay.description,
+  };
+}
+
+/** The group's multi-day events. Members only get those with a day they are allowed to see. */
+export async function listMultiDayEvents(groupId: string, requesterId: string) {
+  const group = await assertMembership(groupId, requesterId);
+  const isLeader = group.leaderId === requesterId;
+  const events = await prisma.multiDayEvent.findMany({
+    where: {
+      groupId,
+      ...(isLeader ? {} : { days: { some: { status: { not: 'draft' } } } }),
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  return events.map(toSharedMultiDayEvent);
+}
+
+/** Publishes every still-draft day of a multi-day event at once: one summary push per member and
+ * one calendar entry spanning the days, rather than a notification and an email per day. */
+export async function publishMultiDayEvent(multiDayEventId: string, requesterId: string) {
+  const multiDay = await prisma.multiDayEvent.findUnique({
+    where: { id: multiDayEventId },
+    include: { days: true },
+  });
+  if (!multiDay) {
+    throw new HttpError(404, 'multi_day_event_not_found');
+  }
+  const group = await assertGroupLeader(multiDay.groupId, requesterId);
+
+  const drafts = multiDay.days.filter((d) => d.status === 'draft');
+  if (drafts.length === 0) {
+    throw new HttpError(409, 'multi_day_all_published');
+  }
+
+  const members = await prisma.groupMember.findMany({
+    where: { groupId: multiDay.groupId, status: 'active' },
+    include: { user: { include: { pushTokens: true } } },
+  });
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.activity.updateMany({
+      where: { id: { in: drafts.map((d) => d.id) } },
+      data: { status: 'published' },
+    });
+    await tx.rsvp.createMany({
+      data: drafts.flatMap((day) =>
+        members.map((member) => ({
+          activityId: day.id,
+          userId: member.userId,
+          status: day.requiresRsvp ? ('pending' as const) : ('approved' as const),
+        })),
+      ),
+      skipDuplicates: true,
+    });
+    return tx.activity.findMany({
+      where: { multiDayEventId },
+      orderBy: { startAt: 'asc' },
+    });
+  });
+
+  await sendPushNotifications(
+    members
+      .filter((m) => m.userId !== requesterId)
+      .flatMap((m) => {
+        const locale = toLocale(m.user.locale);
+        return m.user.pushTokens.map((token) => ({
+          to: token.expoPushToken,
+          title: pushText(locale, 'multiDayPublishedTitle', { group: isolate(group.name) }),
+          body: pushText(locale, 'multiDayPublishedBody', {
+            title: isolate(multiDay.title),
+            count: drafts.length,
+          }),
+          data: { type: 'multi_day_published', multiDayEventId, groupId: multiDay.groupId },
+        }));
+      }),
+  );
+
+  const invited = await announceMultiDayChange('invited', multiDayEventId);
+  return { activities: updated.map(toSharedActivity), invited };
+}
+
+/** A day of a multi-day event is on calendars as part of the one entry, so a change to it
+ * re-sends that entry. */
+async function announceDayChange(activity: Activity, change: 'invited' | 'updated') {
+  if (!activity.multiDayEventId) return 0;
+  return announceMultiDayChange(change, activity.multiDayEventId);
+}
+
 export async function updateActivity(activityId: string, requesterId: string, dto: UpdateActivityDto) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
@@ -269,7 +415,9 @@ export async function updateActivity(activityId: string, requesterId: string, dt
     updated.endAt.getTime() !== activity.endAt.getTime();
   const invited =
     updated.status === 'published' && calendarChanged
-      ? await announceCalendarChange('updated', updated)
+      ? updated.multiDayEventId
+        ? await announceDayChange(updated, 'updated')
+        : await announceCalendarChange('updated', updated)
       : 0;
 
   return { activity: toSharedActivity(updated), invited };
@@ -349,7 +497,21 @@ export async function publishActivity(activityId: string, requesterId: string) {
       }),
   );
 
-  const invited = await announceCalendarChange('invited', updated);
+  let invited: number;
+  if (updated.multiDayEventId) {
+    // Publishing one day on its own: the first day puts the multi-day entry on calendars, later
+    // ones move it.
+    const othersOut = await prisma.activity.count({
+      where: {
+        multiDayEventId: updated.multiDayEventId,
+        id: { not: updated.id },
+        status: { not: 'draft' },
+      },
+    });
+    invited = await announceDayChange(updated, othersOut > 0 ? 'updated' : 'invited');
+  } else {
+    invited = await announceCalendarChange('invited', updated);
+  }
 
   return { activity: toSharedActivity(updated), invited };
 }
@@ -501,6 +663,31 @@ export async function deleteActivity(activityId: string, requesterId: string) {
   // Deleting an event people were invited to takes it off their calendars. The emails are worked
   // out first — once the row is gone there is no roster left to read.
   const stillAhead = activity.status === 'published' && activity.endAt.getTime() > Date.now();
+
+  // A day of a multi-day event isn't on calendars by itself: removing it re-sends the one entry,
+  // or cancels it when this was the last published day.
+  if (activity.multiDayEventId) {
+    const multiDayEventId = activity.multiDayEventId;
+    const othersOut =
+      (await prisma.activity.count({
+        where: { multiDayEventId, id: { not: activityId }, status: { not: 'draft' } },
+      })) > 0;
+    const cancelEntry =
+      stillAhead && !othersOut
+        ? await prepareMultiDayInvitations('cancelled', multiDayEventId).catch((error) => {
+            console.error(`[calendar] could not prepare cancellations (${activityId})`, error);
+            return null;
+          })
+        : null;
+
+    await prisma.activity.delete({ where: { id: activityId } });
+    cancelEntry?.send();
+    if (stillAhead && othersOut) {
+      return { invited: await announceMultiDayChange('updated', multiDayEventId) };
+    }
+    return { invited: cancelEntry?.count ?? 0 };
+  }
+
   const sendCancellations = stillAhead
     ? await prepareCalendarInvitations('cancelled', activity).catch((error) => {
         console.error(`[calendar] could not prepare cancellations (${activityId})`, error);

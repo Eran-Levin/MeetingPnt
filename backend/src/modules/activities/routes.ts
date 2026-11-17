@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { createActivitySchema, updateActivitySchema } from '@meetingpnt/shared';
+import {
+  createActivitySchema,
+  createMultiDayEventSchema,
+  updateActivitySchema,
+} from '@meetingpnt/shared';
 import { authenticate } from '../../middleware/authenticate.js';
 import { validate } from '../../middleware/validate.js';
 import * as activitiesService from './service.js';
@@ -30,6 +34,48 @@ groupActivitiesRouter.get<{ groupId: string }>('/', async (req, res, next) => {
   try {
     const activities = await activitiesService.listActivities(req.params.groupId, req.user!.id);
     res.json({ activities });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Nested under /api/groups/:groupId/multi-day-events
+export const groupMultiDayEventsRouter = Router({ mergeParams: true });
+
+groupMultiDayEventsRouter.use(authenticate);
+
+groupMultiDayEventsRouter.post<{ groupId: string }>(
+  '/',
+  validate(createMultiDayEventSchema),
+  async (req, res, next) => {
+    try {
+      res
+        .status(201)
+        .json(await activitiesService.createMultiDayEvent(req.params.groupId, req.user!.id, req.body));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+groupMultiDayEventsRouter.get<{ groupId: string }>('/', async (req, res, next) => {
+  try {
+    const multiDayEvents = await activitiesService.listMultiDayEvents(req.params.groupId, req.user!.id);
+    res.json({ multiDayEvents });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Standalone /api/multi-day-events/:id
+export const multiDayEventsRouter = Router();
+
+multiDayEventsRouter.use(authenticate);
+
+multiDayEventsRouter.post('/:id/publish', async (req, res, next) => {
+  try {
+    // `invited` is how many people the one calendar invitation is going to.
+    res.json(await activitiesService.publishMultiDayEvent(req.params.id as string, req.user!.id));
   } catch (err) {
     next(err);
   }

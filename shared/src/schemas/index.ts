@@ -140,7 +140,36 @@ export const createActivitySchema = createActivityBaseSchema.refine(
   { message: 'end_before_start', path: ['endAt'] },
 );
 
-export const updateActivitySchema = createActivityBaseSchema
+// A multi-day event is created with its days: the client works out each day's dates (and its title,
+// in the leader's language and time zone) and the server stores them as draft day events.
+export const createMultiDayEventSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  days: z
+    .array(
+      z
+        .object({
+          title: z.string().min(1),
+          startAt: z.string().datetime(),
+          endAt: z.string().datetime(),
+        })
+        .refine((day) => new Date(day.endAt) > new Date(day.startAt), { message: 'end_before_start' }),
+    )
+    .min(1)
+    .max(60),
+  transportMode: z
+    .enum([
+      TransportMode.Driving,
+      TransportMode.Walking,
+      TransportMode.Bicycling,
+      TransportMode.Transit,
+    ])
+    .default(TransportMode.Walking),
+  // Trip days are not re-confirmed each morning: everyone starts approved and declines the day they skip.
+  requiresRsvp: z.boolean().default(false),
+});
+
+export const updateActivitySchema =createActivityBaseSchema
   .omit({ recurrence: true, meetingPoints: true })
   .partial()
   // Only enforceable when a patch carries both ends; a one-sided edit is checked in the service.

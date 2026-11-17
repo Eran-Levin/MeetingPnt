@@ -2,6 +2,8 @@ import type {
   Activity,
   ActivityWithGroup,
   CreateActivityDto,
+  CreateMultiDayEventDto,
+  MultiDayEvent,
   UpdateActivityDto,
 } from '@meetingpnt/shared';
 import { apiFetch } from './client.js';
@@ -15,6 +17,17 @@ export const activitiesApi = {
       `/api/groups/${groupId}/activities`,
       { method: 'POST', body: dto },
     ),
+  createMultiDay: (groupId: string, dto: CreateMultiDayEventDto) =>
+    apiFetch<{ multiDayEvent: MultiDayEvent; activities: Activity[] }>(
+      `/api/groups/${groupId}/multi-day-events`,
+      { method: 'POST', body: dto },
+    ),
+  listMultiDay: (groupId: string) =>
+    apiFetch<{ multiDayEvents: MultiDayEvent[] }>(`/api/groups/${groupId}/multi-day-events`),
+  publishMultiDay: (id: string) =>
+    apiFetch<{ activities: Activity[]; invited: number }>(`/api/multi-day-events/${id}/publish`, {
+      method: 'POST',
+    }),
   get: (id: string) => apiFetch<{ activity: Activity }>(`/api/activities/${id}`),
   update: (id: string, dto: UpdateActivityDto) =>
     apiFetch<{ activity: Activity; invited: number }>(`/api/activities/${id}`, {
