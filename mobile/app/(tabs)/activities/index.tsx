@@ -188,7 +188,7 @@ export default function CalendarScreen() {
           subtitle={joinDot([
             activity.group.name,
             multiDay && t('calendar.dayOfCount', { n: multiDay.dayNumber, count: multiDay.dayCount }),
-            formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+            formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone),
           ])}
           leading={
             <DateBlock weekday={formatWeekdayShort(start, locale)} day={String(start.getDate())} />
@@ -245,7 +245,7 @@ export default function CalendarScreen() {
               title={day.title}
               subtitle={joinDot([
                 t('calendar.dayOfCount', { n: day.multiDay!.dayNumber, count: day.multiDay!.dayCount }),
-                formatActivityWhen(day.startAt, day.endAt, day.allDay, locale),
+                formatActivityWhen(day.startAt, day.endAt, day.allDay, locale, day.effectiveTimeZone),
               ])}
               onPress={() => open(day)}
               last={index === days.length - 1}
@@ -291,7 +291,7 @@ export default function CalendarScreen() {
           </Text>
           <Text style={[text.secondary, styles.askToCloseBody]}>
             {t('calendar.overdueBody', {
-              when: formatActivityWhen(askToClose.startAt, askToClose.endAt, askToClose.allDay, locale),
+              when: formatActivityWhen(askToClose.startAt, askToClose.endAt, askToClose.allDay, locale, askToClose.effectiveTimeZone),
             })}
           </Text>
           <ButtonRow>
@@ -346,7 +346,7 @@ export default function CalendarScreen() {
                   lead.group.name,
                   lead.multiDay
                     ? t('calendar.pastDays', { count: days })
-                    : formatActivityWhen(lead.startAt, lead.endAt, lead.allDay, locale),
+                    : formatActivityWhen(lead.startAt, lead.endAt, lead.allDay, locale, lead.effectiveTimeZone),
                 ])}
                 onPress={() => open(lead)}
                 done

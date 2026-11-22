@@ -448,7 +448,7 @@ export default function ActivityDetailScreen() {
   return (
     <Screen
       title={activity.title}
-      subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+      subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
       bottomInset={80}
     >
       <View style={styles.status}>
@@ -546,6 +546,7 @@ export default function ActivityDetailScreen() {
           onOnMyWay={myStatus === 'approved' && !haveILeftQuery.data?.left ? handleOnMyWay : undefined}
           omwBusy={omwSubmitting}
           message={omwMessage}
+          timeZone={activity.effectiveTimeZone}
         />
       </Section>
 
@@ -653,7 +654,11 @@ export default function ActivityDetailScreen() {
         />
       )}
 
-      <RouteList points={meetingPoints} currentPointId={activity.currentMeetingPointId} />
+      <RouteList
+        points={meetingPoints}
+        currentPointId={activity.currentMeetingPointId}
+        timeZone={activity.effectiveTimeZone}
+      />
     </Screen>
   );
 }

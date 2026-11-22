@@ -10,11 +10,11 @@ import type {
   UpdateActivityDto,
   UpdateMultiDayEventDto,
 } from '@meetingpnt/shared';
-import { isolate, pushText } from '@meetingpnt/shared';
+import { isolate, pushText, resolveTimeZone } from '@meetingpnt/shared';
 import { Prisma, type Activity, type MultiDayEvent } from '@prisma/client';
 import { prisma } from '../../db/prisma.js';
 import { HttpError } from '../../middleware/errorHandler.js';
-import { assertTimeZone, shiftDays } from '../../lib/shiftDays.js';
+import { shiftDays } from '../../lib/shiftDays.js';
 import {
   copyMeetingPoints,
   getNextPlannedMeetingPoint,
@@ -34,7 +34,28 @@ import {
 } from '../calendar/invitations.js';
 import { assertMembership } from '../groups/service.js';
 
-function toSharedActivity(activity: Activity): SharedActivity {
+/** The two inherited levels of an event's time zone: its group's own, and its leader's default. */
+type InheritedZones = { group: string | null; leader: string | null };
+
+/** One query for the zones of every group in a result, so a list stays a single round trip. */
+async function loadInheritedZones(groupIds: string[]): Promise<Map<string, InheritedZones>> {
+  const groups = await prisma.group.findMany({
+    where: { id: { in: [...new Set(groupIds)] } },
+    select: { id: true, timeZone: true, leader: { select: { timeZone: true } } },
+  });
+  return new Map(groups.map((g) => [g.id, { group: g.timeZone, leader: g.leader.timeZone }]));
+}
+
+async function toSharedActivities(activities: Activity[]): Promise<SharedActivity[]> {
+  const zones = await loadInheritedZones(activities.map((a) => a.groupId));
+  return activities.map((a) => buildSharedActivity(a, zones.get(a.groupId)));
+}
+
+async function toSharedActivity(activity: Activity): Promise<SharedActivity> {
+  return (await toSharedActivities([activity]))[0]!;
+}
+
+function buildSharedActivity(activity: Activity, inherited?: InheritedZones): SharedActivity {
   return {
     id: activity.id,
     groupId: activity.groupId,
@@ -45,6 +66,12 @@ function toSharedActivity(activity: Activity): SharedActivity {
     startAt: activity.startAt.toISOString(),
     endAt: activity.endAt.toISOString(),
     allDay: activity.allDay,
+    timeZone: activity.timeZone,
+    effectiveTimeZone: resolveTimeZone({
+      activity: activity.timeZone,
+      group: inherited?.group,
+      leader: inherited?.leader,
+    }),
     transportMode: activity.transportMode,
     requiresRsvp: activity.requiresRsvp,
     singleLocation: activity.singleLocation,
@@ -124,6 +151,7 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
           startAt,
           endAt: new Date(startAt.getTime() + durationMs),
           allDay: dto.allDay,
+          timeZone: dto.timeZone ?? null,
           transportMode: dto.transportMode,
           requiresRsvp: dto.requiresRsvp,
           singleLocation: dto.singleLocation,
@@ -161,7 +189,7 @@ export async function createActivity(groupId: string, requesterId: string, dto: 
     }
   }
 
-  return activities.map(toSharedActivity);
+  return toSharedActivities(activities);
 }
 
 /** Publishes every still-draft occurrence in a recurring series at once, sending a single
@@ -230,7 +258,7 @@ export async function publishSeries(seriesId: string, requesterId: string) {
     newlyPublished.map((a) => a.startAt),
   );
 
-  return { activities: updated.map(toSharedActivity), invited };
+  return { activities: await toSharedActivities(updated), invited };
 }
 
 /**
@@ -260,6 +288,7 @@ export async function createMultiDayEvent(
             startAt: new Date(day.startAt),
             endAt: new Date(day.endAt),
             allDay: true,
+            timeZone: day.timeZone ?? null,
             transportMode: dto.transportMode,
             requiresRsvp: dto.requiresRsvp,
             createdBy: requesterId,
@@ -273,7 +302,7 @@ export async function createMultiDayEvent(
 
   return {
     multiDayEvent: toSharedMultiDayEvent(result.multiDay),
-    activities: result.days.map(toSharedActivity),
+    activities: await toSharedActivities(result.days),
   };
 }
 
@@ -361,7 +390,7 @@ export async function publishMultiDayEvent(multiDayEventId: string, requesterId:
   );
 
   const invited = await announceMultiDayChange('invited', multiDayEventId);
-  return { activities: updated.map(toSharedActivity), invited };
+  return { activities: await toSharedActivities(updated), invited };
 }
 
 async function loadMultiDayForLeader(multiDayEventId: string, requesterId: string) {
@@ -376,14 +405,13 @@ async function loadMultiDayForLeader(multiDayEventId: string, requesterId: strin
   return multiDay;
 }
 
-function checkedTimeZone(timeZone: string): string {
-  try {
-    assertTimeZone(timeZone);
-  } catch {
-    throw new HttpError(400, 'invalid_time_zone');
-  }
-  return timeZone;
+/** The zone a stored event runs in, given the two levels above it. */
+function zoneOf(activity: { timeZone: string | null }, inherited?: InheritedZones): string | null {
+  return resolveTimeZone({ activity: activity.timeZone, group: inherited?.group, leader: inherited?.leader });
 }
+
+/** Moving needs a zone even when none is set: UTC, as the server always assumed before. */
+const SHIFT_FALLBACK_ZONE = 'UTC';
 
 /** Days are titled "<event> · Day n". Renaming the event renames the days that still carry its
  * old title as a prefix; a day the leader titled by hand is left alone. */
@@ -436,16 +464,17 @@ export async function moveMultiDayEvent(
   dto: MoveMultiDayEventDto,
 ) {
   const multiDay = await loadMultiDayForLeader(multiDayEventId, requesterId);
-  const timeZone = checkedTimeZone(dto.timeZone);
+  const inherited = (await loadInheritedZones([multiDay.groupId])).get(multiDay.groupId);
 
   if (multiDay.days.some((d) => d.status !== 'draft' && d.status !== 'published')) {
     throw new HttpError(409, 'multi_day_move_not_started_only');
   }
 
+  // Each day moves in its own zone, so a trip that crosses zones keeps every day's wall clock.
   const moved = multiDay.days.map((day) => ({
     day,
-    startAt: shiftDays(day.startAt, dto.shiftDays, timeZone),
-    endAt: shiftDays(day.endAt, dto.shiftDays, timeZone),
+    startAt: shiftDays(day.startAt, dto.shiftDays, zoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
+    endAt: shiftDays(day.endAt, dto.shiftDays, zoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
   }));
   // Same rule as rescheduling one event: nothing that hasn't run can be planned into the past.
   if (dto.shiftDays !== 0 && moved.some((m) => m.startAt.getTime() < Date.now())) {
@@ -472,7 +501,7 @@ export async function moveMultiDayEvent(
     dto.shiftDays !== 0 && activities.some((a) => a.status !== 'draft')
       ? await announceMultiDayChange('updated', multiDayEventId)
       : 0;
-  return { activities: activities.map(toSharedActivity), invited };
+  return { activities: await toSharedActivities(activities), invited };
 }
 
 /**
@@ -487,7 +516,6 @@ export async function copyMultiDayEvent(
   dto: CopyMultiDayEventDto,
 ) {
   const source = await loadMultiDayForLeader(multiDayEventId, requesterId);
-  const timeZone = checkedTimeZone(dto.timeZone);
 
   const days = source.days.filter((d) => d.status !== 'cancelled');
   if (days.length === 0) {
@@ -498,6 +526,9 @@ export async function copyMultiDayEvent(
   if (targetGroupId !== source.groupId) {
     await assertGroupLeader(targetGroupId, requesterId);
   }
+  const zones = await loadInheritedZones([source.groupId, targetGroupId]);
+  const sourceZones = zones.get(source.groupId);
+  const targetZones = zones.get(targetGroupId);
 
   const title = dto.title ?? source.title;
   const created = await prisma.multiDayEvent.create({
@@ -510,14 +541,23 @@ export async function copyMultiDayEvent(
   });
 
   try {
-    const copies = days.map((day) => ({
-      day,
-      id: randomUUID(),
-      startAt: shiftDays(day.startAt, dto.shiftDays, timeZone),
-      endAt: shiftDays(day.endAt, dto.shiftDays, timeZone),
-    }));
+    const copies = days.map((day) => {
+      const dayZone = zoneOf(day, sourceZones);
+      const shiftZone = dayZone ?? SHIFT_FALLBACK_ZONE;
+      return {
+        day,
+        id: randomUUID(),
+        startAt: shiftDays(day.startAt, dto.shiftDays, shiftZone),
+        endAt: shiftDays(day.endAt, dto.shiftDays, shiftZone),
+        // The copy keeps meaning the same place. If the target group would put it in a different
+        // zone than the source did, the day carries its zone explicitly rather than drifting.
+        timeZone:
+          day.timeZone ??
+          (dayZone !== null && dayZone !== zoneOf({ timeZone: null }, targetZones) ? dayZone : null),
+      };
+    });
     await prisma.activity.createMany({
-      data: copies.map(({ day, id, startAt, endAt }) => ({
+      data: copies.map(({ day, id, startAt, endAt, timeZone }) => ({
         id,
         groupId: targetGroupId,
         multiDayEventId: created.id,
@@ -526,6 +566,7 @@ export async function copyMultiDayEvent(
         startAt,
         endAt,
         allDay: day.allDay,
+        timeZone,
         transportMode: day.transportMode,
         requiresRsvp: day.requiresRsvp,
         singleLocation: day.singleLocation,
@@ -555,7 +596,7 @@ export async function copyMultiDayEvent(
   });
   return {
     multiDayEvent: toSharedMultiDayEvent(created),
-    activities: activities.map(toSharedActivity),
+    activities: await toSharedActivities(activities),
   };
 }
 
@@ -624,6 +665,8 @@ export async function updateActivity(activityId: string, requesterId: string, dt
       ...(dto.startAt !== undefined ? { startAt: new Date(dto.startAt) } : {}),
       ...(dto.endAt !== undefined ? { endAt: new Date(dto.endAt) } : {}),
       ...(dto.allDay !== undefined ? { allDay: dto.allDay } : {}),
+      // null clears the override, back to inheriting the group's zone.
+      ...(dto.timeZone !== undefined ? { timeZone: dto.timeZone } : {}),
       ...(dto.transportMode !== undefined ? { transportMode: dto.transportMode } : {}),
       ...(dto.requiresRsvp !== undefined ? { requiresRsvp: dto.requiresRsvp } : {}),
       ...(dto.singleLocation !== undefined ? { singleLocation: dto.singleLocation } : {}),
@@ -651,7 +694,7 @@ export async function updateActivity(activityId: string, requesterId: string, dt
         : await announceCalendarChange('updated', updated)
       : 0;
 
-  return { activity: toSharedActivity(updated), invited };
+  return { activity: await toSharedActivity(updated), invited };
 }
 
 /**
@@ -744,7 +787,7 @@ export async function publishActivity(activityId: string, requesterId: string) {
     invited = await announceCalendarChange('invited', updated);
   }
 
-  return { activity: toSharedActivity(updated), invited };
+  return { activity: await toSharedActivity(updated), invited };
 }
 
 /** Marks an event as running. Purely a signal to members and the leader's own UI —
@@ -826,7 +869,7 @@ export async function listActivities(groupId: string, requesterId: string) {
     where: { groupId, ...(isLeader ? {} : { status: { not: 'draft' } }) },
     orderBy: { startAt: 'asc' },
   });
-  return activities.map(toSharedActivity);
+  return toSharedActivities(activities);
 }
 
 /** How far back the timeline reaches, so a leader can still finish a roll call after the fact. */
@@ -859,7 +902,15 @@ export async function listMyActivities(userId: string): Promise<ActivityWithGrou
       ],
     },
     include: {
-      group: { select: { id: true, name: true, leaderId: true } },
+      group: {
+        select: {
+          id: true,
+          name: true,
+          leaderId: true,
+          timeZone: true,
+          leader: { select: { timeZone: true } },
+        },
+      },
       multiDayEvent: { select: { id: true, title: true } },
       // The caller's own RSVP only — enough to flag "you haven't replied" without loading everyone's.
       rsvps: { where: { userId }, select: { status: true } },
@@ -891,7 +942,10 @@ export async function listMyActivities(userId: string): Promise<ActivityWithGrou
     .map((activity) => {
       const days = activity.multiDayEvent ? (daysOf.get(activity.multiDayEvent.id) ?? []) : [];
       return {
-        ...toSharedActivity(activity),
+        ...buildSharedActivity(activity, {
+          group: activity.group.timeZone,
+          leader: activity.group.leader.timeZone,
+        }),
         group: { id: activity.group.id, name: activity.group.name },
         multiDay: activity.multiDayEvent
           ? {

@@ -5,6 +5,7 @@ import { usersApi } from '../api/usersApi.js';
 import { useTranslation } from '../i18n/index.js';
 import { useAuthStore } from '../store/authStore.js';
 import { AppLogo } from './AppLogo.js';
+import { TimeZoneField } from './TimeZoneField.js';
 
 /** Each language is named in itself — someone who can't read the current UI language can still find theirs. */
 const LANGUAGE_NAMES: Record<Locale, string> = { en: 'English', he: 'עברית' };
@@ -18,6 +19,11 @@ export function AppHeader() {
 
   async function handleLocale(locale: Locale) {
     const { user: updated } = await usersApi.setLocale(locale);
+    setUser(updated);
+  }
+
+  async function handleTimeZone(timeZone: string) {
+    const { user: updated } = await usersApi.setTimeZone(timeZone);
     setUser(updated);
   }
 
@@ -71,6 +77,16 @@ export function AppHeader() {
                 </option>
               ))}
             </select>
+          )}
+          {/* The leader's default zone: groups and events inherit it unless they set their own. */}
+          {user?.role === 'leader' && (
+            <TimeZoneField
+              ariaLabel={t('timeZone.label')}
+              value={user.timeZone}
+              inherits={false}
+              onChange={(zone) => zone && handleTimeZone(zone)}
+              className="max-w-52 border-line bg-surface px-2 py-1 text-ink-secondary"
+            />
           )}
           <span className="text-sm text-ink-secondary">{user?.name}</span>
           <button

@@ -4,6 +4,7 @@ import type {
   MeetingPointTemplateDto,
   TransportMode,
 } from '@meetingpnt/shared';
+import { dateInput, timeInput } from './zonedInput.js';
 
 /** What the create form needs, in the shapes its inputs hold (date and time as strings). */
 export interface ActivityCopy {
@@ -26,8 +27,6 @@ export interface ActivityCopy {
 const MAX_STOPS = 5;
 const MAX_OFFSET_MINUTES = 1440;
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const clock = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /** `YYYY-MM-DD` plus whole days, done in UTC so a daylight-saving change can't shift the date. */
 function addDays(isoDate: string, days: number): string {
@@ -35,11 +34,11 @@ function addDays(isoDate: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-/** Whole calendar days from one local date to another. */
-function daysBetween(from: Date, to: Date): number {
-  const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
-  const b = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
-  return Math.round((b - a) / 86_400_000);
+/** Whole calendar days from one `YYYY-MM-DD` to another. */
+function daysBetween(from: string, to: string): number {
+  const [fy = 0, fm = 1, fd = 1] = from.split('-').map(Number);
+  const [ty = 0, tm = 1, td = 1] = to.split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
 }
 
 /**
@@ -79,10 +78,20 @@ export function copyActivity(
     requiresRsvp: source.requiresRsvp,
     singleLocation: source.singleLocation,
     date: newDate,
-    startTime: clock(start),
-    endTime: clock(end),
+    // Read on the source's own clock: the form reads these on the new event's clock, so an 08:00
+    // start stays 08:00 wherever it is.
+    startTime: timeInput(source.startAt, source.effectiveTimeZone),
+    endTime: timeInput(source.endAt, source.effectiveTimeZone),
     // A trip keeps its length: the same number of days after the new start.
-    endDate: addDays(newDate, source.allDay ? daysBetween(start, end) : 0),
+    endDate: addDays(
+      newDate,
+      source.allDay
+        ? daysBetween(
+            dateInput(source.startAt, source.effectiveTimeZone),
+            dateInput(source.endAt, source.effectiveTimeZone),
+          )
+        : 0,
+    ),
     meetingPoints,
     trimmed,
   };

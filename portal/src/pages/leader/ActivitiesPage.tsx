@@ -146,7 +146,7 @@ function ActivityRow({
           <p className="truncate text-sm text-ink-secondary">
             {joinDot([
               activity.group.name,
-              formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale),
+              formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone),
             ])}
           </p>
         </div>

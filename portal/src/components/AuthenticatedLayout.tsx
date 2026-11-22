@@ -1,4 +1,7 @@
+import { deviceTimeZone } from '@meetingpnt/shared';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { usersApi } from '../api/usersApi.js';
 import { AppHeader } from './AppHeader.js';
 import { useAuthStore } from '../store/authStore.js';
 import { ConfirmEmailNotice } from './ConfirmEmailNotice.js';
@@ -6,6 +9,19 @@ import { OverdueActivityPrompt } from './OverdueActivityPrompt.js';
 
 export function AuthenticatedLayout() {
   const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
+
+  // A leader who has never picked a zone starts with this browser's. Groups and events inherit it,
+  // so without one their times would have nothing to be read in.
+  const needsZone = user?.role === 'leader' && !user.timeZone;
+  useEffect(() => {
+    if (!needsZone) return;
+    usersApi
+      .setTimeZone(deviceTimeZone())
+      .then(({ user: updated }) => setUser(updated))
+      .catch(() => undefined);
+  }, [needsZone, setUser]);
+
   // A leader who signed up on their own gets this instead of the app until they confirm their
   // address. The header stays, so they can still change language or sign out.
   if (user?.role === 'leader' && !user.emailVerified) {

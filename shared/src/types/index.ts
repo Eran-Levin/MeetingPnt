@@ -36,6 +36,8 @@ export interface User {
   locale: Locale;
   /** Which app "Directions" opens for this person — see `NavApp`. */
   navApp: NavApp;
+  /** The leader's default time zone (IANA name); groups and events inherit it. Null until set. */
+  timeZone: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +49,8 @@ export interface Group {
   description: string | null;
   status: GroupStatus;
   chatMode: GroupChatMode;
+  /** The group's own zone, or null to inherit the leader's. Only the leader edits it. */
+  timeZone: string | null;
   leaderId: string;
   createdAt: string;
   updatedAt: string;
@@ -149,6 +153,13 @@ export interface Activity {
   endAt: string;
   /** Multi-day/date-only activity: clock times are not meaningful and are hidden in the UI. */
   allDay: boolean;
+  /** This event's own zone, or null to inherit its group's. Edited on the event. */
+  timeZone: string | null;
+  /**
+   * The zone it actually runs in: its own, else the group's, else the leader's. Render with this.
+   * Null when none is set anywhere yet — render in the viewer's own zone then.
+   */
+  effectiveTimeZone: string | null;
   transportMode: TransportMode;
   requiresRsvp: boolean;
   /**

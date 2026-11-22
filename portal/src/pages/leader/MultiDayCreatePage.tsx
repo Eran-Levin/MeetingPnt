@@ -14,6 +14,8 @@ import { TextArea, TextField } from '../../components/ui/TextField.js';
 import { useToast } from '../../components/ui/Toast.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
 import { addDays, daysBetween } from '../../lib/days.js';
+import { useInheritedZone } from '../../lib/useInheritedZone.js';
+import { inputToInstant } from '../../lib/zonedInput.js';
 
 const TRANSPORT_MODES: TransportMode[] = ['walking', 'driving', 'bicycling', 'transit'];
 const MAX_DAYS = 60;
@@ -44,13 +46,13 @@ export function MultiDayCreatePage() {
   const [copy, setCopy] = useState<MultiDayCopy | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const inheritedZone = useInheritedZone(groupId);
 
   const dayCount = copy
     ? copy.dayCount
     : startDate && endDate
       ? Math.max(0, daysBetween(startDate, endDate) + 1)
       : 0;
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   function applyCopy(source: MultiDayCopy) {
     setCopy(source);
@@ -76,7 +78,6 @@ export function MultiDayCreatePage() {
         await activitiesApi.copyMultiDay(copy.sourceId, {
           groupId: groupId!,
           shiftDays: daysBetween(copy.sourceStart, startDate),
-          timeZone,
           title,
           description,
         });
@@ -108,8 +109,9 @@ export function MultiDayCreatePage() {
           const day = addDays(startDate, index);
           return {
             title: t('multiDay.dayTitle', { title, n: index + 1 }),
-            startAt: new Date(`${day}T00:00:00`).toISOString(),
-            endAt: new Date(`${day}T23:59:59`).toISOString(),
+            // Day boundaries on the group's clock, so a trip abroad starts at its own midnight.
+            startAt: inputToInstant(day, '00:00:00', inheritedZone).toISOString(),
+            endAt: inputToInstant(day, '23:59:59', inheritedZone).toISOString(),
           };
         }),
         transportMode,

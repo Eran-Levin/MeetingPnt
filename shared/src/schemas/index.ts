@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { AttendanceStatus, GroupChatMode, GroupStatus, LOCALES, NAV_APPS, RsvpStatus, TransportMode, type Locale, type NavApp } from '../enums/index.js';
+import { isValidTimeZone } from '../utils/timeZone.js';
+
+/** An IANA zone name Intl knows. */
+export const timeZoneSchema = z.string().refine(isValidTimeZone, 'invalid_time_zone');
+/** A level that may also be cleared back to "inherit". */
+const optionalTimeZoneSchema = timeZoneSchema.nullable().optional();
 
 export const geoPointSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -42,18 +48,20 @@ export const roleElevationSchema = z.object({
 export const createGroupSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
+  // Overrides the leader's zone for this group's events. Null/absent inherits.
+  timeZone: optionalTimeZoneSchema,
 });
 
 /**
  * A new group started from an existing one. What comes across is the leader's call: the roster
  * (the same people carrying on) and the events (the same trip run again, as drafts). Events move
- * by `shiftDays` whole days, in the leader's `timeZone` so a 08:00 start stays 08:00.
+ * by `shiftDays` whole days, in each event's own time zone so a 08:00 start stays 08:00. The new
+ * group's `timeZone` is its own choice; absent, it starts with the source group's.
  */
 export const duplicateGroupSchema = createGroupSchema.extend({
   copyRoster: z.boolean(),
   copyEvents: z.boolean(),
   shiftDays: z.number().int().min(-3650).max(3650).default(0),
-  timeZone: z.string().min(1).default('UTC'),
 });
 
 export const updateGroupSchema = createGroupSchema
@@ -131,6 +139,8 @@ const createActivityBaseSchema = z.object({
   // A yoga class happens in one room: there is no route to plan, so the clients drop the
   // itinerary entirely rather than showing a one-item list and an "add stop" button.
   singleLocation: z.boolean().default(false),
+  // Overrides the group's zone for this event alone; null/absent inherits.
+  timeZone: optionalTimeZoneSchema,
   recurrence: recurrenceRuleSchema.optional(),
   meetingPoints: z.array(meetingPointTemplateSchema).max(5).optional(),
 });
@@ -152,6 +162,8 @@ export const createMultiDayEventSchema = z.object({
           title: z.string().min(1),
           startAt: z.string().datetime(),
           endAt: z.string().datetime(),
+          // Only for a day in a different zone from the group's (a trip that crosses zones).
+          timeZone: optionalTimeZoneSchema,
         })
         .refine((day) => new Date(day.endAt) > new Date(day.startAt), { message: 'end_before_start' }),
     )
@@ -176,11 +188,10 @@ export const updateMultiDayEventSchema = z.object({
   description: z.string().optional(),
 });
 
-// Whole calendar days, in the leader's own time zone (sent by the browser — the server runs UTC),
-// so an 08:00 start stays 08:00 across a daylight-saving change.
+// Whole calendar days, each day in its own time zone, so an 08:00 start stays 08:00 across a
+// daylight-saving change.
 export const moveMultiDayEventSchema = z.object({
   shiftDays: z.number().int().min(-3650).max(3650),
-  timeZone: z.string().min(1).default('UTC'),
 });
 
 // A copy carries the shape — title, description, days and their stops — as drafts, moved by
@@ -225,6 +236,11 @@ export const updateLocaleSchema = z.object({
 
 export const updateNavAppSchema = z.object({
   navApp: z.enum(NAV_APPS as [NavApp, ...NavApp[]]),
+});
+
+// The leader's default zone — groups and events inherit it unless they set their own.
+export const updateTimeZoneSchema = z.object({
+  timeZone: timeZoneSchema,
 });
 
 // ---- meeting points ----

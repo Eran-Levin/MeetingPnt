@@ -152,7 +152,7 @@ export function ActivityDetailPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-ink">{activity.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-secondary">
-            <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}</span>
+            <span>{formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}</span>
             <span>&middot;</span>
             <span>{t(`newActivity.${activity.transportMode}`)}</span>
             <Badge status={activity.status} />
@@ -231,6 +231,7 @@ export function ActivityDetailPage() {
             activityId={activityId}
             currentMeetingPointId={activity.currentMeetingPointId}
             singleLocation={activity.singleLocation}
+            timeZone={activity.effectiveTimeZone}
           />
         )}
 

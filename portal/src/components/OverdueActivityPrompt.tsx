@@ -47,7 +47,7 @@ export function OverdueActivityPrompt() {
           </p>
           <p className="mt-0.5 text-sm text-ink-secondary">
             {t('calendar.overdueBody', {
-              when: formatActivityWhen(overdue.startAt, overdue.endAt, overdue.allDay, locale),
+              when: formatActivityWhen(overdue.startAt, overdue.endAt, overdue.allDay, locale, overdue.effectiveTimeZone),
             })}
           </p>
         </div>

@@ -824,6 +824,14 @@ export const he: Catalog = {
   notifications: {
     shareLocation: 'שיתוף מיקום',
   },
+  timeZone: {
+    label: 'אזור זמן',
+    inherit: 'כמו {{zone}}',
+    inheritDevice: 'כמו המכשיר הזה ({{zone}})',
+    groupHint: 'המקום שבו מתקיימות פעילויות הקבוצה. אפשר להשאיר כמו שהוא, אלא אם הקבוצה נוסעת, למשל טיול בחו"ל.',
+    eventHint: 'רק אם הפעילות באזור זמן שונה מזה של הקבוצה.',
+    saveFailed: 'לא הצלחנו לשמור את אזור הזמן.',
+  },
   account: {
     title: 'החשבון שלי',
     needCamera: 'MeetingPnt צריכה גישה למצלמה כדי לצלם את התמונה שלכם. אפשר להפעיל בהגדרות.',

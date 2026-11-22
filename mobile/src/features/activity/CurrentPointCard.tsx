@@ -1,4 +1,4 @@
-import { navigationUrl, type MeetingPoint } from '@meetingpnt/shared';
+import { formatDateTime, navigationUrl, type MeetingPoint } from '@meetingpnt/shared';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useLocale, useTranslation } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
@@ -14,6 +14,8 @@ interface Props {
   omwBusy?: boolean;
   onEdit?: () => void;
   message?: string | null;
+  /** The event's zone: the stop's time reads on its clock, not the phone's. */
+  timeZone?: string | null;
 }
 
 /**
@@ -28,6 +30,7 @@ export function CurrentPointCard({
   omwBusy = false,
   onEdit,
   message,
+  timeZone,
 }: Props) {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -46,7 +49,7 @@ export function CurrentPointCard({
   return (
     <Card accent>
       <Text style={styles.label}>{point.label || t('common.meetingPoint')}</Text>
-      <Text style={[text.secondary, styles.time]}>{new Date(point.time).toLocaleString(locale)}</Text>
+      <Text style={[text.secondary, styles.time]}>{formatDateTime(point.time, locale, timeZone)}</Text>
 
       <ButtonRow>
         <Button label={t('common.directions')} onPress={() => Linking.openURL(navigationUrl(point, navApp ?? 'google_maps'))} grow />

@@ -199,7 +199,7 @@ export default function GroupDetailScreen() {
           <Row
             key={activity.id}
             title={activity.title}
-            subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+            subtitle={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
             trailing={<Badge status={activity.status} />}
             onPress={() => openActivity(activity.id)}
             last={index === standaloneActivities.length - 1 && seriesGroups.size === 0}
@@ -227,7 +227,7 @@ export default function GroupDetailScreen() {
               {occurrences.map((activity, index) => (
                 <Row
                   key={activity.id}
-                  title={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+                  title={formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
                   trailing={<Badge status={activity.status} />}
                   onPress={() => openActivity(activity.id)}
                   last={index === occurrences.length - 1}
