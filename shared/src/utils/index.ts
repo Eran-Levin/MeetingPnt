@@ -3,6 +3,7 @@ import { zonedDateKey } from './timeZone.js';
 
 export * from './calendar.js';
 export * from './timeZone.js';
+export * from './activityStatus.js';
 
 export function isBeforeStartTime(startAt: string, now: Date = new Date()): boolean {
   return now.getTime() < new Date(startAt).getTime();

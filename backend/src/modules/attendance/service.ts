@@ -13,6 +13,7 @@ import {
   listMeetingPoints,
 } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
+import { getCurrentStop, withEffectiveStatus } from '../activities/status.js';
 import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
@@ -228,7 +229,9 @@ export async function leaveActivity(activityId: string, userId: string): Promise
   });
   if (!activity) throw new HttpError(404, 'activity_not_found');
   if (activity.group.leaderId === userId) throw new HttpError(403, 'leader_cannot_leave');
-  if (activity.status !== 'in_progress') throw new HttpError(409, 'leave_only_while_running');
+  if ((await withEffectiveStatus(activity)).status !== 'in_progress') {
+    throw new HttpError(409, 'leave_only_while_running');
+  }
 
   const [rsvp, guest] = await Promise.all([
     prisma.rsvp.findUnique({ where: { activityId_userId: { activityId, userId } } }),
@@ -236,7 +239,7 @@ export async function leaveActivity(activityId: string, userId: string): Promise
   ]);
   if (rsvp?.status !== 'approved' && !guest) throw new HttpError(403, 'not_attending');
 
-  const current = await getCurrentMeetingPoint(activityId);
+  const current = await getCurrentStop(activityId);
   if (!current) throw new HttpError(409, 'no_meeting_point_yet');
 
   await prisma.attendance.upsert({
@@ -255,7 +258,7 @@ export async function leaveActivity(activityId: string, userId: string): Promise
 export async function hasLeft(activityId: string, userId: string): Promise<boolean> {
   const points = await listMeetingPoints(activityId);
   if (points.length === 0) return false;
-  const current = await getCurrentMeetingPoint(activityId);
+  const current = await getCurrentStop(activityId);
   const records = await prisma.attendance.findMany({
     where: { userId, meetingPointId: { in: points.map((p) => p.id) } },
     select: { meetingPointId: true, status: true },

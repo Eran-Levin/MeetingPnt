@@ -169,7 +169,12 @@ export interface Activity {
    * must keep its "add stop" button.
    */
   singleLocation: boolean;
+  /** Worked out from the clock (and the two overrides below), never as it is stored. */
   status: ActivityStatus;
+  /** When the leader pressed "Start now", if they did. */
+  startedAt: string | null;
+  /** When the leader pressed "End activity", if they did. */
+  endedAt: string | null;
   /**
    * Where the group is right now. Null before the event starts, and while it runs it lags the
    * end of the itinerary — the leader may have planned five stops but only walked to two.

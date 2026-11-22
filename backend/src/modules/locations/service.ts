@@ -22,6 +22,7 @@ import {
 import { prisma } from '../../db/prisma.js';
 import { displayName, toLocale } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
+import { getCurrentStop, withEffectiveStatus } from '../activities/status.js';
 import { hasLeft } from '../attendance/service.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
 import { getEta } from '../../lib/googleMapsClient.js';
@@ -97,7 +98,7 @@ async function recordSnapshot(
   await assertLeaderOrApproved(activityId, userId, group.leaderId);
   if (userId !== group.leaderId) await assertHasNotLeft(activityId, userId);
 
-  const meetingPoint = await getCurrentMeetingPoint(activityId);
+  const meetingPoint = await getCurrentStop(activityId);
   if (!meetingPoint) {
     throw new HttpError(409, 'no_meeting_point_yet');
   }
@@ -187,8 +188,7 @@ function emitBroadcastChanged(activityId: string, until: Date | null) {
  * wrong: events overrun, and a trek day still going half an hour past its planned finish is
  * precisely when a guide needs the flag up. What keeps a broadcast from outliving its event is the
  * lease — it lapses within the quarter hour once the phone stops posting fixes — and ending the
- * event, which clears it outright. An event nobody ever ends is a separate problem, tracked in
- * BACKLOG.
+ * event, which clears it outright. An event nobody ends now closes itself at the end of its day.
  */
 export async function startLeaderBroadcast(activityId: string, requesterId: string) {
   const { activity } = await assertIsLeader(activityId, requesterId);
