@@ -64,6 +64,13 @@ export function formatActivityWhen(
   const endDate = end.toLocaleDateString(locale, dateOpts);
 
   if (allDay) {
+    // A single whole day is stored as local midnight to 23:59:59. Read on a different clock than it
+    // was made on, those two instants can land on neighbouring dates, so anything under a day and a
+    // half is one day, named by its midpoint (noon on the day it was made for).
+    if (end.getTime() - start.getTime() < 36 * 3_600_000) {
+      const middle = new Date((start.getTime() + end.getTime()) / 2);
+      return middle.toLocaleDateString(locale, dateOpts);
+    }
     return sameDay ? startDate : `${startDate} – ${endDate}`;
   }
 
