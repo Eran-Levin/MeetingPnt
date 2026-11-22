@@ -33,6 +33,7 @@ export function toSharedUser(user: User): SharedUser {
     emailVerified: user.emailVerifiedAt !== null,
     locale: toLocale(user.locale),
     navApp: toNavApp(user.navApp),
+    timeZone: user.timeZone,
     role: user.role,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),

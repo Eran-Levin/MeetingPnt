@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
 import { apiErrorMessage, useTranslation } from '../i18n/index.js';
-import { daysBetween, localDate } from '../lib/days.js';
+import { daysBetween } from '../lib/days.js';
+import { dateInput } from '../lib/zonedInput.js';
 import { Button } from './ui/Button.js';
 import { TextArea, TextField } from './ui/TextField.js';
 import { useToast } from './ui/Toast.js';
@@ -31,7 +32,7 @@ export function MultiDayActions({
   const [mode, setMode] = useState<Mode | null>(null);
   const [title, setTitle] = useState(event.title);
   const [description, setDescription] = useState(event.description ?? '');
-  const firstDay = localDate(days[0]!.startAt);
+  const firstDay = dateInput(days[0]!.startAt, days[0]!.effectiveTimeZone);
   const [newStart, setNewStart] = useState(firstDay);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +67,6 @@ export function MultiDayActions({
     }
   }
 
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const shift = daysBetween(firstDay, newStart);
 
   const savedToast = (invited: number) =>
@@ -139,10 +139,7 @@ export function MultiDayActions({
           onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
-              const { invited } = await activitiesApi.moveMultiDay(event.id, {
-                shiftDays: shift,
-                timeZone,
-              });
+              const { invited } = await activitiesApi.moveMultiDay(event.id, { shiftDays: shift });
               savedToast(invited);
             });
           }}

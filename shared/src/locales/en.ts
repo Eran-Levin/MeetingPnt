@@ -836,6 +836,14 @@ export const en = {
   notifications: {
     shareLocation: 'Share location',
   },
+  timeZone: {
+    label: 'Time zone',
+    inherit: 'Same as {{zone}}',
+    inheritDevice: 'Same as this device ({{zone}})',
+    groupHint: "Where this group's events happen. Leave it unless the group travels, like a tour abroad.",
+    eventHint: 'Only if this event is in a different zone from its group.',
+    saveFailed: 'Could not save the time zone.',
+  },
   account: {
     title: 'Account',
     needCamera: 'MeetingPnt needs camera access to take your photo. Enable it in Settings.',

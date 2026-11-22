@@ -7,6 +7,9 @@ import { activitiesApi } from '../../api/activitiesApi.js';
 import { CopyFromExisting } from '../../components/CopyFromExisting.js';
 import type { ActivityCopy } from '../../lib/copyActivity.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../../i18n/index.js';
+import { TimeZoneField } from '../../components/TimeZoneField.js';
+import { inputToInstant } from '../../lib/zonedInput.js';
+import { useInheritedZone } from '../../lib/useInheritedZone.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -48,6 +51,11 @@ export function ActivityCreatePage() {
     return end.getDate() === start.getDate() ? clock(end) : '23:59';
   });
   const [endDate, setEndDate] = useState('');
+  // This event's own zone, for one in a different zone from its group (a tour abroad). Empty
+  // inherits the group's, else the leader's; the times typed below are read on that clock.
+  const [zoneOverride, setZoneOverride] = useState<string | null>(null);
+  const inheritedZone = useInheritedZone(groupId);
+  const zone = zoneOverride ?? inheritedZone;
   const [transportMode, setTransportMode] = useState<TransportMode>('driving');
   const [requiresRsvp, setRequiresRsvp] = useState(true);
   const [singleLocation, setSingleLocation] = useState(false);
@@ -99,8 +107,12 @@ export function ActivityCreatePage() {
     }
 
     // All-day activities cover whole days; timed ones share a date and differ only by clock time.
-    const start = allDay ? new Date(`${date}T00:00:00`) : new Date(`${date}T${startTime}`);
-    const end = allDay ? new Date(`${endDate || date}T23:59:59`) : new Date(`${date}T${endTime}`);
+    const start = allDay
+      ? inputToInstant(date, '00:00:00', zone)
+      : inputToInstant(date, startTime, zone);
+    const end = allDay
+      ? inputToInstant(endDate || date, '23:59:59', zone)
+      : inputToInstant(date, endTime, zone);
 
     if (end <= start) {
       setError(
@@ -117,6 +129,7 @@ export function ActivityCreatePage() {
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
+        timeZone: zoneOverride,
         transportMode,
         requiresRsvp,
         singleLocation,
@@ -242,6 +255,13 @@ export function ActivityCreatePage() {
               />
             </div>
           )}
+          <TimeZoneField
+            label={t('timeZone.label')}
+            value={zoneOverride}
+            inheritedZone={inheritedZone}
+            onChange={setZoneOverride}
+            hint={t('timeZone.eventHint')}
+          />
         </FormSection>
 
         <FormSection title={t('newActivity.attendance')}>

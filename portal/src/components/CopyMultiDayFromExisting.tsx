@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
 import { groupsApi } from '../api/groupsApi.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../i18n/index.js';
-import { localDate } from '../lib/days.js';
+import { dateInput } from '../lib/zonedInput.js';
 import { Button } from './ui/Button.js';
 import { Card } from './ui/Card.js';
 import { Select } from './ui/Select.js';
@@ -85,7 +85,7 @@ export function CopyMultiDayFromExisting({ onApply }: Props) {
       title: row.event.title,
       description: row.event.description ?? '',
       dayCount: row.days.length,
-      sourceStart: localDate(row.days[0]!.startAt),
+      sourceStart: dateInput(row.days[0]!.startAt, row.days[0]!.effectiveTimeZone),
       newStart: date,
     });
     setOpen(false);

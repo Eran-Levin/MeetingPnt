@@ -85,6 +85,9 @@ model User {
   locale       String   @default("en")
   // Which app "Directions" opens (google_maps | waze). Plain text, validated against shared NavApp.
   navApp       String   @default("google_maps") @map("nav_app")
+  // The leader's default time zone (IANA name). Groups and events inherit it unless they set their
+  // own. Null until set; the portal fills it from the browser.
+  timeZone     String?  @map("time_zone")
   // The secret in their calendar subscription link — a calendar app can't log in, so the link is
   // the credential. Null until first asked for; replaced on reset, which kills the old link.
   calendarToken String? @unique @map("calendar_token")
@@ -170,6 +173,8 @@ model Group {
   description String?
   status      GroupStatus   @default(planned)
   chatMode    GroupChatMode @default(two_way) @map("chat_mode")
+  // Overrides the leader's zone for this group's events — a tour guide sets it once for the trip.
+  timeZone    String?       @map("time_zone")
   leaderId    String        @map("leader_id")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
@@ -275,6 +280,9 @@ model Activity {
   endAt         DateTime       @map("end_at")
   // Multi-day/date-only activity: clock times aren't meaningful and are hidden in the UI.
   allDay        Boolean        @default(false) @map("all_day")
+  // Overrides the group's (and so the leader's) zone for this event alone — one day of a trip that
+  // crosses zones. Null inherits.
+  timeZone      String?        @map("time_zone")
   transportMode TransportMode  @default(driving) @map("transport_mode")
   requiresRsvp  Boolean        @default(true) @map("requires_rsvp")
   // One place, no route: a yoga class in the same room every week. The clients show a single

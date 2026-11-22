@@ -18,6 +18,7 @@ import { EmptyState, SkeletonRows } from '../../components/ui/Skeleton.js';
 import { TextField } from '../../components/ui/TextField.js';
 import { useToast } from '../../components/ui/Toast.js';
 import { MultiDayActions } from '../../components/MultiDayActions.js';
+import { TimeZoneField } from '../../components/TimeZoneField.js';
 import { useAuthStore } from '../../store/authStore.js';
 
 const CHAT_MODES: GroupChatMode[] = ['two_way', 'announcements'];
@@ -141,6 +142,16 @@ export function GroupDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['groups', groupId] });
   }
 
+  async function handleTimeZoneChange(timeZone: string | null) {
+    try {
+      await groupsApi.update(groupId, { timeZone });
+      queryClient.invalidateQueries({ queryKey: ['groups', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['groups', groupId, 'activities'] });
+    } catch (err) {
+      showToast(apiErrorMessage(err, t('timeZone.saveFailed')));
+    }
+  }
+
   async function handleDeleteGroup() {
     const confirmed = window.confirm(
       t('groupPage.confirmDelete', { name: isolate(groupQuery.data?.group.name ?? '') }),
@@ -240,6 +251,15 @@ export function GroupDetailPage() {
                   </option>
                 ))}
               </Select>
+            )}
+            {isLeader && (
+              <TimeZoneField
+                ariaLabel={t('timeZone.label')}
+                value={groupQuery.data.group.timeZone}
+                inheritedZone={currentUser?.timeZone}
+                onChange={handleTimeZoneChange}
+                className="max-w-56 py-1.5"
+              />
             )}
             {isLeader && (
               <Button variant="danger" size="sm" disabled={deleting} onClick={handleDeleteGroup}>
@@ -426,7 +446,7 @@ export function GroupDetailPage() {
                   <Card className="flex flex-wrap items-center justify-between gap-2 transition-shadow hover:shadow-md">
                     <span className="font-medium text-ink">{activity.title}</span>
                     <span className="flex items-center gap-2 text-sm text-ink-secondary">
-                      {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+                      {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
                       <Badge status={activity.status} />
                     </span>
                   </Card>
@@ -459,7 +479,7 @@ export function GroupDetailPage() {
                         >
                           <span>{activity.title}</span>
                           <span className="flex items-center gap-2 text-ink-secondary">
-                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
                             <Badge status={activity.status} />
                           </span>
                         </Link>
@@ -497,7 +517,7 @@ export function GroupDetailPage() {
                           className="flex items-center justify-between py-2 text-sm hover:text-accent-text"
                         >
                           <span>
-                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale)}
+                            {formatActivityWhen(activity.startAt, activity.endAt, activity.allDay, locale, activity.effectiveTimeZone)}
                           </span>
                           <Badge status={activity.status} />
                         </Link>

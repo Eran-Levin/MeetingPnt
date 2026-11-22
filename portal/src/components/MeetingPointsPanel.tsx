@@ -3,7 +3,8 @@ import { SocketEvents } from '@meetingpnt/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { meetingPointsApi } from '../api/meetingPointsApi.js';
-import { isolate } from '@meetingpnt/shared';
+import { formatDateTime, isolate } from '@meetingpnt/shared';
+import { dateInput, inputToInstant, timeInput } from '../lib/zonedInput.js';
 import { apiErrorMessage, useLocale, useTranslation } from '../i18n/index.js';
 import { getSocket } from '../lib/socket.js';
 import { Button } from './ui/Button.js';
@@ -14,13 +15,19 @@ interface Props {
   currentMeetingPointId: string | null;
   /** One place, no route: the panel becomes a single meeting point with nothing to add to. */
   singleLocation: boolean;
+  /** The event's zone: stop times are read and written on its clock, not the browser's. */
+  timeZone: string | null;
 }
 
-/** Converts an ISO instant to the value a datetime-local input expects (local time, no zone). */
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** Converts an ISO instant to the value a datetime-local input expects (the zone's clock, no zone). */
+function toLocalInputValue(iso: string, timeZone: string | null): string {
+  return `${dateInput(iso, timeZone)}T${timeInput(iso, timeZone)}`;
+}
+
+/** The instant a datetime-local value means on the zone's clock. */
+function fromLocalInputValue(value: string, timeZone: string | null): Date {
+  const [date = '', time = ''] = value.split('T');
+  return inputToInstant(date, time, timeZone);
 }
 
 const fieldClass =
@@ -31,7 +38,12 @@ const fieldClass =
  * work down this list from their phone; stops they've reached are marked, and the plan can still
  * be edited ahead of the group.
  */
-export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLocation }: Props) {
+export function MeetingPointsPanel({
+  activityId,
+  currentMeetingPointId,
+  singleLocation,
+  timeZone,
+}: Props) {
   const { t } = useTranslation();
   const locale = useLocale();
   const queryClient = useQueryClient();
@@ -80,7 +92,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
   function startEditing(point: MeetingPoint) {
     setLabel(point.label ?? '');
     setGoogleMapsUrl(point.googleMapsUrl);
-    setTime(toLocalInputValue(point.time));
+    setTime(toLocalInputValue(point.time, timeZone));
     setFormError(null);
     setEditing(point.id);
   }
@@ -93,7 +105,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
       const dto = {
         label: label || undefined,
         googleMapsUrl,
-        time: new Date(time).toISOString(),
+        time: fromLocalInputValue(time, timeZone).toISOString(),
       };
       if (editing === 'new') await meetingPointsApi.create(activityId, dto);
       else if (editing) await meetingPointsApi.update(editing, dto);
@@ -176,7 +188,7 @@ export function MeetingPointsPanel({ activityId, currentMeetingPointId, singleLo
                     <span>
                       <span className="text-ink">{point.label || t('common.meetingPoint')}</span>{' '}
                       <span className="text-ink-muted">
-                        {new Date(point.time).toLocaleString(locale)}
+                        {formatDateTime(point.time, locale, timeZone)}
                       </span>
                       {isCurrent && (
                         <span className="ms-2 rounded-full bg-tone-accent-bg px-2 py-0.5 text-xs font-medium text-tone-accent-fg">

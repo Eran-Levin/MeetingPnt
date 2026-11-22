@@ -7,10 +7,11 @@ import type {
   GroupWithRole,
   UpdateGroupDto,
 } from '@meetingpnt/shared';
+import { resolveTimeZone } from '@meetingpnt/shared';
 import type { Group, GroupMember, Party, User } from '@prisma/client';
 import { copyMeetingPoints } from '../../db/geo.js';
 import { prisma } from '../../db/prisma.js';
-import { assertTimeZone, shiftDays } from '../../lib/shiftDays.js';
+import { shiftDays } from '../../lib/shiftDays.js';
 import { displayName } from '../../lib/userName.js';
 import { HttpError } from '../../middleware/errorHandler.js';
 
@@ -48,6 +49,7 @@ function toSharedGroup(group: Group, hasRunAnEvent = false): SharedGroup {
     description: group.description,
     status: deriveStatus(group.status, hasRunAnEvent),
     chatMode: group.chatMode,
+    timeZone: group.timeZone,
     leaderId: group.leaderId,
     createdAt: group.createdAt.toISOString(),
     updatedAt: group.updatedAt.toISOString(),
@@ -98,7 +100,7 @@ export async function assertMembership(groupId: string, userId: string) {
 export async function createGroup(leaderId: string, dto: CreateGroupDto) {
   const group = await prisma.$transaction(async (tx) => {
     const created = await tx.group.create({
-      data: { name: dto.name, description: dto.description, leaderId },
+      data: { name: dto.name, description: dto.description, timeZone: dto.timeZone ?? null, leaderId },
     });
     await tx.groupMember.create({
       data: { groupId: created.id, userId: leaderId, status: 'active' },
@@ -133,19 +135,19 @@ export async function duplicateGroup(
     throw new HttpError(403, 'leader_only_duplicate_group');
   }
 
-  const timeZone = dto.timeZone ?? 'UTC';
   const shift = dto.shiftDays ?? 0;
-  try {
-    assertTimeZone(timeZone);
-  } catch {
-    throw new HttpError(400, 'invalid_time_zone');
-  }
+  const leader = await prisma.user.findUnique({
+    where: { id: leaderId },
+    select: { timeZone: true },
+  });
 
   const created = await prisma.group.create({
     data: {
       name: dto.name,
       description: dto.description,
       chatMode: source.chatMode,
+      // A rerun of a trip happens where the trip happens, so the zone comes across unless changed.
+      timeZone: dto.timeZone === undefined ? source.timeZone : dto.timeZone,
       leaderId,
       members: { create: { userId: leaderId, status: 'active' } },
     },
@@ -156,7 +158,7 @@ export async function duplicateGroup(
       await copyRoster(sourceId, created.id, leaderId);
     }
     if (dto.copyEvents) {
-      await copyEvents(sourceId, created.id, leaderId, shift, timeZone);
+      await copyEvents(source, created, leaderId, shift, leader?.timeZone ?? null);
     }
   } catch (err) {
     // Half a copy is worse than none: the leader would find a group with some of the roster or
@@ -217,14 +219,15 @@ async function copyRoster(sourceId: string, targetId: string, leaderId: string) 
 }
 
 async function copyEvents(
-  sourceId: string,
-  targetId: string,
+  source: Group,
+  target: Group,
   leaderId: string,
   shiftDaysBy: number,
-  timeZone: string,
+  leaderTimeZone: string | null,
 ) {
+  const targetId = target.id;
   const events = await prisma.activity.findMany({
-    where: { groupId: sourceId, status: { not: 'cancelled' } },
+    where: { groupId: source.id, status: { not: 'cancelled' } },
     orderBy: { startAt: 'asc' },
   });
   if (events.length === 0) return;
@@ -232,14 +235,25 @@ async function copyEvents(
   // A series stays a series, under a new id so "publish all" on the copy can't touch the original.
   const newSeriesId = new Map<string, string>();
   const copies = events.map((event) => {
-    const startAt = shiftDays(event.startAt, shiftDaysBy, timeZone);
-    const endAt = shiftDays(event.endAt, shiftDaysBy, timeZone);
+    // Each event moves in its own zone, so an 08:00 start stays 08:00 there across a DST change.
+    const timeZone = resolveTimeZone({
+      activity: event.timeZone,
+      group: source.timeZone,
+      leader: leaderTimeZone,
+    });
+    const startAt = shiftDays(event.startAt, shiftDaysBy, timeZone ?? 'UTC');
+    const endAt = shiftDays(event.endAt, shiftDaysBy, timeZone ?? 'UTC');
     let seriesId: string | null = null;
     if (event.seriesId) {
       seriesId = newSeriesId.get(event.seriesId) ?? randomUUID();
       newSeriesId.set(event.seriesId, seriesId);
     }
-    return { event, id: randomUUID(), seriesId, startAt, endAt };
+    // The copy keeps meaning the same place: if the new group would put an event in a different
+    // zone than the source did, the event carries its zone explicitly instead of drifting.
+    const targetDefault = resolveTimeZone({ group: target.timeZone, leader: leaderTimeZone });
+    const eventZone =
+      event.timeZone ?? (timeZone !== null && timeZone !== targetDefault ? timeZone : null);
+    return { event, id: randomUUID(), seriesId, startAt, endAt, eventZone };
   });
 
   // A multi-day event stays one: its days arrive grouped under a new container, so the copy shows
@@ -266,7 +280,7 @@ async function copyEvents(
   }
 
   await prisma.activity.createMany({
-    data: copies.map(({ event, id, seriesId, startAt, endAt }) => ({
+    data: copies.map(({ event, id, seriesId, startAt, endAt, eventZone }) => ({
       id,
       groupId: targetId,
       seriesId,
@@ -278,6 +292,7 @@ async function copyEvents(
       startAt,
       endAt,
       allDay: event.allDay,
+      timeZone: eventZone,
       transportMode: event.transportMode,
       requiresRsvp: event.requiresRsvp,
       singleLocation: event.singleLocation,

@@ -1,5 +1,5 @@
 import type { MeetingPoint } from '@meetingpnt/shared';
-import { joinDot, navigationUrl } from '@meetingpnt/shared';
+import { formatDateTime, joinDot, navigationUrl } from '@meetingpnt/shared';
 import { Linking, Text } from 'react-native';
 import { useLocale, useTranslation } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
@@ -13,9 +13,12 @@ import { Row, Section, StepMarker, color, text } from '../../ui';
 export function RouteList({
   points,
   currentPointId,
+  timeZone,
 }: {
   points: MeetingPoint[];
   currentPointId: string | null;
+  /** The event's zone: stop times read on its clock, not the phone's. */
+  timeZone?: string | null;
 }) {
   const { t } = useTranslation();
   const locale = useLocale();
@@ -33,7 +36,7 @@ export function RouteList({
             key={point.id}
             title={point.label || t('common.meetingPoint')}
             subtitle={joinDot([
-              new Date(point.time).toLocaleString(locale),
+              formatDateTime(point.time, locale, timeZone),
               isCurrent ? t('route.headingHere') : visited ? t('route.done') : null,
             ])}
             leading={<StepMarker label={String(index + 1)} active={isCurrent} />}

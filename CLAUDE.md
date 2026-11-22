@@ -103,6 +103,18 @@ ordinary events in the same group, and they *do* take RSVPs.
 - **Every activity has a start and an end.** `allDay` activities are date-only (multi-day trips);
   timed ones are one date plus two clock times. Render both via `formatActivityWhen` in
   `shared/src/utils` so the two clients can't drift.
+- **An event runs in a time zone, set at three levels: the event, its group, the leader** (MPNT-34).
+  `activity.timeZone ?? group.timeZone ?? leader.timeZone`, resolved only by `resolveTimeZone` in
+  `shared/src/utils/timeZone.ts`; the API gives each activity its answer as `effectiveTimeZone`. The
+  leader's default is set from the browser on first portal load and edited in the portal header; a
+  group sets its own when it travels (a tour abroad); one day of a trip that crosses zones sets its
+  own. Start and end stay absolute instants — the zone decides what the clock *reads*, where a day
+  begins and ends, and which wall clock a shift preserves. Forms read and write times on the event's
+  clock (`portal/src/lib/zonedInput.ts`), so a leader in Tel Aviv planning Denver types Denver's
+  08:00. **Null means nobody has set one yet** (a leader from before zones who hasn't opened the
+  portal): clients then render in the viewer's zone, exactly as before, instead of guessing UTC.
+  Not yet on the event's clock: the mobile create/edit forms, the mobile stop editor, the groups
+  list's "next event", and series recurrence across a DST change (MPNT-31).
 - **Copying an activity carries its shape, not its history.** The portal's "Copy from existing" fills
   the create form from any activity the leader runs, in any group, moved to a new date. Title,
   description, transport, RSVP and single-location settings and every stop come across; each stop keeps

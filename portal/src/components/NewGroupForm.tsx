@@ -98,7 +98,6 @@ export function NewGroupForm({ groups, onDone }: Props) {
           copyEvents,
           shiftDays:
             copyEvents && firstDate && newFirstDate ? daysBetween(firstDate, newFirstDate) : 0,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
         queryClient.invalidateQueries({ queryKey: ['groups'] });
         // Straight to the new group: everything about it is editable from there.

@@ -1,6 +1,8 @@
 import { NavApp } from '../enums/index.js';
+import { zonedDateKey } from './timeZone.js';
 
 export * from './calendar.js';
+export * from './timeZone.js';
 
 export function isBeforeStartTime(startAt: string, now: Date = new Date()): boolean {
   return now.getTime() < new Date(startAt).getTime();
@@ -38,29 +40,37 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
  *   all-day, range   -> "18 Jul – 25 Jul"
  *
  * Shared so the portal and mobile never drift apart on this.
+ *
+ * `timeZone` is the event's effective zone: a photo tour in Denver reads "08:00" to everyone, not
+ * the viewer's own conversion. Without one (nobody has set a zone yet) it reads in the viewer's zone.
  */
 export function formatActivityWhen(
   startAt: string,
   endAt: string,
   allDay: boolean,
   locale?: string,
+  timeZone?: string | null,
 ): string {
   const start = new Date(startAt);
   const end = new Date(endAt);
-  const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+  const zone = timeZone || undefined;
+  const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', timeZone: zone };
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', timeZone: zone };
+  const sameDay = zone
+    ? zonedDateKey(start, zone) === zonedDateKey(end, zone)
+    : isSameCalendarDay(start, end);
 
   const startDate = start.toLocaleDateString(locale, dateOpts);
   const endDate = end.toLocaleDateString(locale, dateOpts);
 
   if (allDay) {
-    return isSameCalendarDay(start, end) ? startDate : `${startDate} – ${endDate}`;
+    return sameDay ? startDate : `${startDate} – ${endDate}`;
   }
 
   const startTime = start.toLocaleTimeString(locale, timeOpts);
   const endTime = end.toLocaleTimeString(locale, timeOpts);
 
-  return isSameCalendarDay(start, end)
+  return sameDay
     ? `${startDate}, ${startTime} – ${endTime}`
     : `${startDate}, ${startTime} – ${endDate}, ${endTime}`;
 }

@@ -28,6 +28,7 @@ import type {
   updateAttendanceSchema,
   updateGroupSchema,
   updateMeetingPointSchema,
+  updateTimeZoneSchema,
 } from '../schemas/index.js';
 import type { User } from '../types/index.js';
 
@@ -72,3 +73,4 @@ export interface PaginatedResult<T> {
   page: number;
   pageSize: number;
 }
+export type UpdateTimeZoneDto = z.infer<typeof updateTimeZoneSchema>;

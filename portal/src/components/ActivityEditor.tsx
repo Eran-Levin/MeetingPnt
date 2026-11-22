@@ -3,6 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { activitiesApi } from '../api/activitiesApi.js';
 import { apiErrorMessage, useTranslation } from '../i18n/index.js';
+import { useInheritedZone } from '../lib/useInheritedZone.js';
+import { dateInput, inputToInstant, timeInput } from '../lib/zonedInput.js';
+import { TimeZoneField } from './TimeZoneField.js';
 import { Button } from './ui/Button.js';
 import { Select } from './ui/Select.js';
 import { TextArea, TextField } from './ui/TextField.js';
@@ -13,18 +16,6 @@ const TRANSPORT_MODES: TransportMode[] = ['driving', 'walking', 'bicycling', 'tr
 interface Props {
   activity: Activity;
   onDone: () => void;
-}
-
-function toDateInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function toTimeInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /**
@@ -40,23 +31,32 @@ export function ActivityEditor({ activity, onDone }: Props) {
   const [description, setDescription] = useState(activity.description ?? '');
   const [transportMode, setTransportMode] = useState<TransportMode>(activity.transportMode);
   const [allDay, setAllDay] = useState(activity.allDay);
-  const [date, setDate] = useState(toDateInput(activity.startAt));
-  const [endDate, setEndDate] = useState(toDateInput(activity.endAt));
-  const [startTime, setStartTime] = useState(toTimeInput(activity.startAt));
-  const [endTime, setEndTime] = useState(toTimeInput(activity.endAt));
+  // The inputs show the event's clock, not the browser's: a tour in Denver edited from Tel Aviv
+  // still reads 08:00.
+  const [zoneOverride, setZoneOverride] = useState<string | null>(activity.timeZone);
+  const inheritedZone = useInheritedZone(activity.groupId);
+  const zone = zoneOverride ?? (activity.timeZone === null ? activity.effectiveTimeZone : inheritedZone);
+  const [date, setDate] = useState(dateInput(activity.startAt, activity.effectiveTimeZone));
+  const [endDate, setEndDate] = useState(dateInput(activity.endAt, activity.effectiveTimeZone));
+  const [startTime, setStartTime] = useState(timeInput(activity.startAt, activity.effectiveTimeZone));
+  const [endTime, setEndTime] = useState(timeInput(activity.endAt, activity.effectiveTimeZone));
   const [requiresRsvp, setRequiresRsvp] = useState(activity.requiresRsvp);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const notYetRun = activity.status === 'draft' || activity.status === 'published';
-  const minDate = notYetRun ? toDateInput(new Date().toISOString()) : undefined;
+  const minDate = notYetRun ? dateInput(new Date().toISOString(), zone) : undefined;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const start = allDay ? new Date(`${date}T00:00:00`) : new Date(`${date}T${startTime}`);
-    const end = allDay ? new Date(`${endDate || date}T23:59:59`) : new Date(`${date}T${endTime}`);
+    const start = allDay
+      ? inputToInstant(date, '00:00:00', zone)
+      : inputToInstant(date, startTime, zone);
+    const end = allDay
+      ? inputToInstant(endDate || date, '23:59:59', zone)
+      : inputToInstant(date, endTime, zone);
 
     if (end <= start) {
       setError(allDay ? t('newActivity.endDateBeforeStart') : t('newActivity.endTimeBeforeStart'));
@@ -80,6 +80,7 @@ export function ActivityEditor({ activity, onDone }: Props) {
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
+        timeZone: zoneOverride,
         requiresRsvp,
       });
       queryClient.invalidateQueries({ queryKey: ['activities', activity.id] });
@@ -146,6 +147,14 @@ export function ActivityEditor({ activity, onDone }: Props) {
           <TextField label={t('newActivity.endTime')} type="time" required min={startTime} value={endTime} onChange={(e) => setEndTime(e.target.value)} />
         </div>
       )}
+
+      <TimeZoneField
+        label={t('timeZone.label')}
+        value={zoneOverride}
+        inheritedZone={inheritedZone}
+        onChange={setZoneOverride}
+        hint={t('timeZone.eventHint')}
+      />
 
       <p className="text-xs text-ink-secondary">{t('activityEditor.shiftNote')}</p>
 
