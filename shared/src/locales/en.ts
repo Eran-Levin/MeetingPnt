@@ -838,8 +838,8 @@ export const en = {
   },
   timeZone: {
     label: 'Time zone',
-    inherit: 'Same as {{zone}}',
-    inheritDevice: 'Same as this device ({{zone}})',
+    inherit: '{{zone}}',
+    inheritDevice: '{{zone}}',
     groupHint: "Where this group's events happen. Leave it unless the group travels, like a tour abroad.",
     eventHint: 'Only if this event is in a different zone from its group.',
     saveFailed: 'Could not save the time zone.',
