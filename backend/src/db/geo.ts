@@ -78,6 +78,20 @@ export async function listFirstMeetingPoints(
   `;
 }
 
+/** The first stop on each activity's plan, with its time — where an all-day event begins, and
+ * where the group is taken to be until the leader moves them on. One query for any number. */
+export async function listFirstStops(
+  activityIds: string[],
+): Promise<{ activityId: string; id: string; time: Date }[]> {
+  if (activityIds.length === 0) return [];
+  return prisma.$queryRaw`
+    SELECT DISTINCT ON (activity_id) activity_id AS "activityId", id, time
+    FROM meeting_points
+    WHERE activity_id IN (${Prisma.join(activityIds)})
+    ORDER BY activity_id, created_at ASC
+  `;
+}
+
 /** The stops the group has actually reached, oldest first. */
 export async function listArrivedMeetingPoints(activityId: string): Promise<MeetingPointRow[]> {
   return prisma.$queryRaw<MeetingPointRow[]>`

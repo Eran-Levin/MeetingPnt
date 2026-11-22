@@ -18,6 +18,7 @@ import { HttpError } from '../../middleware/errorHandler.js';
 import { parseGoogleMapsUrl } from '../../lib/googleMapsUrlParser.js';
 import { getIO } from '../../realtime/index.js';
 import { assertActivityParticipant } from '../activities/service.js';
+import { withEffectiveStatus } from '../activities/status.js';
 
 function toSharedMeetingPoint(row: MeetingPointRow): SharedMeetingPoint {
   return {

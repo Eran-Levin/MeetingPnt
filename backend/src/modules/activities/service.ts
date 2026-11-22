@@ -17,9 +17,7 @@ import { HttpError } from '../../middleware/errorHandler.js';
 import { shiftDays } from '../../lib/shiftDays.js';
 import {
   copyMeetingPoints,
-  getNextPlannedMeetingPoint,
   insertMeetingPoint,
-  markMeetingPointArrived,
   shiftMeetingPointTimes,
 } from '../../db/geo.js';
 import { sendPushNotifications } from '../../lib/expoPushClient.js';
@@ -33,29 +31,28 @@ import {
   prepareMultiDayInvitations,
 } from '../calendar/invitations.js';
 import { assertMembership } from '../groups/service.js';
-
-/** The two inherited levels of an event's time zone: its group's own, and its leader's default. */
-type InheritedZones = { group: string | null; leader: string | null };
-
-/** One query for the zones of every group in a result, so a list stays a single round trip. */
-async function loadInheritedZones(groupIds: string[]): Promise<Map<string, InheritedZones>> {
-  const groups = await prisma.group.findMany({
-    where: { id: { in: [...new Set(groupIds)] } },
-    select: { id: true, timeZone: true, leader: { select: { timeZone: true } } },
-  });
-  return new Map(groups.map((g) => [g.id, { group: g.timeZone, leader: g.leader.timeZone }]));
-}
+import {
+  currentStopIdOf,
+  loadInheritedZones,
+  loadStatusContext,
+  statusOf,
+  withEffectiveStatus,
+  zoneOf,
+  type InheritedZones,
+  type StatusContext,
+} from './status.js';
 
 async function toSharedActivities(activities: Activity[]): Promise<SharedActivity[]> {
-  const zones = await loadInheritedZones(activities.map((a) => a.groupId));
-  return activities.map((a) => buildSharedActivity(a, zones.get(a.groupId)));
+  const ctx = await loadStatusContext(activities);
+  return activities.map((a) => buildSharedActivity(a, ctx));
 }
 
 async function toSharedActivity(activity: Activity): Promise<SharedActivity> {
   return (await toSharedActivities([activity]))[0]!;
 }
 
-function buildSharedActivity(activity: Activity, inherited?: InheritedZones): SharedActivity {
+function buildSharedActivity(activity: Activity, ctx: StatusContext): SharedActivity {
+  const status = statusOf(activity, ctx);
   return {
     id: activity.id,
     groupId: activity.groupId,
@@ -67,16 +64,14 @@ function buildSharedActivity(activity: Activity, inherited?: InheritedZones): Sh
     endAt: activity.endAt.toISOString(),
     allDay: activity.allDay,
     timeZone: activity.timeZone,
-    effectiveTimeZone: resolveTimeZone({
-      activity: activity.timeZone,
-      group: inherited?.group,
-      leader: inherited?.leader,
-    }),
+    effectiveTimeZone: zoneOf(activity, ctx),
     transportMode: activity.transportMode,
     requiresRsvp: activity.requiresRsvp,
     singleLocation: activity.singleLocation,
-    status: activity.status,
-    currentMeetingPointId: activity.currentMeetingPointId,
+    status,
+    startedAt: activity.startedAt?.toISOString() ?? null,
+    endedAt: activity.endedAt?.toISOString() ?? null,
+    currentMeetingPointId: currentStopIdOf(activity, ctx, status),
     leaderBroadcastUntil: activity.leaderBroadcastUntil?.toISOString() ?? null,
     createdBy: activity.createdBy,
     createdAt: activity.createdAt.toISOString(),
@@ -402,11 +397,17 @@ async function loadMultiDayForLeader(multiDayEventId: string, requesterId: strin
     throw new HttpError(404, 'multi_day_event_not_found');
   }
   await assertGroupLeader(multiDay.groupId, requesterId);
-  return multiDay;
+  // The days carry their status as it is right now, since "has a day started" is what move and
+  // delete ask of them.
+  const ctx = await loadStatusContext(multiDay.days);
+  return {
+    ...multiDay,
+    days: multiDay.days.map((day) => ({ ...day, status: statusOf(day, ctx) })),
+  };
 }
 
 /** The zone a stored event runs in, given the two levels above it. */
-function zoneOf(activity: { timeZone: string | null }, inherited?: InheritedZones): string | null {
+function inheritedZoneOf(activity: { timeZone: string | null }, inherited?: InheritedZones): string | null {
   return resolveTimeZone({ activity: activity.timeZone, group: inherited?.group, leader: inherited?.leader });
 }
 
@@ -473,8 +474,8 @@ export async function moveMultiDayEvent(
   // Each day moves in its own zone, so a trip that crosses zones keeps every day's wall clock.
   const moved = multiDay.days.map((day) => ({
     day,
-    startAt: shiftDays(day.startAt, dto.shiftDays, zoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
-    endAt: shiftDays(day.endAt, dto.shiftDays, zoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
+    startAt: shiftDays(day.startAt, dto.shiftDays, inheritedZoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
+    endAt: shiftDays(day.endAt, dto.shiftDays, inheritedZoneOf(day, inherited) ?? SHIFT_FALLBACK_ZONE),
   }));
   // Same rule as rescheduling one event: nothing that hasn't run can be planned into the past.
   if (dto.shiftDays !== 0 && moved.some((m) => m.startAt.getTime() < Date.now())) {
@@ -542,7 +543,7 @@ export async function copyMultiDayEvent(
 
   try {
     const copies = days.map((day) => {
-      const dayZone = zoneOf(day, sourceZones);
+      const dayZone = inheritedZoneOf(day, sourceZones);
       const shiftZone = dayZone ?? SHIFT_FALLBACK_ZONE;
       return {
         day,
@@ -553,7 +554,7 @@ export async function copyMultiDayEvent(
         // zone than the source did, the day carries its zone explicitly rather than drifting.
         timeZone:
           day.timeZone ??
-          (dayZone !== null && dayZone !== zoneOf({ timeZone: null }, targetZones) ? dayZone : null),
+          (dayZone !== null && dayZone !== inheritedZoneOf({ timeZone: null }, targetZones) ? dayZone : null),
       };
     });
     await prisma.activity.createMany({
@@ -790,65 +791,59 @@ export async function publishActivity(activityId: string, requesterId: string) {
   return { activity: await toSharedActivity(updated), invited };
 }
 
-/** Marks an event as running. Purely a signal to members and the leader's own UI —
- * nothing is gated on it, unlike ending. */
+/**
+ * "Start now": the leader opens the event ahead of its scheduled time. Events begin on their own
+ * when their time comes, so this only matters for one that is early — it records the moment, and
+ * everything that follows from "running" follows from it.
+ */
 export async function startActivity(activityId: string, requesterId: string) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
 
-  if (activity.status !== 'published') {
+  if (activity.status !== 'published' || (await withEffectiveStatus(activity)).status !== 'published') {
     throw new HttpError(409, 'start_published_only');
   }
 
-  // Within a group, starting is a handover: day 3 of a trek takes over from day 2, which is what
-  // keeps a multi-day trip continuous. The old event runs right up to the moment the new one
-  // begins, so location sharing never lapses overnight — the gap between an evening's end and the
-  // next morning's start is exactly when a guide is most likely to need to find someone.
-  const runningInGroup = await prisma.activity.findFirst({
-    where: { status: 'in_progress', groupId: activity.groupId },
+  // Within a group, starting is a handover: the event that was running takes its leave the moment
+  // this one begins, so a trip stays continuous and location sharing never lapses between them.
+  // Another group's event is left alone — silently ending it would close sharing on people still
+  // out there. Two events at once is the leader's to arrange; it is not refused.
+  const now = new Date();
+  const candidates = await prisma.activity.findMany({
+    where: {
+      groupId: activity.groupId,
+      id: { not: activityId },
+      status: 'published',
+      endedAt: null,
+      endAt: { gte: new Date(now.getTime() - 2 * 24 * 3_600_000) },
+      OR: [{ startedAt: { not: null } }, { startAt: { lte: now } }],
+    },
   });
-  if (runningInGroup) {
+  const ctx = await loadStatusContext(candidates);
+  for (const running of candidates.filter((c) => statusOf(c, ctx, now) === 'in_progress')) {
     await prisma.activity.update({
-      where: { id: runningInGroup.id },
-      data: { status: 'completed', leaderBroadcastUntil: null },
+      where: { id: running.id },
+      data: { endedAt: now, leaderBroadcastUntil: null },
     });
-  }
-
-  // Across groups it stays a refusal. A leader can't be in two places at once, and silently
-  // ending someone else's running event would close location sharing on a group still out there
-  // — the one case where doing it quietly is worse than saying no.
-  const runningElsewhere = await prisma.activity.findFirst({
-    where: { status: 'in_progress', group: { leaderId: requesterId } },
-  });
-  if (runningElsewhere) {
-    throw new HttpError(409, 'already_running_elsewhere', { title: runningElsewhere.title });
-  }
-
-  // Starting the event puts the group at the first stop on the plan — that's what "we're meeting
-  // at the clock tower at nine" means. Without this the event would run with nowhere marked as
-  // current, so nobody would have a destination and ETAs would have nothing to measure to.
-  const firstPoint = await getNextPlannedMeetingPoint(activityId);
-  if (firstPoint) {
-    await markMeetingPointArrived(firstPoint.id);
   }
 
   const updated = await prisma.activity.update({
     where: { id: activityId },
-    data: {
-      status: 'in_progress',
-      ...(firstPoint ? { currentMeetingPointId: firstPoint.id } : {}),
-    },
+    data: { startedAt: now },
   });
   return toSharedActivity(updated);
 }
 
-/** Ends an event. Location sharing and pings stop working from here on — there's no reason
- * to keep locating people after an event is over (see locations/service.ts). */
+/**
+ * "End activity": the leader closes the event before it would have closed itself. Location sharing
+ * and pings stop working from here on — there's no reason to keep locating people after an event
+ * is over (see locations/service.ts).
+ */
 export async function endActivity(activityId: string, requesterId: string) {
   const activity = await getActivityOrThrow(activityId);
   await assertGroupLeader(activity.groupId, requesterId);
 
-  if (activity.status !== 'published' && activity.status !== 'in_progress') {
+  if (activity.status !== 'published' || (await withEffectiveStatus(activity)).status === 'completed') {
     throw new HttpError(409, 'end_published_or_running_only');
   }
 
@@ -856,7 +851,7 @@ export async function endActivity(activityId: string, requesterId: string) {
   // would lapse on its own within the quarter hour, but "the event is over" should stop it now.
   const updated = await prisma.activity.update({
     where: { id: activityId },
-    data: { status: 'completed', leaderBroadcastUntil: null },
+    data: { endedAt: new Date(), leaderBroadcastUntil: null },
   });
   return toSharedActivity(updated);
 }
@@ -921,6 +916,7 @@ export async function listMyActivities(userId: string): Promise<ActivityWithGrou
   const visible = activities.filter(
     (activity) => activity.group.leaderId === userId || activity.status !== 'draft',
   );
+  const ctx = await loadStatusContext(visible);
 
   // "Day 3 of 5" counts the days the caller can see across the whole event, not just those inside
   // the timeline's window — a trip in its last days has most of its days behind the lookback.
@@ -942,10 +938,7 @@ export async function listMyActivities(userId: string): Promise<ActivityWithGrou
     .map((activity) => {
       const days = activity.multiDayEvent ? (daysOf.get(activity.multiDayEvent.id) ?? []) : [];
       return {
-        ...buildSharedActivity(activity, {
-          group: activity.group.timeZone,
-          leader: activity.group.leader.timeZone,
-        }),
+        ...buildSharedActivity(activity, ctx),
         group: { id: activity.group.id, name: activity.group.name },
         multiDay: activity.multiDayEvent
           ? {
@@ -972,7 +965,8 @@ export async function deleteActivity(activityId: string, requesterId: string) {
 
   // Only an event that hasn't happened can be deleted. One that is running or over is a record —
   // who was at which stop, what a class is billed from — and ending it is how it is closed.
-  if (activity.status === 'in_progress' || activity.status === 'completed') {
+  const now = (await withEffectiveStatus(activity)).status;
+  if (now === 'in_progress' || now === 'completed') {
     throw new HttpError(409, 'delete_not_started_only');
   }
 

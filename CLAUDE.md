@@ -42,13 +42,25 @@ ordinary events in the same group, and they *do* take RSVPs.
 
 ## Model decisions worth knowing
 
-- **Starting an event hands over from the one already running in that group.** Day 3 of a trek
-  takes over from day 2 rather than being refused, which is what keeps a multi-day trip continuous:
-  the old event runs right up to the new one starting, so location sharing never lapses overnight —
-  the gap between an evening's end and the next morning's start is exactly when a guide most needs
-  to find someone. Across *different* groups it stays a 409: a leader can't be in two places at
-  once, and silently ending another group's event would close sharing on people still out there.
-  This only tidies up when there *is* a next start (see BACKLOG for the sweep that finishes it).
+- **Whether an event is running or over is derived from the clock, not from a button** (MPNT-34).
+  Only draft, published and cancelled are stored; `in_progress` and `completed` come from
+  `effectiveStatus` in `shared/src/utils/activityStatus.ts`, which the API applies to every
+  activity's `status` (`backend/src/modules/activities/status.ts`) and every gate reads through —
+  location sharing, leaving, the socket room, delete, move. Nothing is written when status changes.
+  - **Begins** at its scheduled start; an all-day event at its first planned stop that day, else at
+    the start of its day. **Ends** at the first of: the leader's "End activity" (`endedAt`); for a
+    day of a multi-day event that has a next day, the moment that next day begins (so location
+    sharing never lapses overnight — the gap between an evening's end and the next morning's start
+    is exactly when a guide most needs to find someone); else the end of the day it was scheduled to
+    finish on, in the event's time zone. An event in *another* group never ends this one.
+  - **"Start now" / "End activity" are overrides**, stored as `Activity.startedAt` / `endedAt` —
+    also the actual times for a later review. "Start now" within a group ends whatever was running
+    there (the handover); it never touches another group's event.
+  - **The group is at the first stop until the leader moves them on** — `currentMeetingPointId` in
+    the API is the stored one, else the first stop while the event runs. The first "Next stop"
+    records the arrival at the first, then moves to the second.
+  - Not built yet: the quiet "running over" state past the scheduled end, and the overlap warning
+    (MPNT-34).
 - **A multi-day event is a container of day events** (`MultiDayEvent`, MPNT-33). A trip, or a
   workshop weekend inside a standing group: the leader plans and publishes it as one thing, while
   each day stays a real event with its own stops and roll call (see "a day is an event" above).
@@ -127,9 +139,10 @@ ordinary events in the same group, and they *do* take RSVPs.
   browser, since the server runs UTC) so an 08:00 start stays 08:00 across a daylight-saving change.
   Same shape as copying an activity: the shape comes across, the history doesn't. All of it is
   editable afterwards on the new group.
-- **A leader runs one event at a time.** `startActivity` refuses (409) if that leader already has
-  an activity `in_progress` — they can't be in two places at once. Scoped per leader, so other
-  leaders are unaffected. Ending one frees them to start the next.
+- **Two events at once for one leader is a warning, never a block.** `startActivity` used to refuse
+  (409) while the leader had another event running; with events starting on their own that would
+  refuse a button for something already true. The overlap warning at publish is still to build
+  (MPNT-34).
 - **A member can leave an event that is under way.** It is a self-marked `absent` at the stop the
   group is at (`leaveActivity` in the attendance service, `markedBy` = themselves), so the roster
   narrowing needs no new rule: they drop off every later stop, keep credit for earlier ones, and
@@ -139,7 +152,7 @@ ordinary events in the same group, and they *do* take RSVPs.
   which stops being possible once the group moves on (they're off that roster). Leaders can't
   leave; they end the event.
 - **Ending an event closes location sharing.** OMW and pings return 409 once an activity is
-  `completed`, and the socket room refuses joins. Attendance stays editable — leaders reconcile
+  `completed` (by the clock or "End activity"), and the socket room refuses joins. Attendance stays editable — leaders reconcile
   after the fact.
 - **A leader who signs up on their own confirms their email before creating a group.** Nobody
   else is asked: a member arrives through a link that was emailed to them, which already proves the

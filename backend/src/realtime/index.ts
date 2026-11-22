@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { corsOrigins, env } from '../config/env.js';
 import { prisma } from '../db/prisma.js';
 import { verifyAccessToken } from '../lib/jwt.js';
+import { withEffectiveStatus } from '../modules/activities/status.js';
 
 let io: SocketIOServer | null = null;
 
@@ -75,7 +76,8 @@ export function createRealtimeServer(httpServer: HttpServer): SocketIOServer {
         const activity = await prisma.activity.findUnique({ where: { id: activityId } });
         if (!activity) return ack?.(false);
         // Ended activities stream nothing, matching the location gate in locations/service.ts.
-        if (activity.status === 'completed' || activity.status === 'cancelled') return ack?.(false);
+        const status = (await withEffectiveStatus(activity)).status;
+        if (status === 'completed' || status === 'cancelled') return ack?.(false);
         const group = await prisma.group.findUnique({ where: { id: activity.groupId } });
         const isLeader = group?.leaderId === userId;
         const isApproved =

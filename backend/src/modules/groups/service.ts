@@ -37,7 +37,14 @@ async function groupIdsWithRunEvents(groupIds: string[]): Promise<Set<string>> {
   if (groupIds.length === 0) return new Set();
   const rows = await prisma.activity.groupBy({
     by: ['groupId'],
-    where: { groupId: { in: groupIds }, status: { in: ['in_progress', 'completed'] } },
+    // Started by the clock or by the leader. A published event whose time has come has begun; this
+    // is the cheap version of asking each event's status. An all-day event counts from the start of
+    // its day rather than from its first stop.
+    where: {
+      groupId: { in: groupIds },
+      status: 'published',
+      OR: [{ startedAt: { not: null } }, { startAt: { lte: new Date() } }],
+    },
   });
   return new Set(rows.map((row) => row.groupId));
 }
@@ -327,7 +334,8 @@ export async function listMyGroups(userId: string): Promise<GroupWithRole[]> {
     where: {
       groupId: { in: groups.map((g) => g.id) },
       endAt: { gte: new Date() },
-      status: { in: ['published', 'in_progress'] },
+      status: 'published',
+      endedAt: null,
     },
     _min: { startAt: true },
   });
