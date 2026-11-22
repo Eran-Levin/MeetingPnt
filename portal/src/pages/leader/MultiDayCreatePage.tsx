@@ -6,6 +6,7 @@ import {
   CopyMultiDayFromExisting,
   type MultiDayCopy,
 } from '../../components/CopyMultiDayFromExisting.js';
+import { TimeZoneField } from '../../components/TimeZoneField.js';
 import { Button } from '../../components/ui/Button.js';
 import { Card } from '../../components/ui/Card.js';
 import { PageContainer } from '../../components/ui/PageContainer.js';
@@ -47,6 +48,8 @@ export function MultiDayCreatePage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const inheritedZone = useInheritedZone(groupId);
+  /** Null = the days inherit the group's (or the leader's) zone. */
+  const [zoneOverride, setZoneOverride] = useState<string | null>(null);
 
   const dayCount = copy
     ? copy.dayCount
@@ -109,9 +112,11 @@ export function MultiDayCreatePage() {
           const day = addDays(startDate, index);
           return {
             title: t('multiDay.dayTitle', { title, n: index + 1 }),
-            // Day boundaries on the group's clock, so a trip abroad starts at its own midnight.
-            startAt: inputToInstant(day, '00:00:00', inheritedZone).toISOString(),
-            endAt: inputToInstant(day, '23:59:59', inheritedZone).toISOString(),
+            // Day boundaries on the trip's clock, so a trip abroad starts at its own midnight.
+            startAt: inputToInstant(day, '00:00:00', zoneOverride ?? inheritedZone).toISOString(),
+            endAt: inputToInstant(day, '23:59:59', zoneOverride ?? inheritedZone).toISOString(),
+            // Saved on each day, so one can be moved to another zone later.
+            timeZone: zoneOverride,
           };
         }),
         transportMode,
@@ -188,6 +193,13 @@ export function MultiDayCreatePage() {
           )}
           {!copy && (
             <>
+              <TimeZoneField
+                label={t('timeZone.label')}
+                value={zoneOverride}
+                inheritedZone={inheritedZone}
+                onChange={setZoneOverride}
+                hint={t('timeZone.eventHint')}
+              />
               <Select
                 label={t('newActivity.transport')}
                 value={transportMode}
